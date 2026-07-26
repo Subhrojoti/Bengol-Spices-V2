@@ -1,0 +1,75 @@
+Live Server /live Preview 
+
+Prettier 
+
+Line Wrap
+
+Tab Size From 4 to 2
+
+Tech needed - FrontEnd
+# React Js
+# Redux Toolkit
+# Tailwind 
+# Material UI
+# Smooth Scroll
+# 
+
+BackEnd 
+# Node Js
+# MongoDB - NoSql
+# NodeMon
+# Salt-Bycrpt
+# Express Js
+# PostMan
+
+Future Enhancement 
+
+- Assign Location Revoke
+- CSV file transfer
+- Dynamic Login Image Change Througn Admin Pannel
+- Auto Suggent State-Wise/nearest Delivery Partner (During Assign Delivery)
+- Auto reminder before due date
+-🔐 Webhook (auto verify instead of frontend)
+- Websocket For Live Chat
+- Assign Location to Agent History
+
+
+Need to Fix
+- My cart Icon update Issue
+- Quatity Update in Mycart Screen
+- Login Page Image update for All Login 
+- Proper Routing
+- All registration page instant photo click and upload changes
+- Permission Updated fix re-login should not be required
+
+Need To Do
+canSetTarget // permission
+Target feature
+Sale Area
+Due payment Integration
+Invoice Generation
+Cupon Code
+policy Page
+Agent DashBoard
+Employee Dashboard ---> same as Admin Dashboard
+Integration of Product Barcode Scan//
+-CSV file transfer
+
+Bank Details - Admin Screen
+Agent Detils underOder ID
+Agent Target
+
+
+Need One Search API for Admin and Employee so that They can search anyAgent By agentID
+
+Delivery App Pending APIs
+- Profile settings (info)
+- notifications
+- new Tab , completed tab deliveredOrders/Returns
+
+
+Fetures need to added
+- Notification after given access to employee.
+
+-New feature 
+per packet commission daily target

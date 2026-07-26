@@ -1,0 +1,7 @@
+Challanges I have faced
+
+- Delivered Product stays their even it get delivered
+- Integration Of RazorPay API
+- Integration of Notification
+- Set Daily target
+- How to Assign Location to the Agent

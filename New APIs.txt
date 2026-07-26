@@ -1,0 +1,62 @@
+// Collect Payment Agent Access Only
+
+curl --location 'http://localhost:8000/agent/orders/ORD2026-0015/collect-payment' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzIwMDlmNTg3YWEyMGI4ZGVmMmNlNyIsImFnZW50SWQiOiJCUzIwMjYtMDAxIiwicm9sZSI6IkFHRU5UIiwiaWF0IjoxNzczNTIyNjIyLCJleHAiOjE3NzYxMTQ2MjJ9.fHG6TxkOvDWPdqm4XMSVfg9ObG963wVGpMrkeeIHhWI' \
+--header 'Content-Type: application/json' \
+--data '{
+  "amount": 550,
+  "method": "CASH",
+  "note": "Full payment collected"
+}'
+
+// Get PaymentInfo With orderID Admin and allowed Employee
+
+curl --location 'http://localhost:8000/agent/orders/ORD2026-0015/payments' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzM1MjM5MjYsImV4cCI6MTc3MzYxMDMyNn0.ksLUcnenwi0s1MswMOcLxh3WZ2EOr8_2JUOMJHTACH0' \
+--header 'api-key: OMpqVWAH.UC80wyXTtPwhDgAUdCTx6'
+
+// Get All Due Orders (Agent Access Only)
+
+curl --location 'http://localhost:8000/agent/orders/due-orders' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzIwMDlmNTg3YWEyMGI4ZGVmMmNlNyIsImFnZW50SWQiOiJCUzIwMjYtMDAxIiwicm9sZSI6IkFHRU5UIiwiaWF0IjoxNzczNTIyNjIyLCJleHAiOjE3NzYxMTQ2MjJ9.fHG6TxkOvDWPdqm4XMSVfg9ObG963wVGpMrkeeIHhWI'
+
+// Get Overdue Orders (Admin, Employee (with permission))
+
+curl --location 'http://localhost:8000/agent/orders/overdue-orders' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzM1MjUzMDYsImV4cCI6MTc3MzYxMTcwNn0.-feQigfgoqX8EMEGZJkZ3Nf0_RCGTEvYC-6YSWwczvE' \
+--header 'api-key: OMpqVWAH.UC80wyXTtPwhDgAUdCTx6'
+
+// Agent Collection Performance (Admin, Employee (with permission))
+
+curl --location 'http://localhost:8000/agent/orders/agent-collection-performance' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzM1MjYwODcsImV4cCI6MTc3MzYxMjQ4N30.jsktKhPEZ6MTMR7lBuM-CMC9oiLPrA8BceL5Nfn8lqE' \
+--header 'api-key: OMpqVWAH.UC80wyXTtPwhDgAUdCTx6'
+
+
+SET Target APIs (Admin/Employee/Agents)
+
+//Create Target (Admin/employee with permissions)
+
+curl --location 'http://localhost:8000/targets/admin/create' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzM2MTE5NTYsImV4cCI6MTc3MzY5ODM1Nn0.odLbqCpYUsWHmSfR1L_5nuNdTvkUcPo9oGkoM4h3y_M' \
+--header 'Content-Type: application/json' \
+--header 'api-key: OMpqVWAH.UC80wyXTtPwhDgAUdCTx6' \
+--data '{
+"name":"Create 2 Stores",
+"type":"STORE_CREATION",
+"requiredCount":2,
+"incentiveAmount":200,
+"startDate":"2026-03-16",
+"endDate":"2026-03-16"
+}'
+
+// Get Target Agent only (Same For All Agents)
+
+curl --location 'http://localhost:8000/targets/agent/today-target' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzIwMDlmNTg3YWEyMGI4ZGVmMmNlNyIsImFnZW50SWQiOiJCUzIwMjYtMDAxIiwicm9sZSI6IkFHRU5UIiwiaWF0IjoxNzczNjE1NTIyLCJleHAiOjE3NzYyMDc1MjJ9.uKTQF57DMZpKQB7QBWsi3VSSUucrZ8WbOj_OKVyz2qU'
+
+// Get TargetPerformance Admin and Employee who have Permissions
+
+curl --location 'http://localhost:8000/targets/admin/performance' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzM2MTYzMzIsImV4cCI6MTc3MzcwMjczMn0.wV_xwo1c0a2c5_wTnBJ8TJ7ErnAlTyXxyrxE7djLjWY' \
+--header 'api-key: OMpqVWAH.UC80wyXTtPwhDgAUdCTx6'

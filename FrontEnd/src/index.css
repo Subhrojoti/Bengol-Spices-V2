@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fix react-simple-wysiwyg list styles */
+
+.rsw-editor ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+}
+
+.rsw-editor ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+}
+
+.rsw-editor li {
+  margin-bottom: 4px;
+}
+
+/* Also remove contenteditable focus ring */
+.rsw-editor [contenteditable="true"] {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.rsw-editor [contenteditable="true"]:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
