@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Typography } from "@mui/material";
 import coriander from "../../../assets/products/BS_Coriander_Powder.jpeg";
 import cumin from "../../../assets/products/BS_Cumin_Powder.jpeg";
@@ -9,6 +9,41 @@ import { useNavigate } from "react-router-dom";
 import HeroBG from "../../../assets/logo/BS_Home.png";
 
 const Home = () => {
+  const videoRefs = useRef([]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+
+          if (entry.isIntersecting) {
+            // Load the video only when it is near the viewport
+            if (!video.src) {
+              video.src = video.dataset.src;
+              video.load();
+            }
+
+            video.play().catch(() => {});
+          } else {
+            // Pause when the video is outside the viewport
+            video.pause();
+          }
+        });
+      },
+      {
+        rootMargin: "200px 0px",
+        threshold: 0.15,
+      },
+    );
+
+    videoRefs.current.forEach((video) => {
+      if (video) observer.observe(video);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const navigate = useNavigate();
   const products = [
     { name: "Coriander Powder", image: coriander },
@@ -141,36 +176,147 @@ const Home = () => {
         </div>
       </div>
 
-      {/* SYSTEM ARCHITECTURE */}
-      <div className="bg-gray-100 px-4 sm:px-6 md:px-20 lg:px-32 xl:px-40 py-10 md:py-16">
-        <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-center mb-6 md:mb-10">
-          Our Digital Ecosystem
-        </h2>
+      {/* DIGITAL ECOSYSTEM */}
+      <div className="bg-slate-100 px-4 sm:px-6 md:px-20 lg:px-32 xl:px-40 py-12 md:py-20">
+        {/* Parent Section Heading */}
+        <div className="text-center mb-12 md:mb-20">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-slate-900">
+            Our Digital Ecosystem
+          </h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 text-center">
+          <p className="mt-3 max-w-2xl mx-auto text-sm sm:text-base text-slate-600 leading-relaxed">
+            A connected suite of applications designed to manage operations,
+            employees, agents, orders, payments, deliveries and returns across
+            the entire business ecosystem.
+          </p>
+        </div>
+
+        {/* Application Showcase */}
+        <div className="max-w-7xl mx-auto space-y-16 md:space-y-28">
           {[
             {
               title: "Admin App",
-              desc: "Controls operations, analytics & system management.",
-            },
-            {
-              title: "Employee App",
-              desc: "Handles internal workflows and store management.",
+              desc: "The central management platform that provides administrators with complete visibility and control over the business ecosystem. Admins can manage employees, delivery partners and agents while overseeing orders, returns and day-to-day operations.",
+              features: [
+                "Manage employees, agents & delivery partners",
+                "Track, assign & manage orders and returns",
+                "Create notifications, targets & products",
+                "Monitor operations and business activities",
+              ],
+              video: "/videos/Admin-Preview.mp4",
+              poster: "/video-posters/Admin-Poster.jpg",
             },
             {
               title: "Agent App",
-              desc: "Places orders and manages retailer relationships.",
+              desc: "The agent-focused application for managing retailer relationships and daily sales operations. Agents can create and manage stores, place orders and returns, track payments and monitor their performance through targets and leaderboards.",
+              features: [
+                "Create & manage retailer stores",
+                "Create, track & manage orders and returns",
+                "Track payments and transaction details",
+                "Analyze targets, performance & leaderboards",
+              ],
+              video: "/videos/Agent-Preview.mp4",
+              poster: "/video-posters/Agent-Poster.jpg",
             },
             {
               title: "Delivery App",
-              desc: "Handles logistics, delivery & returns efficiently.",
+              desc: "The delivery operations platform built to help delivery partners efficiently manage assigned orders and returns. It provides the information required to understand delivery details, update statuses and complete delivery or return workflows.",
+              features: [
+                "Analyze assigned deliveries and returns",
+                "Update order & return statuses",
+                "Access detailed delivery information",
+                "Manage delivery and return workflows efficiently",
+              ],
+              video: "/videos/Delivery-Preview.mp4",
+              poster: "/video-posters/Delivery-Poster.jpg",
             },
-          ].map((item, i) => (
-            <div key={i} className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
-              <h3 className="font-semibold mb-1 md:mb-2 text-sm md:text-base">
-                {item.title}
-              </h3>
-              <p className="text-xs md:text-sm text-gray-600">{item.desc}</p>
+            {
+              title: "Employee App",
+              desc: "A powerful operational platform that provides employees with access to the same core business capabilities available to administrators, while ensuring that access is controlled through role-based permissions configured by the admin.",
+              features: [
+                "Access operational features based on permissions",
+                "Manage assigned orders, stores & workflows",
+                "Work with products, returns and business operations",
+                "Permission-based access to admin capabilities",
+              ],
+              video: "/videos/Employee-Preview.mp4",
+              poster: "/video-posters/Employee-Poster.jpg",
+            },
+          ].map((item, index) => (
+            <div
+              key={item.title}
+              className={`flex flex-col gap-5 md:flex-row md:items-center md:gap-16 ${
+                index % 2 !== 0 ? "md:flex-row-reverse" : ""
+              }`}>
+              {/* Mobile/Desktop Title */}
+              <div className="w-full md:hidden">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white shadow-sm">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  <div className="h-px w-6 bg-orange-300" />
+
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    {item.title}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Video */}
+              <div className="w-full md:w-[58%]">
+                <div className="group overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02]">
+                  <video
+                    src={item.video}
+                    poster={item.poster}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="none"
+                    className="w-full aspect-video object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="w-full md:w-[42%]">
+                {/* Desktop Number + Title */}
+                <div className="hidden md:flex items-center gap-4 mb-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white shadow-sm">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  <div className="h-px w-8 bg-orange-300" />
+
+                  <h3 className="text-2xl sm:text-3xl font-semibold text-slate-900">
+                    {item.title}
+                  </h3>
+                </div>
+
+                {/* Description */}
+                <p className="text-sm sm:text-base text-slate-600 leading-7">
+                  {item.desc}
+                </p>
+
+                {/* Key Capabilities */}
+                <div className="mt-5 md:mt-6">
+                  <p className="text-sm font-semibold text-slate-900 mb-3">
+                    Key capabilities
+                  </p>
+
+                  <ul className="space-y-2.5">
+                    {item.features.map((feature) => (
+                      <li
+                        key={feature}
+                        className="flex items-start gap-2.5 text-sm text-slate-600">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </div>
           ))}
         </div>

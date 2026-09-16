@@ -81,15 +81,11 @@ const Footer = () => {
 
           {/* COLUMN 4 - AVAILABLE */}
           <div>
-            <h2 className="font-semibold text-gray-900 mb-3 text-sm md:text-base">
-              Available in
+            <h2 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">
+              Availability
             </h2>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li>West Bengal</li>
-              <li>Delhi</li>
-              <li>Uttar Pradesh</li>
-              <li>Bihar</li>
-            </ul>
+
+            <p className="text-sm text-gray-700">Nationwide across India.</p>
           </div>
         </div>
       </div>
