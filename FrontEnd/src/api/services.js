@@ -4,7 +4,7 @@ import axiosInstance from "./axiosInstance";
 const API_BASE_URL = "http://localhost:8000";
 
 export const agentRegistration = async (formData) => {
-  const response = await axios.post(`${API_BASE_URL}/agent/apply`, formData, {
+  const response = axiosInstance.post("/agent/apply", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -241,8 +241,8 @@ export const deliveryLogin = async (phone, password) => {
 // Delivery Partner Register
 
 export const deliveryPartnerRegister = async (formData) => {
-  const response = await axios.post(
-    `${API_BASE_URL}/delivery-partner/register`,
+  const response = await axiosInstance.post(
+    "/delivery-partner/register",
     formData,
     {
       headers: {
