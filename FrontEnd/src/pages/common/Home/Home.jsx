@@ -267,7 +267,10 @@ const Home = () => {
               <div className="w-full md:w-[58%]">
                 <div className="group overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02]">
                   <video
-                    src={item.video}
+                    ref={(el) => {
+                      videoRefs.current[index] = el;
+                    }}
+                    data-src={item.video}
                     poster={item.poster}
                     autoPlay
                     loop
