@@ -48,7 +48,7 @@ export const createInvoiceFromOrder = async (order) => {
       seller: {
         name: "BENGOL SPICES PRIVATE LIMITED",
         address: "Kolkata, West Bengal",
-        gstin: "U47211WB2025PTC281150",
+        gstin: "19AANCB7545D1ZF",
       },
 
       buyer: {

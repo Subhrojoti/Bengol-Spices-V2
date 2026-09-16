@@ -162,7 +162,7 @@ export const generateInvoicePDFBuffer = async (invoice) => {
       .text("23/23, Kalipur Kacha Road, Sodpur, Nagvilla, Haridevpur", TX, 34)
       .text("Kolkata – 700082, West Bengal", TX, 45)
       .text(
-        "Email: support@bengolspices.com   |   Phone: +91 9831431018",
+        "Email: support@bengolspices.com   |   Phone: +91 62895 31457",
         TX,
         56,
       );
@@ -178,7 +178,7 @@ export const generateInvoicePDFBuffer = async (invoice) => {
       .fillColor(C.white)
       .font("Helvetica-Bold")
       .fontSize(7.5)
-      .text(invoice.gstin ?? "29AABCB1234A1Z5", GX + 34, 16);
+      .text(invoice.gstin ?? "19AANCB7545D1ZF", GX + 34, 16);
 
     /* ══════════════════════════════════════════
        2 — TITLE ROW
