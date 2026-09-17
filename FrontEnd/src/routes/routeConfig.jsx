@@ -1,3 +1,4 @@
+import { Navigate } from "react-router-dom";
 import { MarketingHub, marketingRoutes } from "../config/marketingRoutes";
 import AgentLogin from "../pages/Auth/Login/AgentLogin";
 import AdminLogin from "../pages/Auth/Login/AdminLogin";
@@ -13,10 +14,10 @@ import AdminBase from "../pages/Admin/AdminBase";
 import ProductDetails from "../pages/Admin/Tabs/AllProducts/ProductDetails";
 import DeliveryLogin from "../pages/Auth/Login/DeliveryLogin";
 import DeliveryHub from "../pages/Delivery/DeliveryHub";
-import DeliveryPanel from "../pages/Delivery/Tabs/DeliveryPanel/DeliveryPanel";
 import AllOrders from "../pages/Delivery/Tabs/AllOrders/AllOrders.jsx";
 import EmployeeLogin from "../pages/Auth/Login/EmployeeLogin";
 import { employeeRoutes } from "../config/employeeRoutes.js";
+import { deliveryRoutes } from "../config/deliveryRoutes.js";
 import EmployeeBase from "../pages/Employee/EmployeeBase";
 import PermissionGuard from "../components/common/PermissionGuard.jsx";
 import PublicRoute from "../routes/PublicRoute";
@@ -235,19 +236,19 @@ export const routes = [
             element: <DeliveryProfile />,
           },
 
-          {
-            path: "delivery-panel",
-            element: <DeliveryPanel />,
-          },
-          {
-            path: "all-orders",
-            element: <AllOrders />,
-          },
+          ...deliveryRoutes.map((route) => {
+            const Component = route.component;
+            return {
+              path: route.path,
+              element: <Component />,
+            };
+          }),
 
-          /* Default route → Overview */
+          /* Default route → My Deliveries. Redirected rather than rendered
+             in place, so the menu and the page title know where you are. */
           {
             index: true,
-            element: <AllOrders />,
+            element: <Navigate to="/delivery/all-orders" replace />,
           },
         ],
       },

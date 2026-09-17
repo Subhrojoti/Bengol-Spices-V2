@@ -31,8 +31,17 @@ export const getLeaderboard = async ({ from, to, limit = 10 }) => {
             $cond: [{ $eq: ["$status", "DELIVERED"] }, 1, 0],
           },
         },
-        sales: { $sum: "$totalAmount" },
-        collected: { $sum: "$paidAmount" },
+        // A cancelled order is not a sale; counting it lifted agents' ranks
+        sales: {
+          $sum: {
+            $cond: [{ $ne: ["$status", "CANCELLED"] }, "$totalAmount", 0],
+          },
+        },
+        collected: {
+          $sum: {
+            $cond: [{ $ne: ["$status", "CANCELLED"] }, "$paidAmount", 0],
+          },
+        },
       },
     },
   ]);

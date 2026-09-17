@@ -285,8 +285,18 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
 
     const data = new FormData();
 
+    /* Only what was changed. Sending every field wrote back the stock shown
+       when this form opened, undoing any orders placed in the meantime. A
+       changed stock goes with the value it was changed from, and the server
+       applies the difference to the current stock. */
     Object.entries(form).forEach(([key, value]) => {
-      data.append(key, String(value ?? "").trim());
+      const next = String(value ?? "").trim();
+      if (next === String(initial[key] ?? "").trim()) return;
+
+      data.append(key, next);
+      if (key === "stock") {
+        data.append("previousStock", String(initial.stock ?? "").trim());
+      }
     });
 
     data.append("certificates", certificates.join(","));

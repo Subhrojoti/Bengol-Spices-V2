@@ -19,10 +19,12 @@ const paymentSchema = new mongoose.Schema(
       index: true,
     },
 
+    // Collections start at ₹1; a smaller amount is accepted only to clear
+    // the last of an order's due (see collectPayment)
     amount: {
       type: Number,
       required: true,
-      min: 1,
+      min: 0.01,
     },
 
     method: {

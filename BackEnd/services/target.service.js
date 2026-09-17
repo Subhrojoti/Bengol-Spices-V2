@@ -2,6 +2,35 @@ import Target from "../models/Target.js";
 import AgentTargetProgress from "../models/AgentTargetProgress.js";
 import AgentIncentiveLedger from "../models/AgentIncentiveLedger.js";
 
+/* Adds to an agent's progress on one target, creating the record the first
+   time. Two first events at once both try the insert; the loser hits the
+   unique (agentId, targetId) index and simply applies its increment to the
+   record the winner created. */
+const addProgress = async ({
+  agentId,
+  targetId,
+  type,
+  achievedDelta,
+  commissionDelta,
+}) => {
+  const filter = { agentId, targetId };
+  const update = {
+    $inc: { achievedValue: achievedDelta, earnedAmount: commissionDelta },
+    $setOnInsert: { type },
+  };
+
+  try {
+    return await AgentTargetProgress.findOneAndUpdate(filter, update, {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    });
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    return AgentTargetProgress.findOneAndUpdate(filter, update, { new: true });
+  }
+};
+
 export const updateTargetProgress = async ({
   agentId,
   type,
@@ -34,32 +63,18 @@ export const updateTargetProgress = async ({
     });
 
     for (const target of targets) {
-      // 🔥 FIX: progress is keyed by (agentId, targetId) only — not by
-      // calendar date. A target's 24-hour window can span midnight, so
-      // matching on "today's date" could split an agent's progress into
-      // two separate records mid-target, and the target would never
-      // reach targetValue even though the agent completed it in time.
-      let progress = await AgentTargetProgress.findOne({
-        agentId,
-        targetId: target._id,
-      });
-
-      if (!progress) {
-        progress = await AgentTargetProgress.create({
-          agentId,
-          targetId: target._id,
-          type,
-        });
-      }
-
       // 🔥 FIX: track only what is genuinely earned during THIS call.
       // The ledger will log exactly this amount — never the flat
       // target.rewardAmount on every single call.
       let newlyEarned = 0;
 
+      // What this event adds, worked out before touching the stored record
+      let achievedDelta = 0;
+      let commissionDelta = 0;
+
       // 🟢 STORE
       if (type === "STORE_CREATION") {
-        progress.achievedValue += value;
+        achievedDelta += value;
       }
 
       // 🟡 ORDER
@@ -84,7 +99,7 @@ export const updateTargetProgress = async ({
           // still scope what counts, so targets already configured that way
           // behave exactly as before.
           if (!hasRules) {
-            progress.achievedValue += quantity;
+            achievedDelta += quantity;
             continue;
           }
 
@@ -96,8 +111,8 @@ export const updateTargetProgress = async ({
 
           if (rule) {
             const commission = quantity * (Number(rule.commissionPerUnit) || 0);
-            progress.achievedValue += quantity;
-            progress.earnedAmount += commission;
+            achievedDelta += quantity;
+            commissionDelta += commission;
             newlyEarned += commission; // ✅ log real commission, not the flat reward
           }
         }
@@ -105,36 +120,60 @@ export const updateTargetProgress = async ({
 
       // 🔵 PAYMENT
       if (type === "PAYMENT") {
-        progress.achievedValue += value;
+        achievedDelta += value;
       }
 
-      // ✅ COMPLETE CHECK — bonus is added, and logged, exactly ONCE:
-      // only on the call where achievedValue first crosses targetValue.
-      if (
-        !progress.isCompleted &&
-        progress.achievedValue >= target.targetValue
-      ) {
-        progress.isCompleted = true;
-        progress.earnedAmount += target.rewardAmount;
-        newlyEarned += target.rewardAmount;
-      }
-
-      // 🔥 FIX: only write a ledger entry when something was actually
-      // earned this call (previously this ran unconditionally every time,
-      // logging the full reward on every store/order/payment event even
-      // before the target was completed — causing the agent to be paid
-      // multiple times for a single target).
-      if (newlyEarned > 0) {
-        await AgentIncentiveLedger.create({
+      try {
+        /* Written as atomic updates, not read → change → save. Two events at
+           the same moment (orders placed back to back) each read the same
+           record: one increment was lost, both could see the target cross
+           its value and both paid the reward. And a record created by both
+           at once failed the unique index, dropping that event entirely. */
+        const progress = await addProgress({
           agentId,
-          amount: newlyEarned,
-          type: "EARNING",
-          source: "TARGET",
-          referenceId: progress._id,
+          targetId: target._id,
+          type,
+          achievedDelta,
+          commissionDelta,
         });
-      }
 
-      await progress.save();
+        // ✅ COMPLETE CHECK — the reward is added, and logged, exactly ONCE:
+        // only the update that flips isCompleted can match this filter.
+        const completed = await AgentTargetProgress.findOneAndUpdate(
+          {
+            _id: progress._id,
+            isCompleted: false,
+            achievedValue: { $gte: target.targetValue },
+          },
+          {
+            $set: { isCompleted: true },
+            $inc: { earnedAmount: target.rewardAmount },
+          },
+          { new: true },
+        );
+
+        if (completed) {
+          newlyEarned += target.rewardAmount;
+        }
+
+        // 🔥 FIX: only write a ledger entry when something was actually
+        // earned this call (previously this ran unconditionally every time,
+        // logging the full reward on every store/order/payment event even
+        // before the target was completed — causing the agent to be paid
+        // multiple times for a single target).
+        if (newlyEarned > 0) {
+          await AgentIncentiveLedger.create({
+            agentId,
+            amount: newlyEarned,
+            type: "EARNING",
+            source: "TARGET",
+            referenceId: progress._id,
+          });
+        }
+      } catch (error) {
+        // One target failing must not stop the others being credited
+        console.error(`TARGET ERROR (target ${target._id}):`, error);
+      }
     }
   } catch (error) {
     console.error("TARGET ERROR:", error);

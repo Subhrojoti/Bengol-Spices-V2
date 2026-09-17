@@ -172,8 +172,9 @@ export default function DeliveryApproval() {
     try {
       setBusy(true);
 
-      if (approving) await approveDeliveryPartner(partner._id);
-      else await rejectDeliveryPartner(partner._id);
+      const result = approving
+        ? await approveDeliveryPartner(partner._id)
+        : await rejectDeliveryPartner(partner._id);
 
       setPartners((prev) =>
         prev.map((p) =>
@@ -183,11 +184,16 @@ export default function DeliveryApproval() {
         ),
       );
 
-      toast.success(
-        approving
-          ? `${partner.name} approved. They can sign in with their phone number.`
-          : `${partner.name} rejected. A notification has been emailed.`,
-      );
+      // Saved either way; say so when only the email failed
+      if (result?.emailSent === false) {
+        toast.warning(result.message);
+      } else {
+        toast.success(
+          approving
+            ? `${partner.name} approved. They can sign in with their phone number.`
+            : `${partner.name} rejected. A notification has been emailed.`,
+        );
+      }
       setPendingAction(null);
     } catch (error) {
       console.error(error);

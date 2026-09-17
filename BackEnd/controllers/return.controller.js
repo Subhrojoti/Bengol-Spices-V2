@@ -11,7 +11,7 @@ export const initiateReturn = async (req, res) => {
     const { reason } = req.body;
 
     // ✅ Validate reason
-    if (!reason || reason.trim() === "") {
+    if (typeof reason !== "string" || reason.trim() === "") {
       return res.status(400).json({
         success: false,
         message: "Return reason is required",
@@ -44,8 +44,12 @@ export const initiateReturn = async (req, res) => {
       });
     }
 
-    // ❌ Prevent duplicate return
-    const existingReturn = await Return.findOne({ orderId });
+    // ❌ Prevent duplicate return. A cancelled one does not count: it used to
+    // block the order from ever being returned again.
+    const existingReturn = await Return.findOne({
+      orderId,
+      status: { $ne: "CANCELLED" },
+    });
     if (existingReturn) {
       return res.status(400).json({
         success: false,
@@ -339,7 +343,7 @@ export const updateReturnStatus = async (req, res) => {
 
     // Must be assigned to this partner
     if (
-      !returnRequest.pickup.partnerId ||
+      !returnRequest.pickup?.partnerId ||
       returnRequest.pickup.partnerId.toString() !== req.user.id
     ) {
       return res.status(403).json({
@@ -427,14 +431,15 @@ export const getMyReturns = async (req, res) => {
 export const cancelReturn = async (req, res) => {
   try {
     const { returnId } = req.params;
-    const { reason } = req.body;
 
-    if (!reason || reason.trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Cancellation reason is required",
-      });
-    }
+    // 🔥 FIX: the agent app's Cancel button sends no reason (and, in builds
+    // already installed, no body at all, which Express 5 leaves undefined).
+    // Destructuring that threw, and a missing reason was refused, so no
+    // agent could cancel a return. A reason is recorded when given.
+    const reason =
+      typeof req.body?.reason === "string" && req.body.reason.trim()
+        ? req.body.reason
+        : "Cancelled by agent";
 
     const returnRequest = await Return.findOne({ returnId });
 
@@ -460,22 +465,20 @@ export const cancelReturn = async (req, res) => {
     const agent = await Agent.findById(req.user.id).select("name");
     const agentName = agent?.name || "Agent";
 
-    // Cannot cancel after pickup started
-    if (
-      ["PICKED_UP", "RECEIVED_AT_WAREHOUSE", "COMPLETED"].includes(
-        returnRequest.status,
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Return cannot be cancelled after pickup",
-      });
-    }
-
     if (returnRequest.status === "CANCELLED") {
       return res.status(400).json({
         success: false,
         message: "Return already cancelled",
+      });
+    }
+
+    // Cannot cancel after pickup started. Listed as the states that CAN be
+    // cancelled: REFUND_PROCESSED was missing from the old blocklist, so a
+    // refunded return could still be cancelled.
+    if (!["INITIATED", "PICKUP_ASSIGNED"].includes(returnRequest.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Return cannot be cancelled after pickup",
       });
     }
 

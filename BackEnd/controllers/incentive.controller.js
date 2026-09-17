@@ -1,5 +1,8 @@
 import AgentIncentiveLedger from "../models/AgentIncentiveLedger.js";
 import Agent from "../models/Agent.js";
+import { withLock } from "../services/payment.service.js";
+
+const roundRupees = (value) => Math.round(Number(value) * 100) / 100;
 
 /* =====================================================
    ✅ ADMIN - AGENT INCENTIVE SUMMARY LIST
@@ -62,9 +65,10 @@ export const getAgentIncentiveList = async (req, res) => {
         phone: agent.phone || null,
         state: agent?.addressDetails?.state || "N/A",
 
-        totalEarned: item.totalEarned,
-        totalPaid: item.totalPaid,
-        pending: item.pending,
+        totalEarned: roundRupees(item.totalEarned),
+        totalPaid: roundRupees(item.totalPaid),
+        // Rounded: float dust (1e-13) left a fully paid agent under PENDING
+        pending: roundRupees(item.pending),
       };
     });
 
@@ -124,72 +128,47 @@ export const getAgentIncentiveList = async (req, res) => {
 // Admin can record a payout for an agent's incentives. This will create a "PAYOUT" entry in the AgentIncentiveLedger and reduce the pending balance for that agent.
 export const payoutIncentive = async (req, res) => {
   try {
-    const { agentId, amount, note } = req.body;
+    const { agentId, note } = req.body;
 
-    if (!agentId || !amount) {
+    if (typeof agentId !== "string" || !agentId.trim() || !req.body.amount) {
       return res.status(400).json({
         success: false,
         message: "agentId and amount required",
       });
     }
 
+    // Text such as "abc" passed both checks below (NaN compares false) and
+    // then failed at the database with a 500
+    const amount = roundRupees(req.body.amount);
+
     // 🔥 FIX: `!amount` only catches 0/falsy — a negative amount (e.g. -50)
     // is truthy and passed straight through. Since pending = earned - paid,
     // recording a negative "PAYOUT" would actually INCREASE the agent's
     // pending balance instead of reducing it.
-    if (amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({
         success: false,
         message: "Amount must be greater than zero",
       });
     }
 
-    // ✅ CHECK PENDING BALANCE
-    const summary = await AgentIncentiveLedger.aggregate([
-      {
-        $match: { agentId },
-      },
-      {
-        $group: {
-          _id: "$agentId",
-          totalEarned: {
-            $sum: {
-              $cond: [{ $eq: ["$type", "EARNING"] }, "$amount", 0],
-            },
-          },
-          totalPaid: {
-            $sum: {
-              $cond: [{ $eq: ["$type", "PAYOUT"] }, "$amount", 0],
-            },
-          },
-        },
-      },
-    ]);
+    /* 🔥 FIX: the balance check and the payout entry are two steps. Two
+       payouts sent together (a double click) both saw the full balance and
+       both were recorded, paying the agent more than was owed. They now run
+       one at a time per agent. */
+    const locked = await withLock(`incentive-payout:${agentId}`, () =>
+      recordPayout({ agentId, amount, note }),
+    );
 
-    const earned = summary[0]?.totalEarned || 0;
-    const paid = summary[0]?.totalPaid || 0;
-    const pending = earned - paid;
-
-    if (amount > pending) {
-      return res.status(400).json({
+    if (locked.busy) {
+      return res.status(409).json({
         success: false,
-        message: "Amount exceeds pending balance",
+        message:
+          "A payout for this agent is being recorded right now. Refresh and check the balance before trying again.",
       });
     }
 
-    // ✅ CREATE PAYOUT ENTRY
-    await AgentIncentiveLedger.create({
-      agentId,
-      amount,
-      type: "PAYOUT",
-      source: "MANUAL",
-      note,
-    });
-
-    return res.json({
-      success: true,
-      message: "Payout recorded successfully",
-    });
+    return res.status(locked.value.code).json(locked.value.body);
   } catch (error) {
     console.error("PAYOUT ERROR:", error);
     res.status(500).json({
@@ -197,6 +176,56 @@ export const payoutIncentive = async (req, res) => {
       message: "Failed to process payout",
     });
   }
+};
+
+// Checks the balance and records the payout; runs under the agent's payout lock
+const recordPayout = async ({ agentId, amount, note }) => {
+  // ✅ CHECK PENDING BALANCE
+  const summary = await AgentIncentiveLedger.aggregate([
+    {
+      $match: { agentId },
+    },
+    {
+      $group: {
+        _id: "$agentId",
+        totalEarned: {
+          $sum: {
+            $cond: [{ $eq: ["$type", "EARNING"] }, "$amount", 0],
+          },
+        },
+        totalPaid: {
+          $sum: {
+            $cond: [{ $eq: ["$type", "PAYOUT"] }, "$amount", 0],
+          },
+        },
+      },
+    },
+  ]);
+
+  const earned = summary[0]?.totalEarned || 0;
+  const paid = summary[0]?.totalPaid || 0;
+  const pending = roundRupees(earned - paid);
+
+  if (amount > pending) {
+    return {
+      code: 400,
+      body: { success: false, message: "Amount exceeds pending balance" },
+    };
+  }
+
+  // ✅ CREATE PAYOUT ENTRY
+  await AgentIncentiveLedger.create({
+    agentId,
+    amount,
+    type: "PAYOUT",
+    source: "MANUAL",
+    note,
+  });
+
+  return {
+    code: 200,
+    body: { success: true, message: "Payout recorded successfully" },
+  };
 };
 
 // Agent can view their total earned incentives, total payouts, and pending balance.

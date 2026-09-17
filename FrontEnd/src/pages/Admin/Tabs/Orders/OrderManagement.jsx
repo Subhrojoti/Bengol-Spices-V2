@@ -35,6 +35,11 @@ import {
 const canConfirm = (o) => o?.status === "PLACED";
 const canCancel = (o) => !["DELIVERED", "CANCELLED"].includes(o?.status);
 
+/* What is still to be collected on an order. A cancelled order keeps the due
+   it had when it was cancelled, but nobody will collect it; counting it made
+   store dues and the outstanding total too high. */
+const openDue = (o) => (o?.status === "CANCELLED" ? 0 : Number(o?.dueAmount || 0));
+
 const n = (v) => Number(v || 0);
 const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
 
@@ -288,7 +293,7 @@ export default function OrderManagement() {
       }
 
       grouped[key].orders.push(order);
-      grouped[key].due += n(order.dueAmount);
+      grouped[key].due += openDue(order);
     });
 
     return Object.values(grouped).sort((a, b) => b.orders.length - a.orders.length);
@@ -333,7 +338,7 @@ export default function OrderManagement() {
       inTransit: orders.filter((o) =>
         ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"].includes(o.status),
       ).length,
-      due: orders.reduce((sum, o) => sum + n(o.dueAmount), 0),
+      due: orders.reduce((sum, o) => sum + openDue(o), 0),
     }),
     [orders],
   );
@@ -466,7 +471,10 @@ export default function OrderManagement() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* ===== STORES ===== */}
-        <Card className="overflow-hidden lg:col-span-4">
+        {/* Kept in view beside a long order list, and only as tall as its own
+            content: it used to stretch to the orders column while the list
+            inside stayed capped, cutting off the last store above a blank area */}
+        <Card className="overflow-hidden lg:sticky lg:top-4 lg:col-span-4 lg:self-start">
           <div className="border-b border-slate-100 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -513,7 +521,7 @@ export default function OrderManagement() {
               }
             />
           ) : (
-            <div className="max-h-[30rem] space-y-2.5 overflow-y-auto p-4 lg:max-h-[calc(100vh-22rem)]">
+            <div className="max-h-[30rem] space-y-2.5 overflow-y-auto p-4 lg:max-h-[calc(100vh-14rem)]">
               {visibleStores.map((store) => {
                 const active = store.consumerId === selectedStore;
 
@@ -671,7 +679,7 @@ export default function OrderManagement() {
                         </p>
                         <p className="mt-0.5 text-[13.5px] tabular-nums text-slate-500">
                           {inr(order.totalAmount)}
-                          {n(order.dueAmount) > 0 && (
+                          {openDue(order) > 0 && (
                             <span className="text-rose-600">
                               {" · "}
                               {inr(order.dueAmount)} due

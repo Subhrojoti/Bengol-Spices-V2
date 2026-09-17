@@ -1,214 +1,221 @@
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  RadialBarChart,
-  RadialBar,
-  PolarAngleAxis,
 } from "recharts";
-
+import {
+  ArrowRight,
+  CheckCircle2,
+  PackageSearch,
+  Truck,
+  Undo2,
+} from "lucide-react";
 import { getDeliveryPartnerDashboard } from "../../../../api/services";
+import { Card, LoadError, Stat } from "../../ui";
+import { n } from "../../format";
 
-const DeliveryPanel = () => {
-  const [dashboardData, setDashboardData] = useState(null);
+const COLORS = {
+  delivered: "#0f766e",
+  returns: "#c2532a",
+};
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
+const Skeleton = () => (
+  <div className="min-h-screen animate-pulse space-y-4 bg-slate-50 px-5 pb-10 pt-5 lg:px-8 lg:pt-6">
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-[74px] rounded-2xl bg-slate-200/70" />
+      ))}
+    </div>
+    <div className="h-80 rounded-2xl bg-slate-200/70" />
+  </div>
+);
 
-  const fetchDashboard = async () => {
+/**
+ * The partner's own numbers. The old version drew a trend line for every
+ * card and, for any month with no deliveries, made one up (the total spread
+ * evenly across the year), so an idle month looked like steady growth.
+ */
+export default function DeliveryPanel() {
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [status, setStatus] = useState("loading");
+
+  const load = useCallback(async () => {
     try {
       const response = await getDeliveryPartnerDashboard();
-      if (response?.success) {
-        setDashboardData(response.data);
-      }
+      if (!response?.success || !response.data) throw new Error("No data");
+      setData(response.data);
+      setStatus("ready");
     } catch (error) {
+      // It used to stay on "Loading dashboard..." forever
       console.error("Dashboard fetch error:", error);
+      setStatus("error");
     }
-  };
+  }, []);
 
-  if (!dashboardData) return <div className="p-8">Loading dashboard...</div>;
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const { summary, monthlyDeliveryDistribution, yearlyComparison } =
-    dashboardData;
+  if (status === "loading") return <Skeleton />;
+  if (status === "error") {
+    return <LoadError title="Could not load your overview" onRetry={load} />;
+  }
 
-  const deliveredTrend = monthlyDeliveryDistribution.map((m, index) => ({
-    month: m.month,
-    value:
-      m.delivered && m.delivered > 0
-        ? m.delivered
-        : Math.round((summary.totalDelivered / 12) * (index + 1)),
-  }));
-
-  const returnTrend = monthlyDeliveryDistribution.map((m, index) => ({
-    month: m.month,
-    value:
-      m.returns && m.returns > 0
-        ? m.returns
-        : Math.round((summary.totalReturnsHandled / 12) * (index + 1)),
-  }));
-
-  const pendingTrend = monthlyDeliveryDistribution.map((m, index) => ({
-    month: m.month,
-    value:
-      summary.totalPendingPickups > 0
-        ? Math.round((summary.totalPendingPickups / 12) * (index + 1))
-        : 0,
-  }));
+  const summary = data.summary || {};
+  const monthly = data.monthlyDeliveryDistribution || [];
+  const yearly = data.yearlyComparison || [];
+  const bestYear = Math.max(...yearly.map((y) => n(y.delivered)), 1);
+  const thisYear = monthly.reduce((sum, m) => sum + n(m.delivered), 0);
+  const hasMonthlyData = monthly.some((m) => n(m.delivered) || n(m.returns));
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-[100svh] md:min-h-screen space-y-6 md:space-y-10">
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-8xl mx-auto">
-        {/* Delivered */}
-        <div className="bg-white p-4 md:p-6 rounded-xl shadow">
-          <p className="text-gray-500 text-sm">Total Delivered</p>
-          <h2 className="text-xl md:text-2xl font-bold text-green-600 mb-3">
-            {summary.totalDelivered}
-          </h2>
-
-          <ResponsiveContainer width="100%" height={60}>
-            <LineChart data={deliveredTrend}>
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#16a34a"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Returns */}
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500 text-sm">Total Returns Handled</p>
-          <h2 className="text-2xl font-bold text-red-600 mb-3">
-            {summary.totalReturnsHandled}
-          </h2>
-
-          <ResponsiveContainer width="100%" height={60}>
-            <LineChart data={returnTrend}>
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#dc2626"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Pending Pickups */}
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500 text-sm">Pending Pickups</p>
-          <h2 className="text-2xl font-bold text-yellow-600 mb-3">
-            {summary.totalPendingPickups}
-          </h2>
-
-          <ResponsiveContainer width="100%" height={60}>
-            <LineChart data={pendingTrend}>
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#eab308"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+    <div className="min-h-screen space-y-4 bg-slate-50 px-5 pb-10 pt-5 lg:px-8 lg:pt-6">
+      {/* ===== SUMMARY ===== */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <Stat
+          label="Deliveries in progress"
+          value={n(summary.activeDeliveries)}
+          icon={<Truck size={17} />}
+          tint="#e6f4f2"
+          ink="#0f766e"
+        />
+        <Stat
+          label="Delivered, all time"
+          value={n(summary.totalDelivered)}
+          icon={<CheckCircle2 size={17} />}
+          tint="#e6f7f0"
+          ink="#12805a"
+        />
+        <Stat
+          label="Return pickups to do"
+          value={n(summary.totalPendingPickups)}
+          icon={<PackageSearch size={17} />}
+          tint="#fdf3e0"
+          ink="#a06c00"
+        />
+        <Stat
+          label="Returns handled"
+          value={n(summary.totalReturnsHandled)}
+          icon={<Undo2 size={17} />}
+          tint="#fdeee7"
+          ink="#c2532a"
+        />
       </div>
 
-      {/* MONTHLY DISTRIBUTION */}
-      <div className="bg-white p-4 md:p-8 rounded-xl shadow max-w-8xl mx-auto">
-        <h2 className="text-lg font-semibold mb-6">
-          Monthly Delivery Distribution
-        </h2>
+      {n(summary.activeDeliveries) + n(summary.totalPendingPickups) > 0 && (
+        <button
+          onClick={() => navigate("/delivery/all-orders")}
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-teal-200 bg-teal-50/70 px-5 py-3.5 text-left transition hover:bg-teal-50">
+          <span className="text-[14.5px] text-teal-900">
+            You have{" "}
+            <span className="font-semibold">
+              {n(summary.activeDeliveries)} deliver
+              {n(summary.activeDeliveries) === 1 ? "y" : "ies"}
+            </span>{" "}
+            and{" "}
+            <span className="font-semibold">
+              {n(summary.totalPendingPickups)} pickup
+              {n(summary.totalPendingPickups) === 1 ? "" : "s"}
+            </span>{" "}
+            waiting.
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[14px] font-semibold text-teal-700">
+            Open <ArrowRight size={15} />
+          </span>
+        </button>
+      )}
 
-        <ResponsiveContainer width="100%" height={220} className="md:h-[300px]">
-          <AreaChart data={monthlyDeliveryDistribution}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="month" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        {/* ===== MONTHLY ===== */}
+        <Card className="p-5 lg:col-span-8">
+          <div className="mb-4">
+            <h2 className="text-[16px] font-semibold leading-tight text-slate-800">
+              This year, month by month
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {thisYear} deliver{thisYear === 1 ? "y" : "ies"} so far, by the
+              day each was completed
+            </p>
+          </div>
 
-            <Area
-              type="monotone"
-              dataKey="delivered"
-              stackId="1"
-              stroke="#16a34a"
-              fill="#22c55e"
-              fillOpacity={0.7}
-            />
+          {hasMonthlyData ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={monthly} barGap={2}>
+                <CartesianGrid vertical={false} stroke="#eef2f6" />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  width={32}
+                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                />
+                <Tooltip cursor={{ fill: "rgba(15,23,42,0.04)" }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 13 }} />
+                <Bar
+                  dataKey="delivered"
+                  name="Delivered"
+                  fill={COLORS.delivered}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="returns"
+                  name="Returns handled"
+                  fill={COLORS.returns}
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="py-24 text-center text-sm text-slate-400">
+              Nothing delivered yet this year
+            </p>
+          )}
+        </Card>
 
-            <Area
-              type="monotone"
-              dataKey="returns"
-              stackId="1"
-              stroke="#dc2626"
-              fill="#ef4444"
-              fillOpacity={0.7}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+        {/* ===== YEARLY ===== */}
+        <Card className="p-5 lg:col-span-4">
+          <h2 className="text-[16px] font-semibold leading-tight text-slate-800">
+            Year on year
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-400">Orders delivered</p>
 
-      {/* YEARLY COMPARISON */}
-      <div className="bg-white p-8 rounded-xl shadow max-w-8xl mx-auto">
-        <h2 className="text-lg font-semibold mb-6 text-center">
-          Yearly Delivery Comparison
-        </h2>
-
-        <ResponsiveContainer width="100%" height={180} className="md:h-[300px]">
-          <RadialBarChart
-            innerRadius="20%"
-            outerRadius="90%"
-            data={yearlyComparison}
-            startAngle={180}
-            endAngle={0}>
-            <PolarAngleAxis
-              type="number"
-              domain={[0, "dataMax"]}
-              tick={false}
-            />
-
-            <Tooltip
-              formatter={(value) => [value, "Delivered"]}
-              labelFormatter={(label, payload) => payload?.[0]?.payload?.year}
-            />
-
-            <RadialBar
-              dataKey="delivered"
-              cornerRadius={10}
-              fill="#6366f1"
-              background
-            />
-          </RadialBarChart>
-        </ResponsiveContainer>
-
-        {/* Year labels */}
-        <div className="flex justify-center gap-6 md:gap-20 mt-4 flex-wrap">
-          {yearlyComparison.map((year) => (
-            <div key={year.year} className="text-center">
-              <p className="text-sm text-gray-500">{year.year}</p>
-              <p className="font-semibold text-indigo-600">{year.delivered}</p>
-            </div>
-          ))}
-        </div>
+          <div className="mt-5 space-y-4">
+            {yearly.map((year) => (
+              <div key={year.year}>
+                <div className="mb-1.5 flex items-center justify-between text-[14px]">
+                  <span className="text-slate-600">{year.year}</span>
+                  <span className="font-semibold tabular-nums text-slate-900">
+                    {n(year.delivered)}
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-2 rounded-full"
+                    style={{
+                      width: `${Math.max((n(year.delivered) / bestYear) * 100, n(year.delivered) ? 4 : 0)}%`,
+                      backgroundColor: COLORS.delivered,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     </div>
   );
-};
-
-export default DeliveryPanel;
+}

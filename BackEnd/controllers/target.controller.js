@@ -3,6 +3,7 @@ import AgentTargetProgress from "../models/AgentTargetProgress.js";
 import { sendBulkNotification } from "../services/notification.service.js";
 import Agent from "../models/Agent.js";
 import Product from "../models/Product.js";
+import mongoose from "mongoose";
 
 /* =====================================================
    ✅ CREATE TARGET (ADMIN)
@@ -85,7 +86,10 @@ export const createTarget = async (req, res) => {
         });
       }
 
-      const exists = await Product.findById(rule.productId);
+      // A malformed ID used to throw a cast error and answer 500
+      const exists = mongoose.isValidObjectId(rule?.productId)
+        ? await Product.findById(rule.productId)
+        : null;
       if (!exists) {
         return res.status(400).json({
           success: false,
@@ -109,22 +113,34 @@ export const createTarget = async (req, res) => {
       endDate: end, // 🔥 always 24h
     });
 
-    // ✅ NOTIFY ALL AGENTS
-    const agents = await Agent.find({ status: "APPROVED" });
+    /* ✅ NOTIFY ALL AGENTS. The target is already saved: a failed
+       notification used to answer "Failed to create target", and creating it
+       again made a duplicate that agents could complete for a second reward. */
+    let agentsNotified = true;
 
-    await sendBulkNotification({
-      users: agents.map((agent) => ({
-        _id: agent._id,
-        role: "Agent",
-      })),
-      title: "🎯 New Target Assigned",
-      message: `A new target "${name}" has been assigned`,
-      senderId: req.user._id,
-    });
+    try {
+      const agents = await Agent.find({ status: "APPROVED" });
+
+      await sendBulkNotification({
+        users: agents.map((agent) => ({
+          _id: agent._id,
+          role: "Agent",
+        })),
+        title: "🎯 New Target Assigned",
+        message: `A new target "${name}" has been assigned`,
+        senderId: req.user._id,
+      });
+    } catch (notifyError) {
+      agentsNotified = false;
+      console.error("TARGET NOTIFICATION ERROR:", notifyError);
+    }
 
     return res.json({
       success: true,
-      message: "Target created successfully",
+      agentsNotified,
+      message: agentsNotified
+        ? "Target created successfully"
+        : "Target created, but agents could not be notified",
       data: target,
     });
   } catch (error) {
@@ -152,6 +168,9 @@ export const getTargetPerformance = async (req, res) => {
     let targetFilter;
 
     if (targetId) {
+      if (!mongoose.isValidObjectId(targetId)) {
+        return res.json({ success: true, count: 0, data: [] });
+      }
       targetFilter = { _id: targetId };
     } else {
       const now = new Date();
@@ -181,7 +200,10 @@ export const getTargetPerformance = async (req, res) => {
     const progress = await AgentTargetProgress.find({
       targetId: { $in: targetIds },
     })
-      .populate("targetId", "name type targetValue rewardAmount startDate endDate")
+      .populate(
+        "targetId",
+        "name type targetValue rewardAmount startDate endDate",
+      )
       .lean();
 
     const agentIds = [...new Set(progress.map((p) => p.agentId))];

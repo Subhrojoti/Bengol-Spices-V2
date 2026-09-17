@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { getPaymentSummary, getAllStores } from "../../../../api/services";
 import EntityAvatar from "../../../../components/common/EntityAvatar";
+import PaymentIssues from "./PaymentIssues";
 
 const FILTERS = [
   { key: "ALL", label: "All" },
@@ -264,6 +265,9 @@ export default function PaymentInfo() {
 
   return (
     <div className="min-h-screen space-y-4 bg-slate-50 px-5 pb-10 pt-5 lg:px-8 lg:pt-6">
+      {/* ===== PAYMENTS TAKEN BUT NOT RECORDED (hidden when none) ===== */}
+      <PaymentIssues />
+
       {/* ===== SUMMARY ===== */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Stat

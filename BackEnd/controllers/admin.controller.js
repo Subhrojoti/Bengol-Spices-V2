@@ -3,6 +3,7 @@ import Store from "../models/store.js";
 import Product from "../models/Product.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import crypto from "crypto";
+import mongoose from "mongoose";
 import Agent from "../models/Agent.js";
 import {
   sendAgentApprovalMail,
@@ -11,6 +12,20 @@ import {
   sendDeliveryPartnerRejectionMail,
 } from "../utils/email.js";
 import { getAdminDashboard } from "../services/dashboard.service.js";
+
+/* The status change is saved before the email goes out. When the email
+   failed, the admin used to get an error for a change that had already
+   happened, and retrying only said "already approved". The change now
+   stands, and the answer says whether the email was sent. */
+const trySendEmail = async (label, send) => {
+  try {
+    await send();
+    return true;
+  } catch (error) {
+    console.error(`${label} EMAIL FAILED:`, error);
+    return false;
+  }
+};
 
 export const approveAgent = async (req, res) => {
   try {
@@ -25,7 +40,11 @@ export const approveAgent = async (req, res) => {
       });
     }
 
-    if (agent.status === "APPROVED") {
+    /* Approved but no password set yet (the email failed, or its link ran
+       out): approving again sends a fresh set-password link. */
+    const resending = agent.status === "APPROVED";
+
+    if (resending && agent.password) {
       return res.status(400).json({
         success: false,
         message: "Agent already approved",
@@ -35,24 +54,37 @@ export const approveAgent = async (req, res) => {
     const token = crypto.randomBytes(32).toString("hex");
 
     agent.status = "APPROVED";
-    agent.passwordResetToken = token;
+    // Only a hash is stored, as the forgot-password flow already does, so a
+    // leaked database copy cannot be used to set this agent's password.
+    // The plain token goes out in the email.
+    agent.passwordResetToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
     agent.passwordResetExpires = Date.now() + 15 * 60 * 1000;
 
     await agent.save();
 
-    await sendAgentApprovalMail({
-      email: agent.email,
-      agentId: agent.agentId,
-      token,
-    });
+    const emailSent = await trySendEmail("AGENT APPROVAL", () =>
+      sendAgentApprovalMail({
+        email: agent.email,
+        agentId: agent.agentId,
+        token,
+      }),
+    );
 
     res.json({
       success: true,
-      message: "Agent approved & email sent",
+      emailSent,
+      message: emailSent
+        ? resending
+          ? "A new password setup link has been emailed"
+          : "Agent approved & email sent"
+        : "Agent approved, but the password setup email could not be sent. Use Resend link to try again.",
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: "Failed to approve agent" });
   }
 };
 
@@ -60,13 +92,20 @@ export const approveAgent = async (req, res) => {
 export const getAllAgents = async (req, res) => {
   try {
     const agents = await Agent.find()
-      .select("-password -passwordResetToken -passwordResetExpires")
-      .sort({ createdAt: -1 });
+      .select("-passwordResetToken -passwordResetExpires")
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({
       success: true,
       count: agents.length,
-      agents,
+      // Whether a password was ever set, so the panel can offer to resend
+      // the setup link to an approved agent who never received or used it.
+      // The hash itself is never sent.
+      agents: agents.map(({ password, ...agent }) => ({
+        ...agent,
+        passwordSet: Boolean(password),
+      })),
     });
   } catch (error) {
     res.status(500).json({
@@ -104,14 +143,19 @@ export const rejectAgent = async (req, res) => {
     await agent.save();
 
     // 📧 SEND REJECTION EMAIL
-    await sendAgentRejectionMail({
-      email: agent.email,
-      agentId: agent.agentId,
-    });
+    const emailSent = await trySendEmail("AGENT REJECTION", () =>
+      sendAgentRejectionMail({
+        email: agent.email,
+        agentId: agent.agentId,
+      }),
+    );
 
     return res.json({
       success: true,
-      message: "Agent rejected and email sent",
+      emailSent,
+      message: emailSent
+        ? "Agent rejected and email sent"
+        : "Agent rejected, but the notification email could not be sent",
     });
   } catch (error) {
     console.error("REJECT AGENT ERROR:", error);
@@ -165,7 +209,10 @@ export const approveDeliveryPartner = async (req, res) => {
   try {
     const { partnerId } = req.params; // ✅ FIXED
 
-    const partner = await DeliveryPartner.findById(partnerId);
+    // A malformed ID used to throw a cast error and answer 500
+    const partner = mongoose.isValidObjectId(partnerId)
+      ? await DeliveryPartner.findById(partnerId)
+      : null;
 
     if (!partner) {
       return res.status(404).json({
@@ -184,16 +231,23 @@ export const approveDeliveryPartner = async (req, res) => {
     partner.status = "ACTIVE";
     await partner.save();
 
-    if (partner.email) {
-      await sendDeliveryPartnerApprovalMail({
-        name: partner.name,
-        email: partner.email,
-      });
-    }
+    // No email on file is not a failure: they sign in with their phone
+    const emailSent = partner.email
+      ? await trySendEmail("DELIVERY PARTNER APPROVAL", () =>
+          sendDeliveryPartnerApprovalMail({
+            name: partner.name,
+            email: partner.email,
+          }),
+        )
+      : null;
 
     return res.json({
       success: true,
-      message: "Delivery partner approved successfully",
+      emailSent,
+      message:
+        emailSent === false
+          ? "Delivery partner approved, but the notification email could not be sent"
+          : "Delivery partner approved successfully",
     });
   } catch (error) {
     console.error("APPROVE DELIVERY PARTNER ERROR:", error);
@@ -209,7 +263,9 @@ export const rejectDeliveryPartner = async (req, res) => {
   try {
     const { partnerId } = req.params;
 
-    const partner = await DeliveryPartner.findById(partnerId); // ✅ FIXED
+    const partner = mongoose.isValidObjectId(partnerId)
+      ? await DeliveryPartner.findById(partnerId)
+      : null;
 
     if (!partner) {
       return res.status(404).json({
@@ -229,16 +285,22 @@ export const rejectDeliveryPartner = async (req, res) => {
     await partner.save();
 
     // 📧 Send rejection mail
-    if (partner.email) {
-      await sendDeliveryPartnerRejectionMail({
-        name: partner.name,
-        email: partner.email,
-      });
-    }
+    const emailSent = partner.email
+      ? await trySendEmail("DELIVERY PARTNER REJECTION", () =>
+          sendDeliveryPartnerRejectionMail({
+            name: partner.name,
+            email: partner.email,
+          }),
+        )
+      : null;
 
     return res.json({
       success: true,
-      message: "Partner rejected successfully",
+      emailSent,
+      message:
+        emailSent === false
+          ? "Partner rejected, but the notification email could not be sent"
+          : "Partner rejected successfully",
     });
   } catch (error) {
     console.error("REJECT ERROR:", error);

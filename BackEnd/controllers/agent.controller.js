@@ -7,6 +7,21 @@ import { getLeaderboard } from "../services/leaderboard.service.js";
 import Counter from "../models/Counter.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 
+// Same day one month earlier, clamped to that month's last day
+const oneMonthBefore = (date) => {
+  const result = new Date(date);
+  const day = result.getDate();
+  result.setDate(1);
+  result.setMonth(result.getMonth() - 1);
+  const lastDay = new Date(
+    result.getFullYear(),
+    result.getMonth() + 1,
+    0,
+  ).getDate();
+  result.setDate(Math.min(day, lastDay));
+  return result;
+};
+
 const cleanupCloudinaryFiles = async (files) => {
   if (!files) return;
 
@@ -51,6 +66,9 @@ export const applyAgent = async (req, res) => {
     const photoPath = getFilePath("photo");
 
     if (!aadhaarPath || !panPath || !photoPath) {
+      // Whichever of the three did arrive would otherwise stay on Cloudinary
+      await cleanupCloudinaryFiles(uploadedFiles);
+
       return res.status(400).json({
         success: false,
         message: "All documents are required",
@@ -408,11 +426,11 @@ export const agentDashboard = async (req, res) => {
   try {
     const { from, to } = req.query;
 
-    // ✅ DEFAULT (1 MONTH)
+    // ✅ DEFAULT (1 MONTH before the end date). This used today's date with
+    // the end date's month, which was wrong whenever "to" was given, and on
+    // the 29th–31st rolled forward (30 March − 1 month = 2 March).
     const endDate = to ? new Date(to) : new Date();
-    const startDate = from
-      ? new Date(from)
-      : new Date(new Date().setMonth(endDate.getMonth() - 1));
+    const startDate = from ? new Date(from) : oneMonthBefore(endDate);
 
     const data = await getAgentDashboard({
       agentId,
@@ -443,16 +461,18 @@ export const leaderboard = async (req, res) => {
   try {
     const { from, to, limit } = req.query;
 
-    // ✅ Default: last 30 days
+    // ✅ Default: the 30 days before the end date (this used today's month
+    // with the end date's day, so a given "to" gave a wrong or empty range)
     const endDate = to ? new Date(to) : new Date();
     const startDate = from
       ? new Date(from)
-      : new Date(new Date().setDate(endDate.getDate() - 30));
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const data = await getLeaderboard({
       from: startDate,
       to: endDate,
-      limit: limit || 10,
+      // Query strings arrive as text; the database rejects a text limit
+      limit: Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100),
     });
 
     res.json({

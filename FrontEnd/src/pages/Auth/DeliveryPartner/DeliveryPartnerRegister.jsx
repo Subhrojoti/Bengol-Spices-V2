@@ -66,8 +66,10 @@ export default function DeliveryPartnerRegister() {
       newErrors.email = "Enter a valid email address";
     }
 
-    if (!form.password || form.password.length < 6)
-      newErrors.password = "Password must be at least 6 characters";
+    // Same rule the server enforces, so the form does not accept what it refuses
+    if (!/^(?=.*[A-Za-z])(?=.*d).{6,}$/.test(form.password || ""))
+      newErrors.password =
+        "Password must be at least 6 characters, with letters and numbers";
 
     if (!form.idNumber.trim()) newErrors.idNumber = "ID Number required";
 

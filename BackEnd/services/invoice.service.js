@@ -1,4 +1,5 @@
 import Invoice from "../models/Invoice.js";
+import Order from "../models/Order.js";
 import { generateInvoiceNumber } from "../utils/invoiceNumber.js";
 import { generateInvoicePDFBuffer } from "../utils/generateInvoicePdf.js";
 import { uploadPdfToCloudinary } from "../utils/uploadPdf.js";
@@ -69,7 +70,7 @@ export const createInvoiceFromOrder = async (order) => {
     });
 
     // ✅ Generate PDF immediately
-    await regenerateInvoicePDF(invoice);
+    await regenerateInvoicePDF(invoice, order);
 
     return invoice;
   } catch (error) {
@@ -92,8 +93,13 @@ export const updateInvoiceAfterPayment = async ({
 
     if (!invoice) return;
 
-    invoice.paidAmount += amount;
-    invoice.dueAmount -= amount;
+    // 🔥 FIX: plain float arithmetic left a paid-off invoice at a due of
+    // something like 1e-14 (45.6 − 15.2 − 30.4), so it never became PAID.
+    // Rounded to paise and floored at zero, as the order itself already is.
+    const roundRupees = (value) => Math.round(Number(value) * 100) / 100;
+
+    invoice.paidAmount = roundRupees(invoice.paidAmount + amount);
+    invoice.dueAmount = Math.max(0, roundRupees(invoice.dueAmount - amount));
 
     invoice.payments.push({
       amount,
@@ -116,9 +122,14 @@ export const updateInvoiceAfterPayment = async ({
    GENERATE + UPLOAD PDF
 ============================= */
 
-export const regenerateInvoicePDF = async (invoice) => {
+export const regenerateInvoicePDF = async (invoice, order = null) => {
   try {
-    const pdfBuffer = await generateInvoicePDFBuffer(invoice);
+    // The invoice holds the amounts; the buyer's state (which decides
+    // CGST + SGST or IGST), city and payment mode are on the order.
+    const sourceOrder =
+      order ?? (await Order.findOne({ orderId: invoice.orderId }).lean());
+
+    const pdfBuffer = await generateInvoicePDFBuffer(invoice, sourceOrder);
 
     const pdfUrl = await uploadPdfToCloudinary(
       pdfBuffer,

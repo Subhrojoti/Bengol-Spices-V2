@@ -1,8 +1,21 @@
 import { Resend } from "resend";
+import { frontendBaseUrl } from "./frontendUrl.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM = "Bengol Spices <noreply@bengolspices.com>";
+
+/* Names, emails and phone numbers come from public application forms, and
+   were written into these emails as raw HTML: an applicant could put a
+   link or a fake "Approve" button into the admin inbox. Every value is
+   escaped before it goes into a template. */
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 export const sendAdminNotification = async ({
   customAgentId,
@@ -30,19 +43,19 @@ export const sendAdminNotification = async ({
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <tr>
                 <td style="padding: 8px; font-weight: bold;">Agent ID</td>
-                <td style="padding: 8px;">${customAgentId}</td>
+                <td style="padding: 8px;">${escapeHtml(customAgentId)}</td>
               </tr>
               <tr style="background: #f9fafb;">
                 <td style="padding: 8px; font-weight: bold;">Name</td>
-                <td style="padding: 8px;">${name}</td>
+                <td style="padding: 8px;">${escapeHtml(name)}</td>
               </tr>
               <tr>
                 <td style="padding: 8px; font-weight: bold;">Email</td>
-                <td style="padding: 8px;">${email}</td>
+                <td style="padding: 8px;">${escapeHtml(email)}</td>
               </tr>
               <tr style="background: #f9fafb;">
                 <td style="padding: 8px; font-weight: bold;">Phone</td>
-                <td style="padding: 8px;">${phone}</td>
+                <td style="padding: 8px;">${escapeHtml(phone)}</td>
               </tr>
             </table>
 
@@ -80,7 +93,7 @@ export const sendAdminNotification = async ({
 };
 
 export const sendAgentApprovalMail = async ({ email, agentId, token }) => {
-  const link = `${process.env.FRONTEND_URL}/agent-set-password?token=${token}`;
+  const link = `${frontendBaseUrl()}/agent-set-password?token=${token}`;
 
   const { error } = await resend.emails.send({
     from: FROM,
@@ -100,7 +113,7 @@ export const sendAgentApprovalMail = async ({ email, agentId, token }) => {
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
               <tr>
                 <td style="padding: 8px; font-weight: bold;">Agent ID</td>
-                <td style="padding: 8px;">${agentId}</td>
+                <td style="padding: 8px;">${escapeHtml(agentId)}</td>
               </tr>
             </table>
 
@@ -108,7 +121,7 @@ export const sendAgentApprovalMail = async ({ email, agentId, token }) => {
 
             <div style="margin-top: 25px; text-align: center;">
               <a
-                href="${link}"
+                href="${escapeHtml(link)}"
                 style="
                   background: #16a34a;
                   color: #ffffff;
@@ -125,7 +138,7 @@ export const sendAgentApprovalMail = async ({ email, agentId, token }) => {
 
             <p style="font-size: 12px; color: #6b7280; margin-top: 16px;">
               If the button doesn't work, copy and paste this link into your browser:<br/>
-              <a href="${link}">${link}</a>
+              <a href="${escapeHtml(link)}">${escapeHtml(link)}</a>
             </p>
           </div>
 
@@ -195,7 +208,7 @@ export const sendEmployeeWelcomeMail = async ({ name, email, employeeId }) => {
         <div style="font-family: Arial, sans-serif; line-height: 1.6;">
           <h2>Welcome to Bengol Spices</h2>
 
-          <p>Hello <strong>${name}</strong>,</p>
+          <p>Hello <strong>${escapeHtml(name)}</strong>,</p>
 
           <p>
             You have been successfully added as an <strong>Employee</strong> at
@@ -203,7 +216,7 @@ export const sendEmployeeWelcomeMail = async ({ name, email, employeeId }) => {
           </p>
 
           <p><strong>Your Employee ID:</strong></p>
-          <h3 style="color: #2c3e50;">${employeeId}</h3>
+          <h3 style="color: #2c3e50;">${escapeHtml(employeeId)}</h3>
 
           <p>
             This <strong>Employee ID</strong> will be used to log in to the system.
@@ -229,12 +242,15 @@ export const sendEmployeeWelcomeMail = async ({ name, email, employeeId }) => {
     if (error) {
       console.error("sendEmployeeWelcomeMail error:", error);
       // Email failure does NOT block employee creation — matches original behaviour
-    } else {
-      console.log("Employee welcome email sent to:", email);
+      return false;
     }
+
+    console.log("Employee welcome email sent to:", email);
+    return true;
   } catch (error) {
     console.error("SEND EMPLOYEE EMAIL ERROR:", error);
     // Email failure does NOT block employee creation — matches original behaviour
+    return false;
   }
 };
 
@@ -253,7 +269,7 @@ export const sendDeliveryPartnerApprovalMail = async ({ name, email }) => {
           </div>
 
           <div style="padding: 20px; color: #333;">
-            <p>Hello ${name},</p>
+            <p>Hello ${escapeHtml(name)},</p>
 
             <p>
               Great news! Your delivery partner account has been <strong>approved</strong>.
@@ -300,7 +316,7 @@ export const sendDeliveryPartnerRejectionMail = async ({ name, email }) => {
           </div>
 
           <div style="padding: 20px; color: #333;">
-            <p>Hello ${name},</p>
+            <p>Hello ${escapeHtml(name)},</p>
 
             <p>
               We regret to inform you that your delivery partner application has been 
@@ -352,18 +368,18 @@ export const sendPasswordResetMail = async ({ name, email, link, roleLabel }) =>
           </div>
 
           <div style="padding: 20px; color: #333;">
-            <p style="font-size: 15px;">Hello ${name || ""},</p>
+            <p style="font-size: 15px;">Hello ${escapeHtml(name)},</p>
 
             <p>
               We received a request to reset the password for your
-              <strong>${roleLabel}</strong> account.
+              <strong>${escapeHtml(roleLabel)}</strong> account.
               Click the button below to choose a new password.
               <strong>This link expires in 15 minutes.</strong>
             </p>
 
             <div style="margin-top: 25px; text-align: center;">
               <a
-                href="${link}"
+                href="${escapeHtml(link)}"
                 style="
                   background: #2563eb;
                   color: #ffffff;
@@ -380,7 +396,7 @@ export const sendPasswordResetMail = async ({ name, email, link, roleLabel }) =>
 
             <p style="font-size: 12px; color: #6b7280; margin-top: 16px;">
               If the button doesn't work, copy and paste this link into your browser:<br/>
-              <a href="${link}">${link}</a>
+              <a href="${escapeHtml(link)}">${escapeHtml(link)}</a>
             </p>
 
             <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">

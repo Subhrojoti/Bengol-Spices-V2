@@ -3,6 +3,15 @@ import Employee from "../models/Employee.js";
 import Counter from "../models/Counter.js";
 import { sendEmployeeWelcomeMail } from "../utils/email.js";
 import { createNotification } from "../services/notification.service.js";
+import cloudinary from "../config/cloudinary.js";
+
+// The photo is uploaded before this runs; a refused request must not leave it behind
+const discardUpload = async (file) => {
+  if (!file?.filename) return;
+  await cloudinary.uploader
+    .destroy(file.filename)
+    .catch((error) => console.error("PROFILE PHOTO CLEANUP FAILED:", error));
+};
 
 // ADMIN CREATE EMPLOYEE
 export const createEmployee = async (req, res) => {
@@ -10,6 +19,7 @@ export const createEmployee = async (req, res) => {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
+      await discardUpload(req.file);
       return res.status(400).json({
         success: false,
         message: "All fields are required",
@@ -23,6 +33,7 @@ export const createEmployee = async (req, res) => {
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
     if (!strongPassword.test(password)) {
+      await discardUpload(req.file);
       return res.status(400).json({
         success: false,
         message:
@@ -38,6 +49,7 @@ export const createEmployee = async (req, res) => {
 
     const exists = await Employee.findOne({ email: trimmedEmail });
     if (exists) {
+      await discardUpload(req.file);
       return res.status(400).json({
         success: false,
         message: "Employee already exists",
@@ -103,14 +115,15 @@ export const createEmployee = async (req, res) => {
     }
 
     if (!employee) {
+      await discardUpload(req.file);
       return res.status(500).json({
         success: false,
         message: "Failed to generate unique employee ID",
       });
     }
 
-    // 📧 SEND EMAIL
-    await sendEmployeeWelcomeMail({
+    // 📧 SEND EMAIL (never blocks creation; the panel is told if it failed)
+    const emailSent = await sendEmployeeWelcomeMail({
       name,
       email: trimmedEmail,
       employeeId: employee.employeeId,
@@ -118,12 +131,16 @@ export const createEmployee = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Employee created successfully",
+      emailSent,
+      message: emailSent
+        ? "Employee created successfully"
+        : `Employee created, but the welcome email could not be sent. Share the Employee ID ${employee.employeeId} with them directly.`,
       employeeId: employee.employeeId,
       profilePic: employee.profilePic,
     });
   } catch (error) {
     console.error("CREATE EMPLOYEE ERROR:", error);
+    await discardUpload(req.file);
 
     // 🔥 FIX: gracefully handle a duplicate email slipping through a race
     // between the pre-check above and the actual insert, instead of a

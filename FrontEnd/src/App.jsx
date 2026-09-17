@@ -23,23 +23,23 @@ const ToastIcon = ({ type }) => {
 
 function App() {
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
+    <BrowserRouter>
+      <ErrorBoundary>
         <AppRouter />
-        <ToastContainer
-          position="top-right"
-          autoClose={3500}
-          newestOnTop
-          closeOnClick
-          pauseOnHover
-          pauseOnFocusLoss={false}
-          draggable
-          hideProgressBar={false}
-          theme="light"
-          icon={ToastIcon}
-        />
-      </BrowserRouter>
-    </ErrorBoundary>
+      </ErrorBoundary>
+      <ToastContainer
+        position="top-right"
+        autoClose={3500}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        pauseOnFocusLoss={false}
+        draggable
+        hideProgressBar={false}
+        theme="light"
+        icon={ToastIcon}
+      />
+    </BrowserRouter>
   );
 }
 

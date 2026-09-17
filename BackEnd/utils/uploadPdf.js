@@ -1,11 +1,12 @@
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import { invoiceFileName } from "./invoiceNumber.js";
 export const uploadPdfToCloudinary = (buffer, invoiceNumber) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         resource_type: "auto",
-        public_id: `bengol_spices/invoices/${invoiceNumber}.pdf`,
+        public_id: `bengol_spices/invoices/${invoiceFileName(invoiceNumber)}.pdf`,
         format: "pdf",
         overwrite: true,
       },

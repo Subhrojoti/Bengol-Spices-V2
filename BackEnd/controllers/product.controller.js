@@ -13,6 +13,34 @@ const toOptionalPrice = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const destroyImage = async (publicId) => {
+  if (!publicId) return;
+  await cloudinary.uploader
+    .destroy(publicId)
+    .catch((error) => console.error("PRODUCT IMAGE CLEANUP FAILED:", error));
+};
+
+/* Fields an edit may change. Everything else (images, createdBy, _id…) used
+   to be writable too, straight from the form body. */
+const EDITABLE_FIELDS = [
+  "name",
+  "title",
+  "description",
+  "brand",
+  "category",
+  "sku",
+  "uom",
+  "price",
+  "discountPrice",
+  "retailerPrice",
+  "wholesalerPrice",
+  "distributorPrice",
+  "gstPercentage",
+  "stock",
+  "minOrderQty",
+  "status",
+];
+
 export const createProduct = async (req, res) => {
   let frontPublicId = null;
   let backPublicId = null;
@@ -37,12 +65,13 @@ export const createProduct = async (req, res) => {
       distributorPrice,
     } = req.body;
 
-    if (!req.files?.frontImage || !req.files?.backImage) {
+    // Taken first, so an upload of only one image is still cleaned up below
+    frontPublicId = req.files?.frontImage?.[0]?.filename ?? null;
+    backPublicId = req.files?.backImage?.[0]?.filename ?? null;
+
+    if (!frontPublicId || !backPublicId) {
       throw new Error("Both front and back images are required");
     }
-
-    frontPublicId = req.files.frontImage[0].filename;
-    backPublicId = req.files.backImage[0].filename;
 
     // 🔥 FIX: trim before the duplicate check — same whitespace-bypass
     // class of bug already fixed for phone/email elsewhere. Without this,
@@ -97,13 +126,9 @@ export const createProduct = async (req, res) => {
       productId: product._id,
     });
   } catch (error) {
-    // 🔥 CLEANUP CLOUDINARY FILES
-    if (frontPublicId) {
-      await cloudinary.uploader.destroy(frontPublicId);
-    }
-    if (backPublicId) {
-      await cloudinary.uploader.destroy(backPublicId);
-    }
+    // 🔥 CLEANUP CLOUDINARY FILES (a failed clean-up must not hide the reason)
+    await destroyImage(frontPublicId);
+    await destroyImage(backPublicId);
 
     return res.status(400).json({
       success: false,
@@ -212,8 +237,28 @@ export const updateProduct = async (req, res) => {
       "minOrderQty",
     ];
 
-    Object.keys(req.body).forEach((key) => {
-      if (key === "certificates") return; // handled separately below
+    /* 🔥 FIX: stock sent with an edit was written as an absolute number. The
+       edit form sends the stock it showed when it was opened, so saving any
+       change (a new description, a price) put back units that orders had
+       taken in the meantime, and those units were sold twice. When the form
+       also sends previousStock, the difference is applied to the current
+       stock instead, and an unchanged stock is left alone. */
+    let stockAdjustment = null;
+
+    if (req.body.stock !== undefined && req.body.previousStock !== undefined) {
+      const next = Number(req.body.stock);
+      const previous = Number(req.body.previousStock);
+
+      if (!Number.isFinite(next) || !Number.isFinite(previous) || next < 0) {
+        throw new Error("Stock must be a number of 0 or more");
+      }
+
+      stockAdjustment = next - previous;
+    }
+
+    EDITABLE_FIELDS.forEach((key) => {
+      if (req.body[key] === undefined) return;
+      if (key === "stock" && stockAdjustment !== null) return; // applied below
 
       if (numericFields.includes(key)) {
         // ✅ Safely parse numeric fields — avoids string storage from multipart
@@ -229,11 +274,23 @@ export const updateProduct = async (req, res) => {
 
     await product.save();
 
+    if (stockAdjustment) {
+      await Product.updateOne(
+        { _id: product._id },
+        { $inc: { stock: stockAdjustment } },
+      );
+      // Orders may have taken more than the reduction left; never below zero
+      await Product.updateOne(
+        { _id: product._id, stock: { $lt: 0 } },
+        { $set: { stock: 0 } },
+      );
+    }
+
     // 🔥 FIX: only clean up the OLD images now that the new state is
     // safely persisted — this is the earliest point it's actually safe
     // to delete them.
-    if (oldFrontId) await cloudinary.uploader.destroy(oldFrontId);
-    if (oldBackId) await cloudinary.uploader.destroy(oldBackId);
+    await destroyImage(oldFrontId);
+    await destroyImage(oldBackId);
 
     return res.json({
       success: true,
@@ -242,12 +299,17 @@ export const updateProduct = async (req, res) => {
   } catch (error) {
     // Cleanup newly uploaded images on error (old images were never
     // touched in this path, so the product's existing data stays valid)
-    if (newFrontId) await cloudinary.uploader.destroy(newFrontId);
-    if (newBackId) await cloudinary.uploader.destroy(newBackId);
+    await destroyImage(newFrontId);
+    await destroyImage(newBackId);
 
     return res.status(400).json({
       success: false,
-      message: error.message,
+      // Changing the SKU to one already in use answered with the raw
+      // "E11000 duplicate key" database error
+      message:
+        error.code === 11000
+          ? "Product with this SKU already exists"
+          : error.message,
     });
   }
 };
@@ -273,8 +335,9 @@ export const deleteProduct = async (req, res) => {
     // still shown to users.
     await product.deleteOne();
 
-    await cloudinary.uploader.destroy(product.images.front.publicId);
-    await cloudinary.uploader.destroy(product.images.back.publicId);
+    // The product is already gone; a failed image clean-up is only logged
+    await destroyImage(product.images?.front?.publicId);
+    await destroyImage(product.images?.back?.publicId);
 
     return res.json({
       success: true,

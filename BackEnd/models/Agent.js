@@ -76,6 +76,8 @@ const agentSchema = new mongoose.Schema(
 
     passwordResetToken: String,
     passwordResetExpires: Date,
+    // Logins issued before this moment are no longer accepted
+    passwordChangedAt: Date,
 
     status: {
       type: String,

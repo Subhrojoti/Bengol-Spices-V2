@@ -54,4 +54,7 @@ router.get(
 
 // Cancel Return (Agent)
 router.put("/:returnId/cancel", protect, isAgent, cancelReturn);
+// Agent app builds already installed send POST here; without this they got
+// "Route not found" and Cancel Return did nothing
+router.post("/:returnId/cancel", protect, isAgent, cancelReturn);
 export default router;

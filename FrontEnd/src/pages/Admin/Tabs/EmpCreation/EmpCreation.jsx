@@ -163,14 +163,20 @@ const CreateEmployee = ({ onCreated }) => {
     try {
       setLoading(true);
 
-      await createEmployee({
+      const result = await createEmployee({
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
         profilePic: photo,
       });
 
-      toast.success("Employee created. Their ID was emailed to them.");
+      // The account exists either way; the ID has to be passed on by hand
+      // when the welcome email could not be sent
+      if (result?.emailSent === false) {
+        toast.warning(result.message);
+      } else {
+        toast.success("Employee created. Their ID was emailed to them.");
+      }
       setForm({ name: "", email: "", password: "" });
       setPhoto(null);
       onCreated?.();

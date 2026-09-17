@@ -11,6 +11,7 @@ import {
   Phone,
   RefreshCcw,
   Search,
+  Send,
   ShieldCheck,
   ShieldX,
   UserRound,
@@ -186,13 +187,15 @@ export default function AgentManagement() {
     if (!pendingAction) return;
 
     const { agent, action } = pendingAction;
-    const approving = action === "approve";
+    // Resending the setup link goes through approve as well
+    const approving = action === "approve" || action === "resend";
 
     try {
       setBusy(true);
 
-      if (approving) await approveAgent(agent.agentId);
-      else await rejectAgent(agent.agentId);
+      const response = approving
+        ? await approveAgent(agent.agentId)
+        : await rejectAgent(agent.agentId);
 
       setAgents((prev) =>
         prev.map((a) =>
@@ -202,11 +205,20 @@ export default function AgentManagement() {
         ),
       );
 
-      toast.success(
-        approving
-          ? `${agent.name} approved. A password setup link has been emailed.`
-          : `${agent.name} rejected. A notification has been emailed.`,
-      );
+      /* The change is saved even when the email fails. This used to show
+         "emailed" regardless, or an error for an approval that had gone
+         through, leaving the agent with no link and no way to resend it. */
+      if (response?.data?.emailSent === false) {
+        toast.warning(response.data.message);
+      } else {
+        toast.success(
+          action === "resend"
+            ? `A new password setup link has been emailed to ${agent.name}.`
+            : approving
+              ? `${agent.name} approved. A password setup link has been emailed.`
+              : `${agent.name} rejected. A notification has been emailed.`,
+        );
+      }
       setPendingAction(null);
     } catch (error) {
       console.error(error);
@@ -392,6 +404,20 @@ export default function AgentManagement() {
                               </>
                             )}
 
+                            {/* Approved but never set a password: the setup
+                                email failed or its link ran out */}
+                            {agent.status === "APPROVED" && agent.passwordSet === false && (
+                              <button
+                                onClick={() =>
+                                  setPendingAction({ agent, action: "resend" })
+                                }
+                                title="This agent has not set a password yet"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13.5px] font-semibold text-slate-700 transition hover:bg-slate-50">
+                                <Send size={14} />
+                                Resend link
+                              </button>
+                            )}
+
                             <button
                               onClick={() => setOpenRow(isOpen ? null : agent._id)}
                               aria-label={isOpen ? "Hide details" : "Show details"}
@@ -516,23 +542,29 @@ export default function AgentManagement() {
       <ConfirmDialog
         open={Boolean(pendingAction)}
         busy={busy}
-        tone={pendingAction?.action === "approve" ? "success" : "danger"}
+        tone={pendingAction?.action === "reject" ? "danger" : "success"}
         icon={
-          pendingAction?.action === "approve" ? (
+          pendingAction?.action === "resend" ? (
+            <Send size={19} />
+          ) : pendingAction?.action === "approve" ? (
             <ShieldCheck size={19} />
           ) : (
             <ShieldX size={19} />
           )
         }
         title={
-          pendingAction?.action === "approve"
-            ? "Approve this agent?"
-            : "Reject this agent?"
+          pendingAction?.action === "resend"
+            ? "Resend the password setup link?"
+            : pendingAction?.action === "approve"
+              ? "Approve this agent?"
+              : "Reject this agent?"
         }
         description={
-          pendingAction?.action === "approve"
-            ? "They will be emailed a link to set their password and can sign in straight away."
-            : "They will be emailed to say their application was rejected."
+          pendingAction?.action === "resend"
+            ? "They have not set a password yet. A new link will be emailed, and any earlier link stops working."
+            : pendingAction?.action === "approve"
+              ? "They will be emailed a link to set their password and can sign in straight away."
+              : "They will be emailed to say their application was rejected."
         }
         detail={
           pendingAction && (
@@ -554,9 +586,11 @@ export default function AgentManagement() {
         confirmLabel={
           busy
             ? "Working…"
-            : pendingAction?.action === "approve"
-              ? "Approve agent"
-              : "Reject agent"
+            : pendingAction?.action === "resend"
+              ? "Resend link"
+              : pendingAction?.action === "approve"
+                ? "Approve agent"
+                : "Reject agent"
         }
         onConfirm={runAction}
         onClose={() => setPendingAction(null)}

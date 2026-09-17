@@ -5,6 +5,7 @@ import Agent from "../models/Agent.js";
 import Employee from "../models/Employee.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import { sendPasswordResetMail } from "../utils/email.js";
+import { frontendBaseUrl } from "../utils/frontendUrl.js";
 
 // Generate link for the Password
 
@@ -12,8 +13,33 @@ export const setPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
 
+    /* 🔥 FIX: token went into the query exactly as sent. Sending an object
+       such as {"$ne": null} instead of a string matched ANY agent holding a
+       live link — including one generated moments earlier by requesting
+       "forgot password" for someone else's agent ID — and set that agent's
+       password. Only a plain string is accepted now. */
+    if (typeof token !== "string" || !token || typeof password !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
+
+    if (!STRONG_PASSWORD_REGEX.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 6 characters long and contain letters and numbers",
+      });
+    }
+
+    // Approval links now store only a hash of the token. The plain match
+    // keeps links sent before this change working until they expire.
     const agent = await Agent.findOne({
-      passwordResetToken: token,
+      $or: [
+        { passwordResetToken: hashResetToken(token) },
+        { passwordResetToken: token },
+      ],
       passwordResetExpires: { $gt: Date.now() },
     });
 
@@ -27,6 +53,7 @@ export const setPassword = async (req, res) => {
     agent.password = await bcrypt.hash(password, 10);
     agent.passwordResetToken = undefined;
     agent.passwordResetExpires = undefined;
+    agent.passwordChangedAt = new Date();
 
     await agent.save();
     res.json({
@@ -44,14 +71,23 @@ export const agentLogin = async (req, res) => {
   try {
     const { agentId, password } = req.body;
 
-    if (!agentId || !password) {
+    // Strings only: an object here would be read as a query operator
+    if (
+      typeof agentId !== "string" ||
+      typeof password !== "string" ||
+      !agentId.trim() ||
+      !password
+    ) {
       return res.status(400).json({
         success: false,
         message: "Agent ID and password are required",
       });
     }
 
-    const agent = await Agent.findOne({ agentId });
+    // Agent IDs are issued in capitals (BS2026-001); forgive the case typed
+    const agent = await Agent.findOne({
+      agentId: agentId.trim().toUpperCase(),
+    });
 
     if (!agent) {
       return res.status(404).json({
@@ -64,6 +100,16 @@ export const agentLogin = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Agent not approved yet",
+      });
+    }
+
+    // Approved but the set-password link was never used: bcrypt would throw
+    // on the missing hash and the agent would only see a server error
+    if (!agent.password) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your password has not been set yet. Use the link in your approval email, or Forgot password.",
       });
     }
 
@@ -195,7 +241,12 @@ export const employeeLogin = async (req, res) => {
   try {
     const { employeeId, password } = req.body;
 
-    if (!employeeId || !password) {
+    if (
+      typeof employeeId !== "string" ||
+      typeof password !== "string" ||
+      !employeeId.trim() ||
+      !password
+    ) {
       return res.status(400).json({
         success: false,
         message: "Employee ID and password are required",
@@ -309,12 +360,6 @@ const STRONG_PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
 const hashResetToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
 
-const frontendBaseUrl = () =>
-  (process.env.FRONTEND_URL || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean)[0] || "http://localhost:5173";
-
 // Generic response so callers cannot enumerate accounts
 const GENERIC_FORGOT_MESSAGE =
   "If an account matching those details exists, a password reset link has been sent to the registered email.";
@@ -387,7 +432,7 @@ const issuePasswordReset = async ({ user, roleLabel, resetPath }, res) => {
 const applyPasswordReset = async (Model, req, res) => {
   const { token, password, confirmPassword } = req.body;
 
-  if (!token || !password) {
+  if (!token || typeof password !== "string" || !password) {
     return res.status(400).json({
       success: false,
       message: "Token and new password are required",
@@ -431,6 +476,8 @@ const applyPasswordReset = async (Model, req, res) => {
   user.password = await bcrypt.hash(password, 10);
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
+  // Anyone still logged in with the old password is signed out
+  user.passwordChangedAt = new Date();
   await user.save();
 
   return res.json({
@@ -455,7 +502,13 @@ export const agentForgotPassword = async (req, res) => {
       ? { agentId: String(agentId).trim().toUpperCase() }
       : { email: String(email).trim().toLowerCase() };
 
-    const agent = await Agent.findOne(query);
+    /* Agent emails were saved exactly as typed, so "Ravi@Gmail.com" never
+       matched the lower-cased lookup and that agent could not reset by
+       email. The collation compares without regard to case. */
+    const agent = await Agent.findOne(query).collation({
+      locale: "en",
+      strength: 2,
+    });
 
     // Only approved agents have a password to reset
     if (agent && agent.status !== "APPROVED") {

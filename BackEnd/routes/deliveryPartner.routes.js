@@ -9,17 +9,19 @@ import {
   getProfile,
   getDeliveryPartnerHistory,
   getMyDeliveryHistory,
+  changeDeliveryPartnerPassword,
 } from "../controllers/deliveryPartner.controller.js";
 import { upload } from "../middleware/upload.js";
 import { protect } from "../middleware/auth.js";
 import { isDeliveryPartner } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
+import { limitLoginAttempts } from "../middleware/loginLimiter.js";
 
 const router = express.Router();
 
 router.post("/register", upload.single("document"), registerDeliveryPartner);
 
-router.post("/login", loginDeliveryPartner);
+router.post("/login", limitLoginAttempts("phone"), loginDeliveryPartner);
 router.post("/logout", protect, isDeliveryPartner, logoutDeliveryPartner);
 router.get(
   "/all",
@@ -47,4 +49,12 @@ router.get(
 );
 
 router.get("/profile", protect, isDeliveryPartner, getProfile);
+
+// Change password while signed in
+router.post(
+  "/change-password",
+  protect,
+  isDeliveryPartner,
+  changeDeliveryPartnerPassword,
+);
 export default router;

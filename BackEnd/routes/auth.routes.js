@@ -12,12 +12,13 @@ import {
 } from "../controllers/auth.controller.js";
 import { adminLogin } from "../controllers/admin.auth.js";
 import { protect } from "../middleware/auth.js";
+import { limitLoginAttempts } from "../middleware/loginLimiter.js";
 
 const router = express.Router();
-// 🔐 LOGIN
-router.post("/agent/login", agentLogin);
-router.post("/admin/login", adminLogin);
-router.post("/employee/login", employeeLogin);
+// 🔐 LOGIN (repeated wrong passwords lock that account's login for a while)
+router.post("/agent/login", limitLoginAttempts("agentId"), agentLogin);
+router.post("/admin/login", limitLoginAttempts("email"), adminLogin);
+router.post("/employee/login", limitLoginAttempts("employeeId"), employeeLogin);
 
 // 🔑 FORGOT / RESET PASSWORD (PUBLIC)
 router.post("/agent/forgot-password", agentForgotPassword);

@@ -329,10 +329,11 @@ export const getDeliveryPartnerReturns = async () => {
 
 // Update Delivery order status
 
-export const updateDeliveryStatus = async (orderId, status) => {
+// Marking an order DELIVERED needs the store owner's 6-digit delivery code
+export const updateDeliveryStatus = async (orderId, status, deliveryCode) => {
   const response = await axiosInstance.put(
     `/agent/orders/${orderId}/delivery-status`,
-    { status },
+    deliveryCode ? { status, deliveryCode } : { status },
   );
   return response.data;
 };
@@ -347,19 +348,17 @@ export const updateReturnStatus = async (returnId, status) => {
   return response.data;
 };
 
-// Generate OTP for delivery
-export const generateDeliveryOtp = async (orderId) => {
-  const response = await axiosInstance.put(
-    `/agent/orders/${orderId}/generate-otp`,
-  );
+// Delivered orders and completed returns of the signed-in delivery partner
+export const getMyDeliveryHistory = async () => {
+  const response = await axiosInstance.get("/delivery-partner/history");
   return response.data;
 };
 
-// Verify OTP for delivery
-export const verifyDeliveryOtp = async (orderId, otp) => {
-  const response = await axiosInstance.put(
-    `/agent/orders/${orderId}/verify-otp`,
-    { otp },
+// Delivery partner changes their own password; answers with a fresh token
+export const changeDeliveryPassword = async (payload) => {
+  const response = await axiosInstance.post(
+    "/delivery-partner/change-password",
+    payload,
   );
   return response.data;
 };
@@ -464,6 +463,27 @@ export const getDueOrders = async () => {
 export const getPaymentSummary = async () => {
   const response = await axiosInstance.get(
     "/agent/orders/complete-payment-summary",
+  );
+  return response.data;
+};
+
+// Razorpay / QR payments taken but not applied or refunded automatically
+export const getPaymentIssues = async () => {
+  const response = await axiosInstance.get("/agent/orders/payment-issues");
+  return response.data;
+};
+
+export const refundPaymentIssue = async (id) => {
+  const response = await axiosInstance.post(
+    `/agent/orders/payment-issues/${id}/refund`,
+  );
+  return response.data;
+};
+
+export const resolvePaymentIssue = async (id, note) => {
+  const response = await axiosInstance.post(
+    `/agent/orders/payment-issues/${id}/resolve`,
+    { note },
   );
   return response.data;
 };

@@ -29,6 +29,8 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // Logins issued before this moment are no longer accepted
+    passwordChangedAt: Date,
     profilePic: {
       url: String,
       publicId: String,

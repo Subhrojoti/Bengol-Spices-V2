@@ -49,9 +49,23 @@ export const getAgentDashboard = async ({ agentId, from, to }) => {
                     $cond: [{ $eq: ["$status", "CANCELLED"] }, 1, 0],
                   },
                 },
-                totalSalesAmount: { $sum: "$totalAmount" },
-                totalCollected: { $sum: "$paidAmount" },
-                totalDue: { $sum: "$dueAmount" },
+                // Cancelled orders are counted above but are not sales, and
+                // their due will never be collected
+                totalSalesAmount: {
+                  $sum: {
+                    $cond: [{ $ne: ["$status", "CANCELLED"] }, "$totalAmount", 0],
+                  },
+                },
+                totalCollected: {
+                  $sum: {
+                    $cond: [{ $ne: ["$status", "CANCELLED"] }, "$paidAmount", 0],
+                  },
+                },
+                totalDue: {
+                  $sum: {
+                    $cond: [{ $ne: ["$status", "CANCELLED"] }, "$dueAmount", 0],
+                  },
+                },
               },
             },
           ],
@@ -72,9 +86,21 @@ export const getAgentDashboard = async ({ agentId, from, to }) => {
                     $cond: [{ $eq: ["$status", "CANCELLED"] }, 1, 0],
                   },
                 },
-                sales: { $sum: "$totalAmount" },
-                collected: { $sum: "$paidAmount" },
-                due: { $sum: "$dueAmount" },
+                sales: {
+                  $sum: {
+                    $cond: [{ $ne: ["$status", "CANCELLED"] }, "$totalAmount", 0],
+                  },
+                },
+                collected: {
+                  $sum: {
+                    $cond: [{ $ne: ["$status", "CANCELLED"] }, "$paidAmount", 0],
+                  },
+                },
+                due: {
+                  $sum: {
+                    $cond: [{ $ne: ["$status", "CANCELLED"] }, "$dueAmount", 0],
+                  },
+                },
               },
             },
             { $sort: { "_id.year": 1, "_id.month": 1 } },
@@ -183,11 +209,17 @@ export const getAgentDashboard = async ({ agentId, from, to }) => {
       monthMap[`${m.month}-${m.year}`] = m;
     });
 
-    const current = new Date(start);
+    /* Stepped from the 1st of the month, in UTC like the $month/$year
+       grouping above. Stepping from the start date's own day skipped months
+       (31 Jan + 1 month is 3 Mar), and the server locale's month name did
+       not always match the "Jan"…"Dec" keys. */
+    const current = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1),
+    );
 
     while (current <= end) {
-      const month = current.toLocaleString("default", { month: "short" });
-      const year = current.getFullYear();
+      const month = monthNames[current.getUTCMonth() + 1];
+      const year = current.getUTCFullYear();
 
       const key = `${month}-${year}`;
 
@@ -203,7 +235,7 @@ export const getAgentDashboard = async ({ agentId, from, to }) => {
         },
       );
 
-      current.setMonth(current.getMonth() + 1);
+      current.setUTCMonth(current.getUTCMonth() + 1);
     }
 
     return result;
@@ -301,6 +333,7 @@ export const getAdminDashboard = async ({ year }) => {
 
     profitData,
     returnAmountData,
+    inProgressOrders,
   ] = await Promise.all([
     // ================= COUNTS =================
     Order.countDocuments(),
@@ -313,16 +346,21 @@ export const getAdminDashboard = async ({ year }) => {
     // ================= ORDER STATS =================
     Order.countDocuments({ status: "DELIVERED" }),
     Order.countDocuments({ status: "CANCELLED" }),
-    Order.countDocuments({ paymentStatus: "PENDING" }),
-    Return.countDocuments({
-      createdAt: { $gte: startOfYear, $lte: endOfYear },
-    }),
+    // A cancelled order keeps its due, but nobody will collect it
+    Order.countDocuments({ paymentStatus: "PENDING", status: { $ne: "CANCELLED" } }),
+    /* All time, like the other order counts beside it on the dashboard; a
+       cancelled return request is not a return. This counted only this
+       year, while every other figure on the card covered all time. */
+    Return.countDocuments({ status: { $ne: "CANCELLED" } }),
 
     // ================= REVENUE =================
+    // Cancelled orders excluded here and below: their totals and dues were
+    // being counted as sales, money collected and money still owed
     Order.aggregate([
       {
         $match: {
           createdAt: { $gte: startOfYear, $lte: endOfYear },
+          status: { $ne: "CANCELLED" },
         },
       },
       {
@@ -399,6 +437,7 @@ export const getAdminDashboard = async ({ year }) => {
       {
         $match: {
           createdAt: { $gte: startOfYear, $lte: endOfYear },
+          status: { $ne: "CANCELLED" },
         },
       },
       { $unwind: "$products" },
@@ -417,6 +456,7 @@ export const getAdminDashboard = async ({ year }) => {
       {
         $match: {
           createdAt: { $gte: startOfYear, $lte: endOfYear },
+          status: { $ne: "CANCELLED" },
         },
       },
       {
@@ -440,7 +480,6 @@ export const getAdminDashboard = async ({ year }) => {
         $group: {
           _id: null,
           totalSales: { $sum: "$totalAmount" },
-          totalDue: { $sum: "$dueAmount" },
           totalCollected: { $sum: "$paidAmount" },
         },
       },
@@ -460,6 +499,15 @@ export const getAdminDashboard = async ({ year }) => {
         },
       },
     ]),
+
+    /* Orders still on their way. With delivered and cancelled this
+       accounts for every order, so the dashboard can show a breakdown that
+       adds up to the total. */
+    Order.countDocuments({
+      status: {
+        $in: ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"],
+      },
+    }),
   ]);
 
   // =========================
@@ -514,12 +562,19 @@ export const getAdminDashboard = async ({ year }) => {
   // =========================
 
   const totalSales = profitData?.[0]?.totalSales || 0;
-  const totalDue = profitData?.[0]?.totalDue || 0;
+  /* Everything still owed on this year's orders that were not cancelled.
+     This counted delivered orders only, but agents collect dues before
+     delivery too, so undelivered orders' dues were left out. */
+  const totalDue =
+    Math.round(revenueMonthly.reduce((sum, m) => sum + m.due, 0) * 100) / 100;
   const totalCollected = profitData?.[0]?.totalCollected || 0;
   const totalRefund = returnAmountData?.[0]?.totalRefund || 0;
+  /* Share of delivered orders that came back. Only a delivered order can be
+     returned, so orders still on their way or cancelled do not belong in
+     the base; dividing by all orders understated the rate. */
   const returnRate =
-    totalOrders > 0
-      ? Number(((totalReturns / totalOrders) * 100).toFixed(2))
+    deliveredOrders > 0
+      ? Number(((totalReturns / deliveredOrders) * 100).toFixed(2))
       : 0;
 
   const profit = totalCollected - totalRefund;
@@ -535,6 +590,7 @@ export const getAdminDashboard = async ({ year }) => {
     },
 
     orderStats: {
+      inProgress: inProgressOrders,
       delivered: deliveredOrders,
       cancelled: cancelledOrders,
       pendingPayments,

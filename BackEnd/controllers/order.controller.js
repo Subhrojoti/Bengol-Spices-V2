@@ -7,17 +7,23 @@ import Order from "../models/Order.js";
 import Store from "../models/store.js";
 import Product from "../models/Product.js";
 import Invoice from "../models/Invoice.js";
-import {
-  createInvoiceFromOrder,
-  regenerateInvoicePDF,
-  updateInvoiceAfterPayment,
-} from "../services/invoice.service.js";
+import { createInvoiceFromOrder } from "../services/invoice.service.js";
 import { createShiprocketOrder } from "../services/shiprocket.service.js";
 import Payment from "../models/Payment.js";
 import { createNotification } from "../services/notification.service.js";
 import { razorpayInstance } from "../config/razorpay.js";
 import Agent from "../models/Agent.js";
 import { updateTargetProgress } from "../services/target.service.js";
+import mongoose from "mongoose";
+import GatewayPayment from "../models/GatewayPayment.js";
+import {
+  applyDuePayment,
+  beginGatewayPayment,
+  markGatewayPayment,
+  refundGatewayPayment,
+  respondToClaimedGatewayPayment,
+  settleFailedGatewayPayment,
+} from "../services/payment.service.js";
 
 /* =============================
    HELPER: Resolve tiered price based on store type
@@ -36,12 +42,59 @@ const resolvePrice = (productDoc, storeType, fallbackUnitPrice) => {
   const tieredPrice = priceMap[storeType];
 
   // ✅ Only use tiered price if it's set and valid (> 0)
-  // Otherwise fall back to what agent passed as unitPrice
   if (tieredPrice !== null && tieredPrice !== undefined && tieredPrice > 0) {
     return tieredPrice;
   }
 
-  return fallbackUnitPrice;
+  /* 🔒 FIX: without a tiered price, the agent's own unitPrice was charged
+     as sent, so a hand-made request could sell at any price at all. It is
+     accepted now only when it matches one of the product's catalogue
+     prices (what the apps show); anything else is replaced by the
+     catalogue price. */
+  const catalogue = [productDoc.discountPrice, productDoc.price].filter(
+    (p) => typeof p === "number" && p > 0,
+  );
+
+  if (!catalogue.length) return fallbackUnitPrice;
+
+  const sent = Number(fallbackUnitPrice);
+  const matches = catalogue.some((p) => Math.abs(p - sent) < 0.005);
+
+  return matches ? sent : catalogue[0];
+};
+
+const roundRupees = (value) => Math.round(Number(value) * 100) / 100;
+
+/* Razorpay's own record of a payment — the amount actually charged, never
+   the amount the app reports. Returns null unless it belongs to the given
+   Razorpay order and the money was taken. */
+const fetchVerifiedRazorpayPayment = async (paymentId, razorpayOrderId) => {
+  const payment = await razorpayInstance.payments.fetch(paymentId);
+
+  if (
+    !payment ||
+    payment.order_id !== razorpayOrderId ||
+    !["captured", "authorized"].includes(payment.status)
+  ) {
+    return null;
+  }
+
+  return payment;
+};
+
+// Signature check that takes the same time whether or not it matches
+const signatureMatches = (razorpayOrderId, razorpayPaymentId, signature) => {
+  if (typeof signature !== "string") return false;
+
+  const expected = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+    .digest("hex");
+
+  return (
+    signature.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+  );
 };
 
 /* =============================
@@ -193,6 +246,8 @@ export const placeOrder = async (req, res) => {
         !item.uom ||
         !item.quantity ||
         !item.unitPrice ||
+        !Number.isFinite(Number(item.quantity)) ||
+        !Number.isFinite(Number(item.unitPrice)) ||
         item.quantity <= 0 ||
         item.unitPrice < 0
       ) {
@@ -214,6 +269,16 @@ export const placeOrder = async (req, res) => {
         productDoc = await Product.findOne({
           name: item.name,
           status: "ACTIVE",
+        });
+      }
+
+      /* 🔒 FIX: a line that matched no product used to be accepted anyway,
+         with whatever name and price the request carried and no stock
+         taken. Every line must now be a real, active catalogue product. */
+      if (!productDoc || productDoc.status !== "ACTIVE") {
+        return res.status(400).json({
+          success: false,
+          message: `${item.name} is no longer available. Please remove it from the cart.`,
         });
       }
 
@@ -242,18 +307,44 @@ export const placeOrder = async (req, res) => {
          CALCULATE TOTAL
          ============================= */
 
-      item.totalPrice = item.quantity * item.unitPrice;
-      totalAmount += item.totalPrice;
+      /* Rounded to paise. Plain float sums (12.1 × 3 = 36.300000000000004)
+         left an order paid in full owing a fraction of a paisa, so it stayed
+         PENDING and listed as due for good. */
+      item.totalPrice = roundRupees(Number(item.quantity) * item.unitPrice);
+      totalAmount = roundRupees(totalAmount + item.totalPrice);
     }
 
-    if (paidAmount < 0 || paidAmount > totalAmount) {
+    // The apps add up the cart with the same float error, so what they send
+    // as "paid in full" is rounded the same way before it is compared.
+    const paid = roundRupees(paidAmount);
+
+    if (!Number.isFinite(paid) || paid < 0 || paid > totalAmount) {
       return res.status(400).json({
         success: false,
         message: "Invalid paid amount",
       });
     }
 
-    const dueAmount = totalAmount - paidAmount;
+    /* The Order model requires at least ₹1 paid. Anything less used to pass
+       here and then fail validation after stock had been reserved. */
+    if (paid < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Paid amount must be at least ₹1",
+      });
+    }
+
+    const dueAmount = roundRupees(totalAmount - paid);
+
+    /* 🔥 FIX: verifyPaymentAndPlaceOrder labels an order ONLINE only when the
+       amount paid equals orderPayload.totalAmount — a field the app never
+       sends (the total is worked out here). Every order paid online arrived
+       as MIXED, even one paid in full. Now that the total is known, a
+       verified Razorpay payment covering all of it is ONLINE. */
+    const finalPaymentMode =
+      paymentMode === "MIXED" && razorpay_payment_id && dueAmount < 0.005
+        ? "ONLINE"
+        : paymentMode;
 
     /* =============================
        TAKE STOCK
@@ -307,9 +398,9 @@ export const placeOrder = async (req, res) => {
       agentId,
       products,
       totalAmount,
-      paidAmount,
+      paidAmount: paid,
       dueAmount,
-      paymentMode,
+      paymentMode: finalPaymentMode,
       dueDate,
       orderLocation: {
         // 🔥 FIX: this is the bug behind delivery partners being sent to
@@ -345,14 +436,25 @@ export const placeOrder = async (req, res) => {
       paymentStatus: dueAmount === 0 ? "COMPLETED" : "PENDING",
     });
 
+    /* The order now owns the stock it reserved. Releasing it on a later
+       failure put stock back for goods that were still going out, and the
+       500 invited the agent to place the same order again. */
+    reservedLines = [];
+
     // ✅ Create payment entry for CASH / initial payment
-    if (paidAmount > 0) {
+    try {
       await Payment.create({
         orderId: order.orderId,
         consumerId: order.consumerId,
         agentId: order.agentId,
-        amount: paidAmount,
-        method: paymentMode === "ONLINE" ? "RAZORPAY" : "CASH",
+        amount: paid,
+        // 🔥 FIX: a partly-online ("MIXED") or QR payment carries a verified
+        // Razorpay reference but was being recorded as CASH, so cash
+        // reconciliation expected money the agent never held.
+        method:
+          paymentMode === "ONLINE" || razorpay_payment_id || razorpay_order_id
+            ? "RAZORPAY"
+            : "CASH",
         // 🔥 FIX: attach the verified Razorpay reference here (when this
         // is an online initial payment) so verifyPaymentAndPlaceOrder no
         // longer needs to create a second, duplicate Payment record for
@@ -365,6 +467,13 @@ export const placeOrder = async (req, res) => {
           role: "AGENT",
         },
       });
+    } catch (paymentError) {
+      // The order already records the amount paid; only the payment log
+      // entry is missing, and it needs adding by hand.
+      console.error(
+        `PAYMENT RECORD FAILED for placed order ${order.orderId} (₹${paid}):`,
+        paymentError,
+      );
     }
 
     /* =============================
@@ -383,6 +492,19 @@ export const placeOrder = async (req, res) => {
       order,
     });
 
+    /* The payment taken with the order counts toward PAYMENT targets however
+       it was collected. Only the online (Razorpay) flow used to count it, so
+       cash and QR collected at order time were never credited. Every place
+       that places an order comes through here, so it is counted once. */
+    if (paid > 0) {
+      await updateTargetProgress({
+        agentId,
+        type: "PAYMENT",
+        value: 1,
+        amount: paid,
+      });
+    }
+
     return res.status(201).json({
       success: true,
       message: "Order placed successfully",
@@ -391,7 +513,7 @@ export const placeOrder = async (req, res) => {
   } catch (error) {
     console.error("PLACE ORDER ERROR:", error);
 
-    // The order never made it, so the stock it held must go back.
+    // The order was never saved, so the stock it held must go back.
     if (reservedLines.length) {
       await releaseStock(reservedLines).catch((releaseError) =>
         console.error("STOCK ROLLBACK FAILED:", releaseError),
@@ -798,6 +920,13 @@ export const assignDeliveryPartner = async (req, res) => {
   }
 };
 // Update Delivery Status (DELIVERY PARTNER)
+const MAX_CODE_ATTEMPTS = 5;
+const CODE_LOCK_MS = 15 * 60 * 1000;
+
+const codesMatch = (entered, expected) =>
+  entered.length === expected.length &&
+  crypto.timingSafeEqual(Buffer.from(entered), Buffer.from(expected));
+
 export const updateDeliveryStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -812,9 +941,10 @@ export const updateDeliveryStatus = async (req, res) => {
       });
     }
 
-    // Must be assigned to this delivery partner
+    // Must be assigned to this delivery partner (an unassigned order has no
+    // delivery block at all, which used to throw here)
     if (
-      !order.delivery.partnerId ||
+      !order.delivery?.partnerId ||
       order.delivery.partnerId.toString() !== req.user.id
     ) {
       return res.status(403).json({
@@ -834,6 +964,88 @@ export const updateDeliveryStatus = async (req, res) => {
         success: false,
         message: "Invalid status transition",
       });
+    }
+
+    /* 🔒 FIX: every store gets a delivery code when it is registered, and
+       its agent gives that code to the store owner, but nothing ever asked
+       for it: a partner could mark any assigned order delivered without
+       going to the store. The partner app even displayed the code. The
+       store owner now reads it out at handover, and it is checked here. */
+    if (status === "DELIVERED") {
+      const lockedUntil = order.delivery.codeLockedUntil;
+
+      if (lockedUntil && lockedUntil > new Date()) {
+        const minutes = Math.ceil((lockedUntil - Date.now()) / 60000);
+        return res.status(429).json({
+          success: false,
+          message: `Too many wrong delivery codes. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}, or contact the office.`,
+        });
+      }
+
+      const deliveryCode =
+        typeof req.body.deliveryCode === "string"
+          ? req.body.deliveryCode.trim()
+          : "";
+
+      if (!/^\d{6}$/.test(deliveryCode)) {
+        return res.status(400).json({
+          success: false,
+          message: "Enter the store's 6-digit delivery code",
+        });
+      }
+
+      const store =
+        (order.store &&
+          (await Store.findById(order.store).select("deliveryCode").lean())) ||
+        (await Store.findOne({ consumerId: order.consumerId })
+          .select("deliveryCode")
+          .lean());
+
+      if (!store?.deliveryCode) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "This store has no delivery code on file. Contact the office to confirm this delivery.",
+        });
+      }
+
+      if (!codesMatch(deliveryCode, store.deliveryCode)) {
+        // Counted atomically, so parallel guesses cannot slip past the limit
+        const counted = await Order.findOneAndUpdate(
+          { _id: order._id },
+          { $inc: { "delivery.codeAttempts": 1 } },
+          { new: true },
+        );
+        const attempts = counted?.delivery?.codeAttempts || 0;
+
+        if (attempts >= MAX_CODE_ATTEMPTS) {
+          await Order.updateOne(
+            { _id: order._id },
+            {
+              $set: {
+                "delivery.codeAttempts": 0,
+                "delivery.codeLockedUntil": new Date(Date.now() + CODE_LOCK_MS),
+              },
+            },
+          );
+
+          return res.status(429).json({
+            success: false,
+            message:
+              "Wrong delivery code entered 5 times. Confirming this delivery is locked for 15 minutes.",
+          });
+        }
+
+        const left = MAX_CODE_ATTEMPTS - attempts;
+        return res.status(400).json({
+          success: false,
+          message: `That delivery code does not match. ${left} attempt${left === 1 ? "" : "s"} left.`,
+        });
+      }
+
+      order.delivery.codeAttempts = 0;
+      order.delivery.codeLockedUntil = undefined;
+      order.delivery.deliveredAt = new Date();
     }
 
     order.status = status;
@@ -861,82 +1073,58 @@ export const updateDeliveryStatus = async (req, res) => {
   }
 };
 
-// Collect Payment (Future code mode --- Razorpay / Stripe)
+// Collect Payment (Agent) — cash or another offline method, against a due
+const OFFLINE_METHODS = ["CASH", "UPI", "CARD", "BANK_TRANSFER"];
+
 export const collectPayment = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { amount, method, note } = req.body;
+    const { note } = req.body;
+    const method = req.body.method || "CASH";
 
-    const order = await Order.findOne({ orderId });
+    /* 🔥 FIX: amount was used as sent. A negative amount passed every check
+       below and was recorded — lowering the order's paid total and raising
+       its due. A numeric string was concatenated rather than added. */
+    const amount = Math.round(Number(req.body.amount) * 100) / 100;
 
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found",
-      });
-    }
-
-    if (order.agentId !== req.user.agentId) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not allowed to collect payment for this order",
-      });
-    }
-
-    if (order.dueAmount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({
         success: false,
-        message: "No due amount remaining",
+        message: "Enter a valid amount of at least ₹1",
       });
     }
 
-    if (amount > order.dueAmount) {
+    // A Razorpay payment is recorded only once Razorpay itself confirms it
+    if (!OFFLINE_METHODS.includes(method)) {
       return res.status(400).json({
         success: false,
-        message: "Amount exceeds due amount",
+        message: "Invalid payment method",
       });
     }
 
-    await Payment.create({
-      orderId: order.orderId,
-      consumerId: order.consumerId,
-      agentId: order.agentId,
+    /* Checked and recorded under the order's payment lock (see
+       applyDuePayment): two identical requests arriving together used to
+       both pass the due check and both be recorded. */
+    const result = await applyDuePayment({
+      orderId,
+      agentId: req.user.agentId,
       amount,
       method,
       note,
-      collectedBy: {
-        id: req.user.agentId,
-        role: "AGENT",
-      },
     });
 
-    order.paidAmount += amount;
-    order.dueAmount -= amount;
-
-    if (order.dueAmount === 0) {
-      order.paymentStatus = "COMPLETED";
+    if (!result.ok) {
+      return res.status(result.code).json({
+        success: false,
+        message: result.message,
+      });
     }
-
-    await order.save();
-    // Update invoice after payment
-    await updateInvoiceAfterPayment({
-      orderId: order.orderId,
-      amount,
-      method: method || "CASH",
-    });
-
-    await updateTargetProgress({
-      agentId: req.user.agentId,
-      type: "PAYMENT",
-      value: 1,
-      amount,
-    });
 
     res.json({
       success: true,
       message: "Payment recorded successfully",
-      paidAmount: order.paidAmount,
-      dueAmount: order.dueAmount,
+      paidAmount: result.order.paidAmount,
+      dueAmount: result.order.dueAmount,
     });
   } catch (error) {
     console.error("COLLECT PAYMENT ERROR:", error);
@@ -947,6 +1135,7 @@ export const collectPayment = async (req, res) => {
     });
   }
 };
+
 
 // Payment history for an order (ADMIN / EMPLOYEE )
 export const getOrderPayments = async (req, res) => {
@@ -1237,12 +1426,23 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    if (order.agentId !== req.user.agentId) {
+      return res.status(403).json({
+        message: "You are not allowed to collect payment for this order",
+      });
+    }
+
+    if (order.status === "CANCELLED") {
+      return res.status(400).json({ message: "This order was cancelled" });
+    }
+
     if (order.dueAmount <= 0) {
       return res.status(400).json({ message: "No due amount left" });
     }
 
     const razorpayOrder = await razorpayInstance.orders.create({
-      amount: order.dueAmount * 100,
+      // Razorpay needs whole paise: 14.29 * 100 is 1428.9999…, which it refuses
+      amount: Math.round(order.dueAmount * 100),
       currency: "INR",
       receipt: order.orderId,
     });
@@ -1259,115 +1459,113 @@ export const createRazorpayOrder = async (req, res) => {
   }
 };
 
-// Verify Razorpay Payment
+/* Shared ending for a gateway payment that threw part-way: never leave it
+   PROCESSING with no answer. */
+const failClaimedPayment = async (res, claim, error, fallbackMessage) => {
+  if (claim) {
+    try {
+      return await settleFailedGatewayPayment(res, claim, {
+        code: 500,
+        message: error?.message,
+      });
+    } catch (settleError) {
+      console.error("COULD NOT RECORD PAYMENT FAILURE:", settleError);
+    }
+  }
+
+  return res.status(500).json({ success: false, message: fallbackMessage });
+};
+
+// Verify Razorpay Payment (a due, paid online)
 export const verifyRazorpayPayment = async (req, res) => {
+  let claim = null;
+
   try {
     const {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
       orderId,
-      amount,
     } = req.body;
 
-    // ✅ Ensure number
-    const numericAmount = Number(amount);
-
     // 🔐 Verify Signature
-    const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET) // ✅ FIXED
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex");
-
-    if (expectedSignature !== razorpay_signature) {
+    if (
+      !signatureMatches(
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid payment signature",
       });
     }
 
-    // 🔍 Idempotency check
+    /* 🔒 FIX: the amount recorded used to be the "amount" field the app sent.
+       The signature only proves the payment is real, not how much it was
+       for, so paying ₹1 and reporting the full due marked the order paid.
+       The web app also reported the figure typed into the form while
+       Razorpay charged the full due. The amount now comes from Razorpay. */
+    const razorpayPayment = await fetchVerifiedRazorpayPayment(
+      razorpay_payment_id,
+      razorpay_order_id,
+    );
+
+    if (!razorpayPayment) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment could not be confirmed with Razorpay",
+      });
+    }
+
+    const amount = Number(razorpayPayment.amount) / 100; // paise → rupees
+
+    /* 🔍 Idempotency. Claimed before anything is recorded, so the same
+       payment sent twice at once is applied once; the old "already
+       processed?" lookup let two simultaneous requests both through. */
+    const began = await beginGatewayPayment(`payment:${razorpay_payment_id}`, {
+      purpose: "ORDER_DUE",
+      agentId: req.user.agentId,
+      orderId,
+      amount,
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentIds: [razorpay_payment_id],
+    });
+
+    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    claim = began.record;
+
+    // Recorded before payments were claimed like this
     const existing = await Payment.findOne({
-      razorpayPaymentId: razorpay_payment_id,
+      razorpayPaymentId: String(razorpay_payment_id),
     });
 
     if (existing) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment already processed",
+      await markGatewayPayment(claim, {
+        status: "APPLIED",
+        orderId: existing.orderId,
+      });
+      return respondToClaimedGatewayPayment(res, {
+        status: "APPLIED",
+        orderId: existing.orderId,
       });
     }
 
-    // 🔍 Fetch order
-    const order = await Order.findOne({ orderId });
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    // ✅ Correct unit comparison (paise vs rupees)
-    if (numericAmount > order.dueAmount * 100) {
-      return res.status(400).json({
-        message: "Amount exceeds due",
-      });
-    }
-
-    // ✅ Save payment
-    await Payment.create({
-      orderId: order.orderId,
-      consumerId: order.consumerId,
-      agentId: order.agentId,
-      amount: numericAmount / 100, // store in rupees
+    const result = await applyDuePayment({
+      orderId,
+      agentId: req.user.agentId,
+      amount,
       method: "RAZORPAY",
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
       razorpaySignature: razorpay_signature,
-      collectedBy: {
-        id: order.agentId,
-        role: "AGENT",
-      },
     });
 
-    // ✅ Update order
-    const paidAmountInRupees = numericAmount / 100;
+    // Refused (cancelled order, due already paid…): refunded, not just logged
+    if (!result.ok) return settleFailedGatewayPayment(res, claim, result);
 
-    order.paidAmount += paidAmountInRupees;
-    order.dueAmount -= paidAmountInRupees;
-
-    if (order.dueAmount === 0) {
-      order.paymentStatus = "COMPLETED";
-    }
-
-    await order.save();
-
-    // ✅ UPDATE INVOICE AFTER PAYMENT
-    const invoice = await Invoice.findOne({ orderId });
-
-    if (invoice) {
-      const paid = numericAmount / 100;
-
-      invoice.paidAmount += paid;
-      invoice.dueAmount -= paid;
-
-      invoice.payments.push({
-        amount: paid,
-        method: "RAZORPAY",
-        paymentId: razorpay_payment_id,
-      });
-
-      invoice.status = invoice.dueAmount === 0 ? "PAID" : "PARTIAL";
-
-      await invoice.save();
-
-      // 🔥 OPTIONAL: regenerate PDF
-      await regenerateInvoicePDF(invoice);
-    }
-
-    await updateTargetProgress({
-      agentId: order.agentId,
-      type: "PAYMENT",
-      value: 1,
-    });
+    await markGatewayPayment(claim, { status: "APPLIED" });
 
     res.json({
       success: true,
@@ -1375,19 +1573,17 @@ export const verifyRazorpayPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("RAZORPAY VERIFY ERROR:", error);
-    res.status(500).json({
-      success: false,
-      message: "Payment verification failed",
-    });
+    return failClaimedPayment(res, claim, error, "Payment verification failed");
   }
 };
+
 
 // Initial Payment Razorpayment during placing order
 export const createOrderPayment = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const amount = Number(req.body.amount);
 
-    if (!amount || amount < 1) {
+    if (!Number.isFinite(amount) || amount < 1) {
       return res.status(400).json({
         success: false,
         message: "Minimum amount should be ₹1",
@@ -1395,7 +1591,8 @@ export const createOrderPayment = async (req, res) => {
     }
 
     const razorpayOrder = await razorpayInstance.orders.create({
-      amount: amount * 100,
+      // Whole paise only — see createRazorpayOrder
+      amount: Math.round(amount * 100),
       currency: "INR",
       receipt: `order_${Date.now()}`,
     });
@@ -1415,47 +1612,99 @@ export const createOrderPayment = async (req, res) => {
   }
 };
 
+// Runs placeOrder for a pay-first flow and hands back what it answered
+const placeOrderFor = (req) =>
+  new Promise((resolve, reject) => {
+    placeOrder(req, {
+      status: (code) => ({
+        json: (data) => resolve({ code, data }),
+      }),
+    }).catch(reject);
+  });
+
 // Verify initial payment for order placement
 export const verifyPaymentAndPlaceOrder = async (req, res) => {
+  let claim = null;
+
   try {
     const {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      amount,
       orderPayload, // 👈 full order body (same as placeOrder)
     } = req.body;
 
-    const numericAmount = Number(amount);
+    if (!orderPayload || typeof orderPayload !== "object") {
+      return res.status(400).json({
+        success: false,
+        message: "Order details are missing",
+      });
+    }
 
     /* =============================
        🔐 VERIFY SIGNATURE
        ============================= */
 
-    const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex");
-
-    if (expectedSignature !== razorpay_signature) {
+    if (
+      !signatureMatches(
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid payment signature",
       });
     }
 
+    /* 🔒 FIX: the paid amount was the "amount" the app sent, so a ₹1 payment
+       reported as the full total placed a fully-paid order. It now comes
+       from Razorpay's record of the payment. */
+    const razorpayPayment = await fetchVerifiedRazorpayPayment(
+      razorpay_payment_id,
+      razorpay_order_id,
+    );
+
+    if (!razorpayPayment) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment could not be confirmed with Razorpay",
+      });
+    }
+
+    const amount = Number(razorpayPayment.amount) / 100; // paise → rupees
+
     /* =============================
-       🔁 DUPLICATE CHECK
+       🔁 DUPLICATE CHECK — claimed before the order is placed, so the same
+       payment submitted twice at once places one order, not two
        ============================= */
 
+    const began = await beginGatewayPayment(`payment:${razorpay_payment_id}`, {
+      purpose: "ORDER_INITIAL",
+      agentId: req.user.agentId,
+      amount,
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentIds: [razorpay_payment_id],
+    });
+
+    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    claim = began.record;
+
+    // Recorded before payments were claimed like this, or by an attempt
+    // that crashed after placing the order
     const existing = await Payment.findOne({
-      razorpayPaymentId: razorpay_payment_id,
+      razorpayPaymentId: String(razorpay_payment_id),
     });
 
     if (existing) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment already processed",
+      await markGatewayPayment(claim, {
+        status: "APPLIED",
+        orderId: existing.orderId,
+      });
+      return respondToClaimedGatewayPayment(res, {
+        status: "APPLIED",
+        orderId: existing.orderId,
       });
     }
 
@@ -1465,9 +1714,8 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
 
     req.body = {
       ...orderPayload,
-      paidAmount: numericAmount / 100, // ✅ override safely
-      paymentMode:
-        numericAmount / 100 === orderPayload.totalAmount ? "ONLINE" : "MIXED",
+      paidAmount: amount, // ✅ override safely
+      paymentMode: amount === orderPayload.totalAmount ? "ONLINE" : "MIXED",
       // 🔥 FIX: pass the verified Razorpay reference through so placeOrder
       // attaches it to the ONE Payment record it creates, instead of a
       // second duplicate Payment record being made below for the same
@@ -1480,36 +1728,29 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
       razorpay_signature,
     };
 
-    // ⚡ Call your existing controller
-    const response = await new Promise((resolve) => {
-      placeOrder(req, {
-        status: (code) => ({
-          json: (data) => resolve({ code, data }),
-        }),
-      });
-    });
+    const response = await placeOrderFor(req);
 
-    // ✅ CREATE INVOICE AFTER ORDER CREATED
-    const order = await Order.findOne({ orderId: response.data.orderId });
-
-    if (order) {
-      await createInvoiceFromOrder(order); // 👈 helper function (clean code)
-    }
-
+    /* The money has been taken but no order exists. Used to be a log line
+       only: a refused order (out of stock, bad cart) is now refunded, and an
+       unexpected failure is kept for a retry and listed for the office. */
     if (!response.data.success) {
-      return res.status(400).json(response.data);
+      console.error("ONLINE PAYMENT TAKEN BUT ORDER NOT PLACED:", {
+        razorpay_payment_id,
+        agentId: req.user?.agentId,
+        amount,
+        reason: response.data.message,
+      });
+      return settleFailedGatewayPayment(res, claim, {
+        code: response.code,
+        message: response.data.message,
+      });
     }
 
-    // 🔥 FIX: removed the duplicate Payment.create that used to run here.
-    // placeOrder (called above) already created the Payment record for
-    // this exact amount — now carrying the Razorpay reference too — so
-    // creating a second one here was double-counting this single
-    // transaction wherever payments get summed.
-
-    await updateTargetProgress({
-      agentId: order.agentId,
-      type: "PAYMENT",
-      value: 1,
+    // The PAYMENT target is credited inside placeOrder, as it is for cash
+    // and QR, so it is not added again here.
+    await markGatewayPayment(claim, {
+      status: "APPLIED",
+      orderId: response.data.orderId,
     });
 
     return res.json({
@@ -1519,10 +1760,7 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("VERIFY + PLACE ORDER ERROR:", error);
-    res.status(500).json({
-      success: false,
-      message: "Order placement failed",
-    });
+    return failClaimedPayment(res, claim, error, "Order placement failed");
   }
 };
 /* ============================================================
@@ -1546,12 +1784,14 @@ function qrExpiryTimestamp() {
 /* STEP 1a - CREATE QR FOR A NEW ORDER (initial payment) */
 export const createInitialPaymentQr = async (req, res) => {
   try {
-    const { amount } = req.body;
+    // A text or sub-rupee amount went straight to Razorpay, which refused it
+    // and the agent only saw "Failed to generate QR code"
+    const amount = roundRupees(req.body.amount);
 
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amount) || amount < 1) {
       return res.status(400).json({
         success: false,
-        message: "A valid amount is required",
+        message: "Minimum amount should be ₹1",
       });
     }
 
@@ -1595,6 +1835,12 @@ export const createDuePaymentQr = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Order not found" });
+    }
+    if (order.agentId !== req.user.agentId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to collect payment for this order",
+      });
     }
     if (order.dueAmount <= 0) {
       return res
@@ -1661,8 +1907,24 @@ export const checkQrPaymentStatus = async (req, res) => {
 
 /* STEP 3a - VERIFY QR PAID + PLACE THE ORDER (mirrors verifyInitialPaymentAndPlaceOrder) */
 export const verifyQrAndPlaceOrder = async (req, res) => {
+  let claim = null;
+
   try {
-    const { qrCodeId, amount, orderPayload } = req.body;
+    const { qrCodeId, orderPayload } = req.body;
+
+    if (typeof qrCodeId !== "string" || !qrCodeId) {
+      return res.status(400).json({
+        success: false,
+        message: "QR code reference is missing",
+      });
+    }
+
+    if (!orderPayload || typeof orderPayload !== "object") {
+      return res.status(400).json({
+        success: false,
+        message: "Order details are missing",
+      });
+    }
 
     // Re-fetch directly from Razorpay — never trust a client-reported "paid" flag.
     const qrCode = await razorpayInstance.qrCode.fetch(qrCodeId);
@@ -1678,37 +1940,118 @@ export const verifyQrAndPlaceOrder = async (req, res) => {
       });
     }
 
+    // A QR generated by a different agent, or for a due payment, is not this order's
+    if (
+      qrCode.notes?.agentId !== req.user.agentId ||
+      qrCode.notes?.purpose !== "order_initial_payment"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "This QR code does not belong to this order",
+      });
+    }
+
     const payments = await razorpayInstance.qrCode.fetchAllPayments(qrCodeId);
-    const razorpayPaymentId = payments.items?.[0]?.id ?? null;
+    const paymentIds = (payments.items || [])
+      .map((item) => item.id)
+      .filter(Boolean);
+
+    // 🔒 FIX: was the "amount" the app sent; now what the QR actually received
+    const amount = qrCode.payments_amount_received / 100;
+
+    /* 🔒 FIX: one paid QR could be submitted again and again, placing a new
+       "paid" order each time. It is claimed before the order is placed, so
+       two submissions arriving together cannot both get through either. */
+    const began = await beginGatewayPayment(`qr:${qrCodeId}`, {
+      purpose: "ORDER_INITIAL",
+      agentId: req.user.agentId,
+      amount,
+      qrCodeId,
+      razorpayPaymentIds: paymentIds,
+    });
+
+    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    claim = began.record;
+
+    // Used before QR codes were claimed like this
+    const alreadyUsed = await Payment.findOne({ razorpayOrderId: qrCodeId });
+    if (alreadyUsed) {
+      await markGatewayPayment(claim, {
+        status: "APPLIED",
+        orderId: alreadyUsed.orderId,
+      });
+      return respondToClaimedGatewayPayment(res, {
+        status: "APPLIED",
+        orderId: alreadyUsed.orderId,
+      });
+    }
 
     req.body = {
       ...orderPayload,
       paymentMode: "QR",
       paidAmount: amount,
-      razorpayOrderId: qrCodeId,
-      razorpayPaymentId,
+      // placeOrder reads these snake_case names; the camelCase ones it was
+      // given were silently ignored, so the QR was never linked to the payment
+      razorpay_order_id: qrCodeId,
+      razorpay_payment_id: paymentIds[0] ?? null,
     };
 
-    return placeOrder(req, res);
+    const response = await placeOrderFor(req);
+
+    if (!response.data.success) {
+      console.error("QR PAYMENT TAKEN BUT ORDER NOT PLACED:", {
+        qrCodeId,
+        agentId: req.user?.agentId,
+        amount,
+        reason: response.data.message,
+      });
+      return settleFailedGatewayPayment(res, claim, {
+        code: response.code,
+        message: response.data.message,
+      });
+    }
+
+    await markGatewayPayment(claim, {
+      status: "APPLIED",
+      orderId: response.data.orderId,
+    });
+
+    return res.status(response.code).json(response.data);
   } catch (error) {
     console.error("VERIFY QR AND PLACE ORDER ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to verify QR payment",
-    });
+    return failClaimedPayment(res, claim, error, "Failed to verify QR payment");
   }
 };
 
 /* STEP 3b - VERIFY QR PAID + APPLY TO AN EXISTING ORDER'S DUE (mirrors verifyRazorpayDuePayment) */
 export const verifyDueQrPayment = async (req, res) => {
+  let claim = null;
+
   try {
     const { qrCodeId, orderId } = req.body;
 
-    const order = await Order.findOne({ orderId });
+    if (typeof qrCodeId !== "string" || !qrCodeId) {
+      return res.status(400).json({
+        success: false,
+        message: "QR code reference is missing",
+      });
+    }
+
+    const order = await Order.findOne({ orderId })
+      .select("orderId agentId")
+      .lean();
+
     if (!order) {
       return res
         .status(404)
         .json({ success: false, message: "Order not found" });
+    }
+
+    if (order.agentId !== req.user.agentId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to collect payment for this order",
+      });
     }
 
     const qrCode = await razorpayInstance.qrCode.fetch(qrCodeId);
@@ -1724,38 +2067,254 @@ export const verifyDueQrPayment = async (req, res) => {
       });
     }
 
-    const amountPaid = qrCode.payments_amount_received / 100;
+    // A QR made for one order's due cannot settle another order
+    if (
+      qrCode.notes?.purpose !== "order_due_payment" ||
+      qrCode.notes?.orderId !== order.orderId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "This QR code does not belong to this order",
+      });
+    }
 
     const payments = await razorpayInstance.qrCode.fetchAllPayments(qrCodeId);
-    const razorpayPaymentId = payments.items?.[0]?.id ?? null;
+    const paymentIds = (payments.items || [])
+      .map((item) => item.id)
+      .filter(Boolean);
 
-    await Payment.create({
+    const amount = qrCode.payments_amount_received / 100;
+
+    /* 🔒 FIX: nothing stopped the same paid QR being applied repeatedly, and
+       each time the order's paid amount grew again. It is now claimed first,
+       which also stops two simultaneous submissions. */
+    const began = await beginGatewayPayment(`qr:${qrCodeId}`, {
+      purpose: "ORDER_DUE",
+      agentId: req.user.agentId,
       orderId: order.orderId,
-      amount: amountPaid,
-      mode: "QR",
-      razorpayOrderId: qrCodeId,
-      razorpayPaymentId,
-      status: "SUCCESS",
+      amount,
+      qrCodeId,
+      razorpayPaymentIds: paymentIds,
     });
 
-    order.paidAmount += amountPaid;
-    order.dueAmount = Math.max(0, order.dueAmount - amountPaid);
-    if (order.paymentMode !== "QR") {
-      order.paymentMode =
-        order.paymentMode === "CASH" ? "MIXED" : order.paymentMode;
+    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    claim = began.record;
+
+    // Recorded before QR codes were claimed like this
+    const alreadyUsed = await Payment.findOne({ razorpayOrderId: qrCodeId });
+    if (alreadyUsed) {
+      await markGatewayPayment(claim, {
+        status: "APPLIED",
+        orderId: alreadyUsed.orderId,
+      });
+      return respondToClaimedGatewayPayment(res, {
+        status: "APPLIED",
+        orderId: alreadyUsed.orderId,
+      });
     }
-    await order.save();
+
+    const result = await applyDuePayment({
+      orderId: order.orderId,
+      agentId: req.user.agentId,
+      amount,
+      method: "RAZORPAY",
+      note: "QR payment",
+      razorpayOrderId: qrCodeId,
+      razorpayPaymentId: paymentIds[0],
+      nextPaymentMode: (mode) => (mode === "CASH" ? "MIXED" : mode),
+    });
+
+    // Refused (cancelled order, due already paid…): refunded, not just logged
+    if (!result.ok) return settleFailedGatewayPayment(res, claim, result);
+
+    await markGatewayPayment(claim, { status: "APPLIED" });
 
     return res.status(200).json({
       success: true,
       message: "Payment received",
-      order,
+      order: result.order,
     });
   } catch (error) {
     console.error("VERIFY DUE QR PAYMENT ERROR:", error);
+    return failClaimedPayment(res, claim, error, "Failed to verify QR payment");
+  }
+};
+
+/* ============================================================
+   PAYMENTS NEEDING ATTENTION
+
+   A Razorpay or QR payment that was taken but could not be applied, and
+   was not refunded automatically: an unexpected failure nobody retried, a
+   refund Razorpay refused, or an attempt that crashed part-way.
+   ============================================================ */
+
+const STALE_ATTEMPT_MS = 10 * 60 * 1000;
+
+const needsAttentionFilter = () => ({
+  $or: [
+    { status: { $in: ["FAILED", "REFUND_FAILED"] } },
+    {
+      status: "PROCESSING",
+      updatedAt: { $lt: new Date(Date.now() - STALE_ATTEMPT_MS) },
+    },
+  ],
+});
+
+// List them (Admin / Employee with canSeePaymentInfo)
+export const getPaymentIssues = async (req, res) => {
+  try {
+    const issues = await GatewayPayment.find(needsAttentionFilter())
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const agentIds = [
+      ...new Set(issues.map((issue) => issue.agentId).filter(Boolean)),
+    ];
+    const agents = await Agent.find({ agentId: { $in: agentIds } })
+      .select("agentId name phone")
+      .lean();
+
+    const agentMap = {};
+    agents.forEach((agent) => {
+      agentMap[agent.agentId] = agent;
+    });
+
+    return res.json({
+      success: true,
+      count: issues.length,
+      data: issues.map((issue) => ({
+        _id: issue._id,
+        status: issue.status,
+        purpose: issue.purpose,
+        amount: issue.amount,
+        agentId: issue.agentId,
+        agentName: agentMap[issue.agentId]?.name || null,
+        agentPhone: agentMap[issue.agentId]?.phone || null,
+        orderId: issue.orderId || null,
+        qrCodeId: issue.qrCodeId || null,
+        razorpayPaymentIds: issue.razorpayPaymentIds || [],
+        failureReason: issue.failureReason || null,
+        refundError: issue.refundError || null,
+        createdAt: issue.createdAt,
+        updatedAt: issue.updatedAt,
+      })),
+    });
+  } catch (error) {
+    console.error("GET PAYMENT ISSUES ERROR:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to verify QR payment",
+      message: "Failed to load payments needing attention",
+    });
+  }
+};
+
+// Takes one issue for an admin action, so a retry cannot run at the same time
+const claimIssue = async (id) => {
+  if (!mongoose.isValidObjectId(id)) return { code: 404 };
+
+  const issue = await GatewayPayment.findOne({
+    _id: id,
+    ...needsAttentionFilter(),
+  }).lean();
+
+  if (!issue) return { code: 404 };
+
+  // It may have gone through after all (a later retry, or a crash after the
+  // order was saved); refunding it then would give the money back twice over
+  const applied = await Payment.findOne(
+    issue.qrCodeId
+      ? { razorpayOrderId: issue.qrCodeId }
+      : { razorpayPaymentId: { $in: issue.razorpayPaymentIds || [] } },
+  ).lean();
+
+  if (applied) {
+    await markGatewayPayment(issue, {
+      status: "APPLIED",
+      orderId: applied.orderId,
+    });
+    return { code: 409, appliedTo: applied.orderId };
+  }
+
+  const claimed = await GatewayPayment.findOneAndUpdate(
+    { _id: issue._id, status: issue.status, updatedAt: issue.updatedAt },
+    { $set: { status: "PROCESSING" } },
+    { new: true },
+  );
+
+  return claimed ? { issue: claimed } : { code: 409 };
+};
+
+const issueNotAvailable = (res, { code, appliedTo }) =>
+  res.status(code).json({
+    success: false,
+    message: appliedTo
+      ? `This payment was already recorded against order ${appliedTo}, so nothing was done.`
+      : code === 404
+        ? "This payment is not waiting for action"
+        : "This payment is being handled right now. Refresh and check again.",
+  });
+
+// Refund it to the customer (Admin)
+export const refundPaymentIssue = async (req, res) => {
+  try {
+    const claimed = await claimIssue(req.params.id);
+    if (!claimed.issue) return issueNotAvailable(res, claimed);
+
+    const { refunded, refundError } = await refundGatewayPayment(
+      claimed.issue,
+      claimed.issue.failureReason || "Refunded by the office",
+    );
+
+    if (!refunded) {
+      return res.status(502).json({
+        success: false,
+        message: `Razorpay refused the refund: ${refundError}`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Payment refunded to the customer",
+    });
+  } catch (error) {
+    console.error("REFUND PAYMENT ISSUE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to refund the payment",
+    });
+  }
+};
+
+// Mark it settled by hand, e.g. the order was placed manually (Admin)
+export const resolvePaymentIssue = async (req, res) => {
+  try {
+    const note =
+      typeof req.body?.note === "string" ? req.body.note.trim() : "";
+
+    if (!note) {
+      return res.status(400).json({
+        success: false,
+        message: "Add a note saying how this payment was settled",
+      });
+    }
+
+    const claimed = await claimIssue(req.params.id);
+    if (!claimed.issue) return issueNotAvailable(res, claimed);
+
+    await markGatewayPayment(claimed.issue, {
+      status: "RESOLVED",
+      resolutionNote: note.slice(0, 500),
+    });
+
+    return res.json({
+      success: true,
+      message: "Marked as settled",
+    });
+  } catch (error) {
+    console.error("RESOLVE PAYMENT ISSUE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update the payment",
     });
   }
 };

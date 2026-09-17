@@ -47,6 +47,7 @@ const SERIES = { sales: "#2a78d6", profit: "#eb6834" };
 const SINGLE = { product: "#2a78d6", agent: "#eb6834", state: "#2a78d6" };
 const CHROME = { grid: "#e1e0d9", axis: "#898781" };
 const STATUS = {
+  inProgress: "#2a78d6",
   delivered: "#0ca30c",
   pending: "#fab219",
   cancelled: "#d03b3b",
@@ -282,7 +283,18 @@ export default function AdminDashboard() {
   const generatedAt = meta?.generatedAt ? new Date(meta.generatedAt) : null;
 
   const totalOrders = n(counts.orders);
+  /* Every order is in exactly one of these, so the rows add up to the total
+     and their shares to 100%. Payment pending and returns used to sit in the
+     same list, but they overlap with these (a delivered order can still owe
+     money), so the rows added up to more than the total. */
   const breakdown = [
+    {
+      key: "inProgress",
+      label: "In progress",
+      value: n(orderStats.inProgress),
+      color: STATUS.inProgress,
+      icon: <Truck size={15} />,
+    },
     {
       key: "delivered",
       label: "Delivered",
@@ -291,25 +303,11 @@ export default function AdminDashboard() {
       icon: <CheckCircle2 size={15} />,
     },
     {
-      key: "pending",
-      label: "Payment pending",
-      value: n(orderStats.pendingPayments),
-      color: STATUS.pending,
-      icon: <Clock size={15} />,
-    },
-    {
       key: "cancelled",
       label: "Cancelled",
       value: n(orderStats.cancelled),
       color: STATUS.cancelled,
       icon: <XCircle size={15} />,
-    },
-    {
-      key: "returns",
-      label: "Returns",
-      value: n(orderStats.totalReturns),
-      color: STATUS.returns,
-      icon: <RotateCcw size={15} />,
     },
   ];
   const breakdownMax = Math.max(...breakdown.map((b) => b.value), 1);
@@ -523,11 +521,36 @@ export default function AdminDashboard() {
             })}
           </div>
 
-          <div className="mt-5 pt-4 border-t border-slate-100 flex items-baseline justify-between">
-            <span className="text-[14px] text-slate-500">Return rate</span>
-            <span className="text-lg font-semibold text-slate-900 tabular-nums">
-              {n(orderStats.returnRate)}%
-            </span>
+          {/* Measured separately: these overlap with the rows above */}
+          <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex items-center gap-2">
+              <span style={{ color: STATUS.pending }} className="shrink-0">
+                <Clock size={15} />
+              </span>
+              <span className="text-[14px] text-slate-600">Payment pending</span>
+              <span className="ml-auto text-[14px] font-semibold text-slate-900 tabular-nums">
+                {n(orderStats.pendingPayments).toLocaleString("en-IN")}
+              </span>
+              <span className="text-xs text-slate-400 w-16 text-right">
+                {n(orderStats.pendingPayments) === 1 ? "order" : "orders"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span style={{ color: STATUS.returns }} className="shrink-0">
+                <RotateCcw size={15} />
+              </span>
+              <span className="text-[14px] text-slate-600">Return rate</span>
+              <span className="ml-auto text-[14px] font-semibold text-slate-900 tabular-nums">
+                {n(orderStats.returnRate)}%
+              </span>
+              <span className="text-xs text-slate-400 w-16 text-right tabular-nums">
+                {n(orderStats.totalReturns)} of {n(orderStats.delivered)}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Returns as a share of delivered orders.
+            </p>
           </div>
         </Panel>
       </div>

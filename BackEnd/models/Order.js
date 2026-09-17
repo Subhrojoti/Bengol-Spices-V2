@@ -291,6 +291,22 @@ const orderSchema = new mongoose.Schema(
       assignedAt: {
         type: Date,
       },
+
+      // When the partner confirmed the handover with the store's code
+      deliveredAt: {
+        type: Date,
+      },
+
+      // Wrong delivery codes in a row; five locks confirmation for a while,
+      // so the 6-digit code cannot simply be guessed
+      codeAttempts: {
+        type: Number,
+        default: 0,
+      },
+
+      codeLockedUntil: {
+        type: Date,
+      },
     },
 
     deliveryOtp: {

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import Notification from "../models/Notification.js";
 import Employee from "../models/Employee.js";
 import Agent from "../models/Agent.js";
@@ -17,7 +18,14 @@ export const getMyNotifications = async (req, res) => {
 
 export const markAsRead = async (req, res) => {
   try {
-    await Notification.findByIdAndUpdate(req.params.id, {
+    // 🔒 FIX: any account could mark anyone's notification as read. Only the
+    // recipient can now; admin, which has no account record, as before.
+    const filter =
+      req.user.role === "ADMIN"
+        ? { _id: req.params.id }
+        : { _id: req.params.id, recipientId: req.user._id };
+
+    await Notification.findOneAndUpdate(filter, {
       isRead: true,
     });
 
@@ -73,7 +81,8 @@ export const sendCustomNotification = async (req, res) => {
       deliverypartner: "DeliveryPartner",
     };
 
-    const normalizedRole = roleMap[targetRole.toLowerCase()];
+    // String(): a non-text targetRole used to throw here and answer 500
+    const normalizedRole = roleMap[String(targetRole).toLowerCase()];
 
     if (!normalizedRole) {
       return res.status(400).json({
@@ -114,6 +123,8 @@ export const sendCustomNotification = async (req, res) => {
     }
 
     // 📩 BULK NOTIFICATION (with future-proofing)
+    // One ID for the whole send, so the history lists it as one broadcast
+    const broadcastId = crypto.randomUUID();
     const notifications = users.map((user) => ({
       title: cleanTitle,
       message: cleanMessage,
@@ -124,6 +135,7 @@ export const sendCustomNotification = async (req, res) => {
       type: "CUSTOM",
       meta: {
         broadcast: true,
+        broadcastId,
         senderRole: req.user.role,
       },
     }));
@@ -195,14 +207,28 @@ export const getSentNotifications = async (req, res) => {
       { $match: { type: "CUSTOM", "meta.broadcast": true } },
       {
         $group: {
+          /* Grouped by the send itself. Broadcasts from before broadcastId
+             existed fall back to title, message, audience and minute — which
+             split one large send in two when it crossed a minute. */
           _id: {
-            title: "$title",
-            message: "$message",
-            recipientModel: "$recipientModel",
-            minute: {
-              $dateToString: { format: "%Y-%m-%dT%H:%M", date: "$createdAt" },
-            },
+            $ifNull: [
+              "$meta.broadcastId",
+              {
+                title: "$title",
+                message: "$message",
+                recipientModel: "$recipientModel",
+                minute: {
+                  $dateToString: {
+                    format: "%Y-%m-%dT%H:%M",
+                    date: "$createdAt",
+                  },
+                },
+              },
+            ],
           },
+          title: { $first: "$title" },
+          message: { $first: "$message" },
+          recipientModel: { $first: "$recipientModel" },
           recipients: { $sum: 1 },
           readCount: { $sum: { $cond: ["$isRead", 1, 0] } },
           sentAt: { $min: "$createdAt" },
@@ -214,9 +240,9 @@ export const getSentNotifications = async (req, res) => {
     ]);
 
     const data = grouped.map((g) => ({
-      title: g._id.title,
-      message: g._id.message,
-      audience: g._id.recipientModel,
+      title: g.title,
+      message: g.message,
+      audience: g.recipientModel,
       sentAt: g.sentAt,
       senderRole: g.senderRole || null,
       recipients: g.recipients,

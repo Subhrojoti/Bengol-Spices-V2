@@ -24,9 +24,12 @@ import {
   checkQrPaymentStatus,
   verifyQrAndPlaceOrder,
   verifyDueQrPayment,
+  getPaymentIssues,
+  refundPaymentIssue,
+  resolvePaymentIssue,
 } from "../controllers/order.controller.js";
 import { protect } from "../middleware/auth.js";
-import { isAgent, isDeliveryPartner } from "../middleware/role.js";
+import { isAdmin, isAgent, isDeliveryPartner } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
 
 const router = express.Router();
@@ -144,6 +147,17 @@ router.post(
   verifyQrAndPlaceOrder,
 );
 router.post("/razorpay/verify-due-qr", protect, isAgent, verifyDueQrPayment);
+
+// Razorpay / QR payments taken but not applied or refunded automatically
+router.get(
+  "/payment-issues",
+  protect,
+  checkPermission("canSeePaymentInfo"),
+  getPaymentIssues,
+);
+// Refunding money or closing an issue by hand is left to the admin
+router.post("/payment-issues/:id/refund", protect, isAdmin, refundPaymentIssue);
+router.post("/payment-issues/:id/resolve", protect, isAdmin, resolvePaymentIssue);
 
 // CREATE SHIPMENT (EMPLOYEE / ADMIN) [Future code mode --- ShipRocket]
 // router.post(
