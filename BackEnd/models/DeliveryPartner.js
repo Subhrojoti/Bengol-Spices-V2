@@ -26,6 +26,10 @@ const deliveryPartnerSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Forgot-password flow (hashed token + expiry)
+    passwordResetToken: String,
+    passwordResetExpires: Date,
+
     address: {
       state: {
         type: String,

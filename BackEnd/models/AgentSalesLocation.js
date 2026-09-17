@@ -27,10 +27,14 @@ const agentSalesLocationSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Not required: the admin signs in against environment credentials and
+    // has no Admin document, so there is no id to store. Every existing
+    // admin-made assignment already has this empty — the upsert simply never
+    // ran the required validator. Marking it required was a trap: turning on
+    // runValidators would have broken admin assignment outright.
     assignedBy: {
       type: mongoose.Schema.Types.ObjectId,
       refPath: "assignedByModel",
-      required: true,
     },
 
     assignedByModel: {

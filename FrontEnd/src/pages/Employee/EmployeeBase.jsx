@@ -1,20 +1,35 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box, CircularProgress } from "@mui/material";
-import { Outlet } from "react-router-dom";
-import EmployeeSidePanel from "../../components/sidebar/EmployeeSidePanel";
+import { useNavigate } from "react-router-dom";
+import PanelLayout from "../../components/layout/PanelLayout";
+import NotificationBell from "../../components/notifications/NotificationBell";
+import { employeeRoutes } from "../../config/employeeRoutes";
 import { getEmployeeProfile } from "../../api/services";
+import { canAccessRoute } from "../../utils/permissionUtils";
+import useAccessSync from "../../hooks/useAccessSync";
+
+const EMPLOYEE_ACCENT = {
+  main: "#7c3aed",
+  soft: "rgba(124, 58, 237, 0.12)",
+  surface: "linear-gradient(180deg, #faf8ff 0%, #f1ecff 100%)",
+};
 
 const EmployeeBase = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
 
+  /* Fetched once here and handed to the sidebar. The sidebar used to fetch
+     the same profile a second time on every page load. */
   useEffect(() => {
     const loadProfile = async () => {
       try {
         const res = await getEmployeeProfile();
 
         const permissions = res?.employee?.permissions || {};
-
         localStorage.setItem("permissions", JSON.stringify(permissions));
+
+        if (res?.employee) setProfile(res.employee);
       } catch (error) {
         console.error("Failed to load employee profile", error);
       } finally {
@@ -24,6 +39,31 @@ const EmployeeBase = () => {
 
     loadProfile();
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("employeeToken");
+    localStorage.removeItem("permissions");
+    localStorage.removeItem("role");
+    navigate("/employee/login", { replace: true });
+  };
+
+  /* Sign the employee out as soon as the admin changes their access, so the
+     next login reflects it. */
+  useAccessSync({
+    enabled: !loading && Boolean(profile),
+    permissions: profile?.permissions,
+    onSignOut: handleLogout,
+  });
+
+  /* Only advertise tabs this employee can actually open — the sidebar used
+     to list every tab and walk them into an "Access Restricted" wall. */
+  const visibleItems = useMemo(
+    () =>
+      employeeRoutes.filter(
+        (route) => route.path !== "profile" && canAccessRoute(route),
+      ),
+    [loading],
+  );
 
   if (loading) {
     return (
@@ -40,13 +80,17 @@ const EmployeeBase = () => {
   }
 
   return (
-    <Box sx={{ display: "flex" }}>
-      <EmployeeSidePanel />
-
-      <Box sx={{ flexGrow: 1, minHeight: "100vh", marginLeft: "5%" }}>
-        <Outlet />
-      </Box>
-    </Box>
+    <PanelLayout
+      items={visibleItems}
+      basePath="/employee"
+      brandTitle="Employee Panel"
+      accent={EMPLOYEE_ACCENT}
+      storageKey="employeePanel"
+      profile={profile}
+      profilePath="/employee/profile"
+      onLogout={handleLogout}
+      bell={<NotificationBell color="#475569" popupPosition="right" />}
+    />
   );
 };
 

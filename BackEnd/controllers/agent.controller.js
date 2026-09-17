@@ -467,3 +467,39 @@ export const leaderboard = async (req, res) => {
     });
   }
 };
+
+/**
+ * LIST ASSIGNED SALES LOCATIONS (Admin / Employee with canAssignLocations)
+ *
+ * Added because assignSalesLocation upserts on (agentId, state): saving
+ * replaces that agent's whole pincode list for the state. Without a way to
+ * read the current assignment first, the admin panel was overwriting
+ * coverage blind.
+ *
+ * Optional ?agentId= narrows it to one agent.
+ */
+export const getSalesLocations = async (req, res) => {
+  try {
+    const { agentId } = req.query;
+
+    const filter = agentId ? { agentId: String(agentId).trim() } : {};
+
+    const locations = await AgentSalesLocation.find(filter).sort({
+      agentId: 1,
+      state: 1,
+    });
+
+    return res.json({
+      success: true,
+      count: locations.length,
+      locations,
+    });
+  } catch (error) {
+    console.error("GET SALES LOCATIONS ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch sales locations",
+    });
+  }
+};

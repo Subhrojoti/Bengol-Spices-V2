@@ -1,7 +1,10 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import Agent from "../models/Agent.js";
 import Employee from "../models/Employee.js";
+import DeliveryPartner from "../models/DeliveryPartner.js";
+import { sendPasswordResetMail } from "../utils/email.js";
 
 // Generate link for the Password
 
@@ -287,6 +290,258 @@ export const employeeLogout = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Logout failed",
+    });
+  }
+};
+
+/* =====================================================================
+   FORGOT / RESET PASSWORD (AGENT + DELIVERY PARTNER)
+   Flow:
+     1. POST forgot-password  -> email a one-time reset link (15 min)
+     2. POST reset-password   -> verify token, set new password
+   The raw token goes in the email; only its SHA-256 hash is stored.
+   ===================================================================== */
+
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const RESET_RESEND_COOLDOWN_MS = 60 * 1000; // 1 minute between emails
+const STRONG_PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
+
+const hashResetToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+const frontendBaseUrl = () =>
+  (process.env.FRONTEND_URL || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean)[0] || "http://localhost:5173";
+
+// Generic response so callers cannot enumerate accounts
+const GENERIC_FORGOT_MESSAGE =
+  "If an account matching those details exists, a password reset link has been sent to the registered email.";
+
+/**
+ * Shared implementation for both roles.
+ * @param {object} opts
+ * @param {import("mongoose").Document|null} opts.user  matched account (or null)
+ * @param {string} opts.roleLabel  "Agent" | "Delivery Partner"
+ * @param {string} opts.resetPath  frontend path that hosts the reset form
+ */
+const issuePasswordReset = async ({ user, roleLabel, resetPath }, res) => {
+  // Unknown account -> still respond 200 (no enumeration)
+  if (!user) {
+    return res.json({ success: true, message: GENERIC_FORGOT_MESSAGE });
+  }
+
+  // Account exists but has no email we can send to
+  if (!user.email) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "No email address is registered with this account. Please contact support to reset your password.",
+    });
+  }
+
+  // Cooldown: a link was issued less than a minute ago, do not resend
+  if (
+    user.passwordResetExpires &&
+    user.passwordResetExpires.getTime() - Date.now() >
+      RESET_TOKEN_TTL_MS - RESET_RESEND_COOLDOWN_MS
+  ) {
+    return res.json({ success: true, message: GENERIC_FORGOT_MESSAGE });
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+
+  user.passwordResetToken = hashResetToken(rawToken);
+  user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+  await user.save();
+
+  const link = `${frontendBaseUrl()}${resetPath}?token=${rawToken}`;
+
+  try {
+    await sendPasswordResetMail({
+      name: user.name,
+      email: user.email,
+      link,
+      roleLabel,
+    });
+  } catch (mailError) {
+    // Roll back so the user can retry immediately
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+    console.error("PASSWORD RESET MAIL ERROR:", mailError);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send reset email. Please try again.",
+    });
+  }
+
+  return res.json({ success: true, message: GENERIC_FORGOT_MESSAGE });
+};
+
+/**
+ * Shared reset implementation for both roles.
+ * @param {import("mongoose").Model} Model
+ */
+const applyPasswordReset = async (Model, req, res) => {
+  const { token, password, confirmPassword } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Token and new password are required",
+    });
+  }
+
+  if (confirmPassword !== undefined && password !== confirmPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "New password and confirm password do not match",
+    });
+  }
+
+  if (!STRONG_PASSWORD_REGEX.test(password)) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Password must be at least 6 characters long and contain letters and numbers",
+    });
+  }
+
+  const user = await Model.findOne({
+    passwordResetToken: hashResetToken(String(token)),
+    passwordResetExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired reset link. Please request a new one.",
+    });
+  }
+
+  if (user.password && (await bcrypt.compare(password, user.password))) {
+    return res.status(400).json({
+      success: false,
+      message: "New password cannot be the same as your old password",
+    });
+  }
+
+  user.password = await bcrypt.hash(password, 10);
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+
+  return res.json({
+    success: true,
+    message: "Password reset successfully. You can now log in.",
+  });
+};
+
+// POST /auth/agent/forgot-password   body: { agentId } or { email }
+export const agentForgotPassword = async (req, res) => {
+  try {
+    const { agentId, email } = req.body;
+
+    if (!agentId && !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Agent ID or registered email is required",
+      });
+    }
+
+    const query = agentId
+      ? { agentId: String(agentId).trim().toUpperCase() }
+      : { email: String(email).trim().toLowerCase() };
+
+    const agent = await Agent.findOne(query);
+
+    // Only approved agents have a password to reset
+    if (agent && agent.status !== "APPROVED") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your account is not approved yet. Password reset is available only after approval.",
+      });
+    }
+
+    return await issuePasswordReset(
+      { user: agent, roleLabel: "Agent", resetPath: "/agent-reset-password" },
+      res,
+    );
+  } catch (error) {
+    console.error("AGENT FORGOT PASSWORD ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process password reset request",
+    });
+  }
+};
+
+// POST /auth/agent/reset-password   body: { token, password, confirmPassword }
+export const agentResetPassword = async (req, res) => {
+  try {
+    return await applyPasswordReset(Agent, req, res);
+  } catch (error) {
+    console.error("AGENT RESET PASSWORD ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reset password",
+    });
+  }
+};
+
+// POST /auth/delivery-partner/forgot-password   body: { phone }
+export const deliveryPartnerForgotPassword = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: "Registered phone number is required",
+      });
+    }
+
+    const partner = await DeliveryPartner.findOne({
+      phone: String(phone).trim(),
+    });
+
+    if (partner && partner.status !== "ACTIVE") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your account is not active. Password reset is available only for approved accounts.",
+      });
+    }
+
+    return await issuePasswordReset(
+      {
+        user: partner,
+        roleLabel: "Delivery Partner",
+        resetPath: "/delivery-reset-password",
+      },
+      res,
+    );
+  } catch (error) {
+    console.error("DELIVERY PARTNER FORGOT PASSWORD ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process password reset request",
+    });
+  }
+};
+
+// POST /auth/delivery-partner/reset-password   body: { token, password, confirmPassword }
+export const deliveryPartnerResetPassword = async (req, res) => {
+  try {
+    return await applyPasswordReset(DeliveryPartner, req, res);
+  } catch (error) {
+    console.error("DELIVERY PARTNER RESET PASSWORD ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reset password",
     });
   }
 };

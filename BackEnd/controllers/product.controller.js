@@ -1,6 +1,18 @@
 import Product from "../models/Product.js";
 import cloudinary from "../config/cloudinary.js";
 
+/**
+ * An optional price coming off a multipart form: absent, null or blank all
+ * mean "not set", never zero.
+ */
+const toOptionalPrice = (value) => {
+  if (value === undefined || value === null) return null;
+  if (String(value).trim() === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export const createProduct = async (req, res) => {
   let frontPublicId = null;
   let backPublicId = null;
@@ -56,13 +68,15 @@ export const createProduct = async (req, res) => {
       minOrderQty,
       certificates: certificates ? certificates.split(",") : [],
 
-      // ✅ NEW: Save tiered prices — stored as null if not provided (safe)
-      // Parse to Number because req.body from multipart/form-data is string
-      retailerPrice: retailerPrice !== undefined ? Number(retailerPrice) : null,
-      wholesalerPrice:
-        wholesalerPrice !== undefined ? Number(wholesalerPrice) : null,
-      distributorPrice:
-        distributorPrice !== undefined ? Number(distributorPrice) : null,
+      // Tiered prices are optional and must stay null when not supplied.
+      // 🔥 FIX: this checked only for undefined, but multipart/form-data
+      // sends an untouched field as an empty string. Number("") is 0, so
+      // leaving a tier blank silently priced the product at ₹0 for that
+      // store category — and the order controller treats a set tier price
+      // as authoritative, so it would have been charged.
+      retailerPrice: toOptionalPrice(retailerPrice),
+      wholesalerPrice: toOptionalPrice(wholesalerPrice),
+      distributorPrice: toOptionalPrice(distributorPrice),
 
       images: {
         front: {

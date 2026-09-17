@@ -1,287 +1,137 @@
-import { useState, useEffect } from "react";
-import {
-  Box,
-  Container,
-  Paper,
-  TextField,
-  Typography,
-  Button,
-  MobileStepper,
-  CircularProgress,
-  InputAdornment,
-  IconButton,
-} from "@mui/material";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { employeeLogin } from "../../../api/services";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import slide1 from "../../../assets/Slides/Slide1.png";
-import slide2 from "../../../assets/Slides/Slide2.png";
-import slide3 from "../../../assets/Slides/Slide3.png";
+import { Eye, EyeOff, IdCard, KeyRound, Loader2, UserRound } from "lucide-react";
+import AuthShell, { AuthField } from "./AuthShell";
+import { employeeLogin } from "../../../api/services";
 
-const spiceImages = [
-  {
-    img: slide1,
-    title: "Bengol Spices",
-    desc: "Authentic spices sourced with tradition and purity.",
-  },
-  {
-    img: slide2,
-    title: "Rich Flavours",
-    desc: "Bold aromas and vibrant blends for everyday cooking.",
-  },
-  {
-    img: slide3,
-    title: "Premium Quality",
-    desc: "Carefully selected ingredients for modern kitchens.",
-  },
+const THEME = {
+  panel: "bg-[#1b1035]",
+  glowA: "radial-gradient(circle, #7c3aed 0%, transparent 70%)",
+  glowB: "radial-gradient(circle, #d946ef 0%, transparent 70%)",
+};
+
+const STATEMENTS = [
+  "Your day's work in one place: orders, returns, dispatch and payments.",
+  "You only see the sections you have been granted. Nothing else gets in the way.",
+  "Sign in with the employee ID emailed to you when your account was created.",
 ];
 
 export default function EmployeeLogin() {
-  const [activeStep, setActiveStep] = useState(0);
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({ employeeId: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState(false);
 
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveStep((prev) => (prev + 1) % spiceImages.length);
-    }, 4000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const errors = {
+    employeeId: form.employeeId.trim() ? "" : "Employee ID is required",
+    password: form.password ? "" : "Password is required",
   };
 
-  const handleLogin = async () => {
-    const { employeeId, password } = form;
+  const invalid = Boolean(errors.employeeId || errors.password);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setTouched(true);
+
+    if (invalid) return;
 
     try {
       setLoading(true);
-      const data = await employeeLogin(employeeId, password);
+      const data = await employeeLogin(form.employeeId.trim(), form.password);
 
-      if (data.success) {
-        localStorage.setItem("employeeToken", data.token);
-        localStorage.setItem("role", "EMPLOYEE");
-
-        navigate("/employee/dashboard", { replace: true });
+      if (!data?.success || !data?.token) {
+        toast.error(data?.message || "Those credentials were not accepted");
+        return;
       }
+
+      localStorage.setItem("employeeToken", data.token);
+      localStorage.setItem("role", "EMPLOYEE");
+      navigate("/employee/dashboard", { replace: true });
     } catch (error) {
-      console.error(error);
-      toast.error("Invalid employee ID or password");
+      /* The API distinguishes a deactivated account from a wrong password.
+         The old page replaced both with one generic line. */
+      toast.error(
+        error?.response?.data?.message || "Invalid employee ID or password",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, #c084fc 0%, #6c35cb 45%, #421983 100%)",
-        display: "flex",
-        alignItems: "center",
-      }}>
-      <Container maxWidth="md">
-        <Box sx={{ position: "relative", height: 540 }}>
-          {/* LEFT SLIDER */}
-          <Paper
-            elevation={10}
-            sx={{
-              width: "80%",
-              height: "100%",
-              borderRadius: 2,
-              overflow: "hidden",
-              position: "relative",
-              display: { xs: "none", md: "block" },
-            }}>
-            {spiceImages.map((item, index) => (
-              <Box
-                key={index}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  opacity: activeStep === index ? 1 : 0,
-                  transition: "opacity 0.8s ease",
-                }}>
-                <Box
-                  component="img"
-                  src={item.img}
-                  alt={item.title}
-                  sx={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
+    <AuthShell
+      theme={THEME}
+      eyebrow="Employee Portal"
+      headline="Everything you need for the day, and nothing you don't."
+      statements={STATEMENTS}
+      altLinks={[
+        { to: "/admin/login", label: "Admin sign in" },
+        { to: "/agent/login", label: "Agent sign in" },
+        { to: "/delivery/login", label: "Delivery partner sign in" },
+      ]}>
+      <div className="mb-8">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-600/20">
+          <UserRound size={13} />
+          Employee
+        </span>
 
-                <Box
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    backgroundColor: "rgba(0,0,0,0.45)",
-                  }}
-                />
+        <h2 className="mt-4 text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
+          Sign in
+        </h2>
+        <p className="mt-1.5 text-[14px] text-slate-500">
+          Use the employee ID from your welcome email.
+        </p>
+      </div>
 
-                <Box
-                  sx={{
-                    position: "absolute",
-                    bottom: 40,
-                    left: 40,
-                    right: 40,
-                    color: "#fff",
-                  }}>
-                  <Typography variant="h5" fontWeight={700}>
-                    {item.title}
-                  </Typography>
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <AuthField
+          label="Employee ID"
+          name="employeeId"
+          autoComplete="username"
+          placeholder="EMP2026-001"
+          icon={<IdCard size={16} />}
+          value={form.employeeId}
+          onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+          error={touched ? errors.employeeId : ""}
+          className="font-mono"
+        />
 
-                  <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                    {item.desc}
-                  </Typography>
-                </Box>
-              </Box>
-            ))}
-
-            <MobileStepper
-              variant="dots"
-              steps={spiceImages.length}
-              position="static"
-              activeStep={activeStep}
-              sx={{
-                position: "absolute",
-                bottom: 12,
-                left: 32,
-                background: "transparent",
-              }}
-              nextButton={null}
-              backButton={null}
-            />
-          </Paper>
-
-          {/* LOGIN CARD */}
-          <Paper
-            elevation={14}
-            sx={{
-              width: 400,
-              p: 4,
-              borderRadius: 2,
-              position: "absolute",
-              right: 0,
-              top: "50%",
-              transform: "translateY(-50%)",
-              backgroundColor: "#fff",
-            }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              Employee Login
-            </Typography>
-
-            <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
-              Sign in to access your Bengol Spices employee dashboard
-            </Typography>
-
-            <TextField
-              fullWidth
-              variant="standard"
-              label="Employee ID"
-              name="employeeId"
-              value={form.employeeId}
-              onChange={handleChange}
-              margin="normal"
-              sx={{
-                "& .MuiInputLabel-root.Mui-focused": {
-                  color: "#5b21b6",
-                },
-                "& .MuiInput-underline:after": {
-                  borderBottomColor: "#5b21b6",
-                },
-                "& .MuiInput-underline:hover:not(.Mui-disabled):before": {
-                  borderBottomColor: "#5b21b6",
-                },
-              }}
-            />
-
-            <TextField
-              fullWidth
-              variant="standard"
-              type={showPassword ? "text" : "password"}
-              label="Password"
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              margin="normal"
-              sx={{
-                "& .MuiInputLabel-root.Mui-focused": {
-                  color: "#5b21b6",
-                },
-                "& .MuiInput-underline:after": {
-                  borderBottomColor: "#5b21b6",
-                },
-                "& .MuiInput-underline:hover:not(.Mui-disabled):before": {
-                  borderBottomColor: "#5b21b6",
-                },
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword((prev) => !prev)}
-                      edge="end"
-                      size="small"
-                      sx={{ color: "text.secondary" }}>
-                      {showPassword ? (
-                        <VisibilityOff fontSize="small" />
-                      ) : (
-                        <Visibility fontSize="small" />
-                      )}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <Button
+        <AuthField
+          label="Password"
+          type={showPassword ? "text" : "password"}
+          name="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          icon={<KeyRound size={16} />}
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          error={touched ? errors.password : ""}
+          trailing={
+            <button
               type="button"
-              fullWidth
-              variant="contained"
-              onClick={handleLogin}
-              disabled={loading}
-              sx={{
-                mt: 4,
-                py: 1.3,
-                backgroundColor: "#7c3aed",
-                fontWeight: 600,
-                textTransform: "none",
-                "&:hover": {
-                  backgroundColor: "#5b21b6",
-                },
-              }}>
-              {loading ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                  }}>
-                  Logging in
-                  <CircularProgress
-                    size={16}
-                    thickness={5}
-                    sx={{ color: "#fff" }}
-                  />
-                </Box>
-              ) : (
-                "Login"
-              )}
-            </Button>
-          </Paper>
-        </Box>
-      </Container>
-    </Box>
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700">
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-3.5 text-[14.5px] font-semibold text-white transition hover:bg-violet-700 focus:outline-none focus:ring-4 focus:ring-violet-600/20 disabled:opacity-60">
+          {loading && <Loader2 size={16} className="animate-spin" />}
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+
+        <p className="pt-1 text-center text-[12.5px] text-slate-400">
+          Forgotten your password? Your administrator can reset it.
+        </p>
+      </form>
+    </AuthShell>
   );
 }

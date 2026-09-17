@@ -60,3 +60,41 @@ curl --location 'http://localhost:8000/targets/agent/today-target' \
 curl --location 'http://localhost:8000/targets/admin/performance' \
 --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzM2MTYzMzIsImV4cCI6MTc3MzcwMjczMn0.wV_xwo1c0a2c5_wTnBJ8TJ7ErnAlTyXxyrxE7djLjWY' \
 --header 'api-key: OMpqVWAH.UC80wyXTtPwhDgAUdCTx6'
+
+FORGOT / RESET PASSWORD APIs (Public - no token needed)
+
+// Agent - request reset link (send agentId OR email)
+
+curl --location 'http://localhost:8000/auth/agent/forgot-password' \
+--header 'Content-Type: application/json' \
+--data '{
+  "agentId": "BS2026-001"
+}'
+
+// Agent - set new password using token from the email link (/agent-reset-password?token=...)
+
+curl --location 'http://localhost:8000/auth/agent/reset-password' \
+--header 'Content-Type: application/json' \
+--data '{
+  "token": "<token from email link>",
+  "password": "newpass123",
+  "confirmPassword": "newpass123"
+}'
+
+// Delivery Partner - request reset link (registered phone; link goes to email on file)
+
+curl --location 'http://localhost:8000/auth/delivery-partner/forgot-password' \
+--header 'Content-Type: application/json' \
+--data '{
+  "phone": "9876543210"
+}'
+
+// Delivery Partner - set new password using token from the email link (/delivery-reset-password?token=...)
+
+curl --location 'http://localhost:8000/auth/delivery-partner/reset-password' \
+--header 'Content-Type: application/json' \
+--data '{
+  "token": "<token from email link>",
+  "password": "newpass123",
+  "confirmPassword": "newpass123"
+}'

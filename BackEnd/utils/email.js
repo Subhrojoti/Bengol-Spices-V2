@@ -336,3 +336,70 @@ export const sendDeliveryPartnerRejectionMail = async ({ name, email }) => {
     throw new Error(error.message || "Failed to send rejection email");
   }
 };
+
+// 🔑 PASSWORD RESET EMAIL (Agent / Delivery Partner)
+export const sendPasswordResetMail = async ({ name, email, link, roleLabel }) => {
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: "Reset your Bengol Spices password",
+    html: `
+      <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+
+          <div style="background: #1f2937; color: #ffffff; padding: 16px 20px;">
+            <h2 style="margin: 0;">Password Reset Request</h2>
+          </div>
+
+          <div style="padding: 20px; color: #333;">
+            <p style="font-size: 15px;">Hello ${name || ""},</p>
+
+            <p>
+              We received a request to reset the password for your
+              <strong>${roleLabel}</strong> account.
+              Click the button below to choose a new password.
+              <strong>This link expires in 15 minutes.</strong>
+            </p>
+
+            <div style="margin-top: 25px; text-align: center;">
+              <a
+                href="${link}"
+                style="
+                  background: #2563eb;
+                  color: #ffffff;
+                  padding: 12px 24px;
+                  text-decoration: none;
+                  border-radius: 6px;
+                  font-weight: bold;
+                  display: inline-block;
+                "
+              >
+                Reset My Password
+              </a>
+            </div>
+
+            <p style="font-size: 12px; color: #6b7280; margin-top: 16px;">
+              If the button doesn't work, copy and paste this link into your browser:<br/>
+              <a href="${link}">${link}</a>
+            </p>
+
+            <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">
+              If you did not request a password reset, you can safely ignore this
+              email. Your password will not change.
+            </p>
+          </div>
+
+          <div style="background: #f3f4f6; padding: 12px; text-align: center; font-size: 12px; color: #6b7280;">
+            © ${new Date().getFullYear()} Bengol Spices Pvt Ltd
+          </div>
+
+        </div>
+      </div>
+    `,
+  });
+
+  if (error) {
+    console.error("sendPasswordResetMail error:", error);
+    throw new Error(error.message || "Failed to send password reset email");
+  }
+};

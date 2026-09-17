@@ -6,6 +6,8 @@ import Onboarding from "../pages/Auth/Agent/AgentOnboarding";
 import { adminRoutes } from "../config/adminRoutes";
 import ProfileSettings from "../pages/marketingHub/ProfileSettings/ProfileSettings.jsx";
 import SetPassword from "../pages/Auth/Agent/AgentSetPassword";
+import ForgotPassword from "../pages/Auth/ForgotPassword";
+import ResetPassword from "../pages/Auth/ResetPassword";
 import DeliveryPartnerRegister from "../pages/Auth/DeliveryPartner/DeliveryPartnerRegister";
 import AdminBase from "../pages/Admin/AdminBase";
 import ProductDetails from "../pages/Admin/Tabs/AllProducts/ProductDetails";
@@ -78,6 +80,24 @@ export const routes = [
     path: "/agent-set-password",
     element: <SetPassword />,
   },
+
+  /* Forgot / reset password (public) */
+  {
+    path: "/agent-forgot-password",
+    element: <ForgotPassword role="agent" />,
+  },
+  {
+    path: "/agent-reset-password",
+    element: <ResetPassword role="agent" />,
+  },
+  {
+    path: "/delivery-forgot-password",
+    element: <ForgotPassword role="delivery" />,
+  },
+  {
+    path: "/delivery-reset-password",
+    element: <ResetPassword role="delivery" />,
+  },
   {
     path: "/delivery-partner-register",
     element: <DeliveryPartnerRegister />,
@@ -103,8 +123,15 @@ export const routes = [
             element: <ProductDetails />,
           },
           {
+            /* adminRoutes entries expose `component`, not `element`.
+               Reading `.element` here rendered undefined, so a bare
+               /admin visit (e.g. the logged-in redirect from
+               /admin/login) showed an empty page. */
             index: true,
-            element: adminRoutes[0].element,
+            element: (() => {
+              const DefaultComponent = adminRoutes[0].component;
+              return <DefaultComponent />;
+            })(),
           },
         ],
       },
@@ -132,6 +159,20 @@ export const routes = [
               ),
             };
           }),
+
+          {
+            /* The products grid links to its own panel's detail page. This
+               route never existed under /employee, so an employee clicking a
+               product fell through to the admin panel's copy — which reads a
+               different token entirely. Guarded by the same permission as
+               the All Products tab it is reached from. */
+            path: "allproducts/:productId",
+            element: (
+              <PermissionGuard permission="canManageProducts">
+                <ProductDetails />
+              </PermissionGuard>
+            ),
+          },
 
           /* Default */
           {

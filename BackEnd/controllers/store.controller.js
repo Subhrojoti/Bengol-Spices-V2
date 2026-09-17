@@ -215,3 +215,33 @@ export const getMyStores = async (req, res) => {
     });
   }
 };
+
+/**
+ * LIST ALL STORES (Admin / Employee who can see all orders)
+ *
+ * Orders only embed a flattened delivery address — store name, owner, phone
+ * and location — with no link back to the store record, so the admin panel
+ * had no way to show a store's photo or type beside its orders.
+ */
+export const getAllStores = async (req, res) => {
+  try {
+    const stores = await Store.find()
+      .select(
+        "consumerId storeName ownerName phone address storeType image status registeredBy createdAt",
+      )
+      .sort({ createdAt: -1 });
+
+    return res.json({
+      success: true,
+      count: stores.length,
+      stores,
+    });
+  } catch (error) {
+    console.error("GET ALL STORES ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch stores",
+    });
+  }
+};

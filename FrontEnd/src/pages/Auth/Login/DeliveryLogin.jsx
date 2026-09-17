@@ -274,6 +274,17 @@ export default function DeliveryLogin() {
               }}
             />
 
+            <Box sx={{ textAlign: "right", mt: 1 }}>
+              <Link
+                component={RouterLink}
+                to="/delivery-forgot-password"
+                underline="hover"
+                variant="body2"
+                sx={{ fontWeight: 500, color: "#0f766e" }}>
+                Forgot password?
+              </Link>
+            </Box>
+
             <Button
               type="button"
               fullWidth
@@ -281,7 +292,7 @@ export default function DeliveryLogin() {
               onClick={handleLogin}
               disabled={loading}
               sx={{
-                mt: 4,
+                mt: 3,
                 py: 1.3,
                 backgroundColor: "#0f766e",
                 fontWeight: 600,

@@ -30,3 +30,181 @@
   border: none !important;
   box-shadow: none !important;
 }
+
+/* ===================================================================
+   Scrollbars
+
+   The admin and employee panels scroll in several places at once — the
+   page column, the sidebar rail, side panels and wide tables. Left at the
+   browser default those render as thick grey bars that dominate the
+   chrome. These are slim, rounded and low-contrast until hovered.
+
+   Firefox gets the two standard properties; Chrome, Edge and Safari get
+   the -webkit- pseudo-elements. Inputs keep the default so text fields
+   behave normally.
+   =================================================================== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.3);
+  border-radius: 999px;
+  /* Transparent border drawn over the thumb keeps it visually slim while
+     leaving a comfortably large grab target. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(71, 85, 105, 0.55);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ===================================================================
+   Toasts
+
+   react-toastify's stock look is a squared-off card with a thick
+   full-width progress bar. These restyle it into the same visual
+   language as the panels: a soft card, a hairline border, a thin status
+   accent down the left edge and a 2px progress line.
+
+   Styling it here rather than swapping the library keeps all 35 call
+   sites untouched.
+   =================================================================== */
+
+.Toastify__toast-container {
+  width: 380px;
+  padding: 0;
+}
+
+@media (max-width: 480px) {
+  .Toastify__toast-container {
+    width: calc(100vw - 24px);
+    left: 12px;
+    right: 12px;
+    margin: 0;
+  }
+}
+
+.Toastify__toast {
+  position: relative;
+  min-height: 0;
+  margin-bottom: 12px;
+  padding: 14px 14px 14px 18px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 14px 34px -14px rgba(15, 23, 42, 0.3);
+  color: #0f172a;
+  font-family: inherit;
+  overflow: hidden;
+}
+
+/* Status accent down the leading edge */
+.Toastify__toast::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--toast-accent, #2a78d6);
+}
+
+.Toastify__toast--success {
+  --toast-accent: #0ca30c;
+}
+.Toastify__toast--error {
+  --toast-accent: #d03b3b;
+}
+.Toastify__toast--warning {
+  --toast-accent: #fab219;
+}
+.Toastify__toast--info,
+.Toastify__toast--default {
+  --toast-accent: #2a78d6;
+}
+
+.Toastify__toast-body {
+  margin: 0;
+  padding: 0;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.Toastify__toast-body > div:last-child {
+  padding-top: 1px;
+}
+
+.Toastify__toast-icon {
+  width: auto;
+  margin-inline-end: 0;
+  align-self: flex-start;
+}
+
+.Toastify__progress-bar {
+  height: 2px;
+  background: var(--toast-accent);
+  opacity: 0.8;
+}
+
+.Toastify__close-button {
+  align-self: center;
+  color: #94a3b8;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.Toastify__toast:hover .Toastify__close-button {
+  opacity: 1;
+}
+
+.Toastify__close-button:hover {
+  color: #475569;
+}
+
+/* ===================================================================
+   Typography
+
+   Tailwind's preflight applies the family from tailwind.config.js, so this
+   only adds the rendering hints that make Inter look right and a slightly
+   tighter tracking on headings.
+   =================================================================== */
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.011em;
+}

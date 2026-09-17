@@ -39,6 +39,33 @@ export const sendCustomNotification = async (req, res) => {
       });
     }
 
+    // 🔥 A title or message of only spaces passed the check above and was
+    // then broadcast to everyone as a blank notification, with no way to
+    // recall it.
+    const cleanTitle = String(title).trim();
+    const cleanMessage = String(message).trim();
+
+    if (!cleanTitle || !cleanMessage) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and message cannot be blank",
+      });
+    }
+
+    if (cleanTitle.length > 120) {
+      return res.status(400).json({
+        success: false,
+        message: "Title must be 120 characters or fewer",
+      });
+    }
+
+    if (cleanMessage.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        message: "Message must be 1000 characters or fewer",
+      });
+    }
+
     // 🔒 Normalize role (avoid case issues)
     const roleMap = {
       agent: "Agent",
@@ -88,8 +115,8 @@ export const sendCustomNotification = async (req, res) => {
 
     // 📩 BULK NOTIFICATION (with future-proofing)
     const notifications = users.map((user) => ({
-      title,
-      message,
+      title: cleanTitle,
+      message: cleanMessage,
       recipientId: user._id,
       recipientModel: normalizedRole,
       recipientCode: user.employeeId || user.agentId || user.partnerId || null, // 🔥 future-proof
@@ -113,6 +140,99 @@ export const sendCustomNotification = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to send notification",
+    });
+  }
+};
+
+/**
+ * How many people each role would actually reach.
+ *
+ * Counts use the same filters sendCustomNotification does, so the number
+ * shown before sending is the number that will be written. A broadcast goes
+ * to everyone at once and cannot be recalled, so the panel showed no idea of
+ * its own blast radius before this.
+ */
+export const getNotificationAudience = async (req, res) => {
+  try {
+    const [agents, employees, deliveryPartners] = await Promise.all([
+      Agent.countDocuments({ status: "APPROVED" }),
+      Employee.countDocuments({ status: "ACTIVE" }),
+      DeliveryPartner.countDocuments({ status: "ACTIVE" }),
+    ]);
+
+    return res.json({
+      success: true,
+      audience: {
+        Agent: agents,
+        Employee: employees,
+        DeliveryPartner: deliveryPartners,
+      },
+    });
+  } catch (error) {
+    console.error("NOTIFICATION AUDIENCE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to count the audience",
+    });
+  }
+};
+
+/**
+ * History of custom broadcasts, newest first.
+ *
+ * One send fans out into a row per recipient, so they are regrouped by
+ * title, message, audience and the minute they went out. Each entry carries
+ * how many people received it and how many have read it — previously a
+ * broadcast vanished the moment it was sent, with no record and no way to
+ * tell whether anyone saw it.
+ *
+ * Only genuine broadcasts are included: system notifications (a new target,
+ * an approval) do not set meta.broadcast and stay out of this list.
+ */
+export const getSentNotifications = async (req, res) => {
+  try {
+    const grouped = await Notification.aggregate([
+      { $match: { type: "CUSTOM", "meta.broadcast": true } },
+      {
+        $group: {
+          _id: {
+            title: "$title",
+            message: "$message",
+            recipientModel: "$recipientModel",
+            minute: {
+              $dateToString: { format: "%Y-%m-%dT%H:%M", date: "$createdAt" },
+            },
+          },
+          recipients: { $sum: 1 },
+          readCount: { $sum: { $cond: ["$isRead", 1, 0] } },
+          sentAt: { $min: "$createdAt" },
+          senderRole: { $first: "$meta.senderRole" },
+        },
+      },
+      { $sort: { sentAt: -1 } },
+      { $limit: 50 },
+    ]);
+
+    const data = grouped.map((g) => ({
+      title: g._id.title,
+      message: g._id.message,
+      audience: g._id.recipientModel,
+      sentAt: g.sentAt,
+      senderRole: g.senderRole || null,
+      recipients: g.recipients,
+      readCount: g.readCount,
+    }));
+
+    return res.json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    console.error("SENT NOTIFICATIONS ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch sent notifications",
     });
   }
 };

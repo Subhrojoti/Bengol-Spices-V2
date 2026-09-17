@@ -55,7 +55,9 @@ const employeeSchema = new mongoose.Schema(
       canAssignLocations: { type: Boolean, default: false },
       canPayoutIncentives: { type: Boolean, default: false },
       canManageDeliveryPartners: { type: Boolean, default: false },
-      canGetAllDeliveryPartners: { type: Boolean, default: false },
+      // NOTE: canGetAllDeliveryPartners is declared once, above. It used to
+      // appear a second time here, which silently overwrote the first
+      // declaration (duplicate object key).
     },
 
     status: {

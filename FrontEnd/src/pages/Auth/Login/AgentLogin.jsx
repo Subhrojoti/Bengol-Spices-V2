@@ -249,6 +249,17 @@ export default function Login() {
               }}
             />
 
+            <Box sx={{ textAlign: "right", mt: 1 }}>
+              <Link
+                component={RouterLink}
+                to="/agent-forgot-password"
+                underline="hover"
+                variant="body2"
+                sx={{ fontWeight: 500, color: "#b45309" }}>
+                Forgot password?
+              </Link>
+            </Box>
+
             <Button
               type="button"
               fullWidth
@@ -256,7 +267,7 @@ export default function Login() {
               onClick={handleLogin}
               disabled={loading}
               sx={{
-                mt: 4,
+                mt: 3,
                 py: 1.3,
                 backgroundColor: "#b45309",
                 fontWeight: 600,

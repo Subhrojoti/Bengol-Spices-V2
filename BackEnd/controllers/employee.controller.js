@@ -16,6 +16,20 @@ export const createEmployee = async (req, res) => {
       });
     }
 
+    // The creation form has always told admins the password needs at least 8
+    // characters with upper case, lower case, a number and a symbol, but
+    // nothing enforced it on either side — "1" was accepted.
+    const strongPassword =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+    if (!strongPassword.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number and a symbol",
+      });
+    }
+
     // 🔥 FIX: normalize before the duplicate check. The schema's unique
     // index is case-sensitive with no lowercase/trim, so "Test@x.com" and
     // "test@x.com " were treated as different values — letting the same

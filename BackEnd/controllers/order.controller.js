@@ -44,8 +44,72 @@ const resolvePrice = (productDoc, storeType, fallbackUnitPrice) => {
   return fallbackUnitPrice;
 };
 
+/* =============================
+   HELPER: STOCK RESERVATION
+
+   🔥 FIX: nothing in the codebase ever changed Product.stock. Placing an
+   order left it untouched, so the number shown in the catalog was whatever
+   was typed at product creation and never moved again. Agents could order
+   far more than existed, and "out of stock" never happened.
+
+   The decrement is a conditional atomic update rather than read-then-save:
+   `stock: { $gte: quantity }` means two orders landing at the same moment
+   cannot both pass the check and oversell the last unit. A null result means
+   there was not enough left.
+   ============================= */
+export const releaseStock = async (lines) => {
+  for (const line of lines) {
+    await Product.updateOne(
+      { _id: line.productId },
+      { $inc: { stock: line.quantity } },
+    );
+  }
+};
+
+/**
+ * Takes stock for every line, or takes none at all.
+ * @returns {{ok: true, taken: Array}|{ok: false, message: string}}
+ */
+export const reserveStock = async (lines) => {
+  const taken = [];
+
+  for (const line of lines) {
+    const updated = await Product.findOneAndUpdate(
+      { _id: line.productId, stock: { $gte: line.quantity } },
+      { $inc: { stock: -line.quantity } },
+      { new: true },
+    );
+
+    if (!updated) {
+      // Put back whatever this order already took, so a partial failure
+      // never leaves stock quietly missing.
+      await releaseStock(taken);
+
+      const product = await Product.findById(line.productId).select(
+        "name stock uom",
+      );
+
+      return {
+        ok: false,
+        message: product
+          ? `Not enough stock for ${product.name}. Asked for ${line.quantity}, only ${product.stock} ${product.uom || "units"} left.`
+          : "A product in this order is no longer available",
+      };
+    }
+
+    taken.push(line);
+  }
+
+  return { ok: true, taken };
+};
+
 // PLACE ORDER (AGENT)
 export const placeOrder = async (req, res) => {
+  /* Tracked outside the try so the catch can hand stock back if anything
+     fails after it was taken — otherwise a crash between the reservation
+     and a saved order would quietly lose inventory. */
+  let reservedLines = [];
+
   try {
     const {
       consumerId,
@@ -118,6 +182,10 @@ export const placeOrder = async (req, res) => {
 
     let totalAmount = 0;
 
+    /* Every line that maps to a real product, so stock can be taken for it
+       once the whole order has passed validation. */
+    const stockLines = [];
+
     for (const item of products) {
       // BASIC VALIDATION
       if (
@@ -163,6 +231,11 @@ export const placeOrder = async (req, res) => {
         // If tiered price exists for this storeType → use it
         // If not → keep item.unitPrice as sent by agent (backward safe)
         item.unitPrice = resolvePrice(productDoc, storeType, item.unitPrice);
+
+        stockLines.push({
+          productId: productDoc._id,
+          quantity: Number(item.quantity),
+        });
       }
 
       /* =============================
@@ -181,6 +254,25 @@ export const placeOrder = async (req, res) => {
     }
 
     const dueAmount = totalAmount - paidAmount;
+
+    /* =============================
+       TAKE STOCK
+
+       Done after every other check has passed, so a rejection for some
+       unrelated reason never leaves stock held against an order that was
+       not created.
+       ============================= */
+
+    const reservation = await reserveStock(stockLines);
+
+    if (!reservation.ok) {
+      return res.status(400).json({
+        success: false,
+        message: reservation.message,
+      });
+    }
+
+    reservedLines = reservation.taken;
 
     /* =============================
        SAFE ORDER ID GENERATION
@@ -298,6 +390,13 @@ export const placeOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("PLACE ORDER ERROR:", error);
+
+    // The order never made it, so the stock it held must go back.
+    if (reservedLines.length) {
+      await releaseStock(reservedLines).catch((releaseError) =>
+        console.error("STOCK ROLLBACK FAILED:", releaseError),
+      );
+    }
 
     return res.status(500).json({
       success: false,
@@ -576,6 +675,23 @@ export const cancelOrder = async (req, res) => {
     });
 
     await order.save();
+
+    /* Goods never left, so the stock this order was holding goes back.
+       Released only after the cancellation is saved: an order that failed to
+       save must not hand stock back, or it would be sold twice. The guards
+       above already reject a second cancel, so this cannot double-restore. */
+    const linesToReturn = (order.products || [])
+      .filter((item) => item.productId && Number(item.quantity) > 0)
+      .map((item) => ({
+        productId: item.productId,
+        quantity: Number(item.quantity),
+      }));
+
+    if (linesToReturn.length) {
+      await releaseStock(linesToReturn).catch((restoreError) =>
+        console.error("STOCK RESTORE ON CANCEL FAILED:", restoreError),
+      );
+    }
 
     return res.json({
       success: true,

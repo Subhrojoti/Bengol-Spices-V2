@@ -186,12 +186,17 @@ export const verifyStoreOtp = async ({ storeId, otp }) => {
 // Employee Creation
 
 export const createEmployee = async ({ name, email, password, profilePic }) => {
-  const response = await axiosInstance.post("/employee/create", {
-    name,
-    email,
-    password,
-    profilePic,
-  });
+  /* Must be multipart: the route runs multer (`upload.single("profilePic")`).
+     This used to post a plain object, so the File serialised to `{}` in JSON
+     and every profile photo was silently dropped on the way to the server. */
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("email", email);
+  formData.append("password", password);
+
+  if (profilePic) formData.append("profilePic", profilePic);
+
+  const response = await axiosInstance.post("/employee/create", formData);
 
   return response.data;
 };
@@ -422,7 +427,11 @@ export const getActiveOrders = async () => {
 // Get active returns
 
 export const getActiveReturns = async () => {
-  const response = await axiosInstance.get("/agent/orders/active");
+  /* This pointed at "/agent/orders/active" — the active *orders* endpoint.
+     It returns { orders }, never { returns }, so the Assign Returns tab read
+     an empty list and always said "No return requests found", however many
+     returns were actually waiting for a pickup. */
+  const response = await axiosInstance.get("/returns/active");
   return response.data;
 };
 
@@ -673,4 +682,125 @@ export const approveDeliveryPartner = async (id) => {
 export const rejectDeliveryPartner = async (id) => {
   const res = await axiosInstance.post(`/admin/delivery-partners/${id}/reject`);
   return res.data;
+};
+
+/* ===================== FORGOT / RESET PASSWORD ===================== */
+
+// Agent: identify by agentId or email
+export const agentForgotPassword = async ({ agentId, email }) => {
+  const response = await axiosInstance.post("/auth/agent/forgot-password", {
+    agentId,
+    email,
+  });
+
+  return response.data;
+};
+
+export const agentResetPassword = async ({
+  token,
+  password,
+  confirmPassword,
+}) => {
+  const response = await axiosInstance.post("/auth/agent/reset-password", {
+    token,
+    password,
+    confirmPassword,
+  });
+
+  return response.data;
+};
+
+// Delivery partner: identify by registered phone
+export const deliveryForgotPassword = async ({ phone }) => {
+  const response = await axiosInstance.post(
+    "/auth/delivery-partner/forgot-password",
+    { phone },
+  );
+
+  return response.data;
+};
+
+export const deliveryResetPassword = async ({
+  token,
+  password,
+  confirmPassword,
+}) => {
+  const response = await axiosInstance.post(
+    "/auth/delivery-partner/reset-password",
+    { token, password, confirmPassword },
+  );
+
+  return response.data;
+};
+
+/* ===================== EMPLOYEE ACCESS SYNC ===================== */
+
+/**
+ * Background poll of the signed-in employee's own record.
+ *
+ * Deliberately uses a bare axios call instead of axiosInstance: the shared
+ * response interceptor sends the browser to /error on any 5xx or network
+ * error, which would eject an employee mid-work on a brief backend hiccup.
+ * A background check must never do that, so failures are classified and
+ * returned instead of thrown.
+ */
+export const fetchEmployeeAccessState = async () => {
+  const token = localStorage.getItem("employeeToken");
+
+  if (!token) return { ok: false, reason: "INVALID_SESSION" };
+
+  try {
+    const root = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+    const response = await axios.get(`${root}/employee/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000,
+    });
+
+    return { ok: true, employee: response.data?.employee };
+  } catch (error) {
+    const status = error?.response?.status;
+
+    if (status === 401 || status === 403 || status === 404) {
+      return { ok: false, reason: "INVALID_SESSION" };
+    }
+
+    // Offline, timeout or server error — ignore this tick and try again later
+    return { ok: false, reason: "TRANSIENT" };
+  }
+};
+
+/**
+ * Current sales-location coverage. Assigning upserts on (agentId, state), so
+ * the panel reads this first to show what a save would replace.
+ */
+export const getSalesLocations = async (agentId) => {
+  const response = await axiosInstance.get("/agent/store/locations", {
+    params: agentId ? { agentId } : undefined,
+  });
+  return response.data;
+};
+
+/** All stores, used to show a store's photo and details beside its orders. */
+export const getAllStores = async () => {
+  const response = await axiosInstance.get("/agent/store/all");
+  return response.data;
+};
+
+/** Every target that has been created, newest window first. */
+export const getAllTargets = async () => {
+  const response = await axiosInstance.get("/targets/admin/all");
+  return response.data;
+};
+
+/** How many people each role would receive a broadcast. */
+export const getNotificationAudience = async () => {
+  const response = await axiosInstance.get("/api/notifications/audience");
+  return response.data;
+};
+
+/** Previously sent broadcasts, with recipient and read counts. */
+export const getSentNotifications = async () => {
+  const response = await axiosInstance.get("/api/notifications/sent");
+  return response.data;
 };

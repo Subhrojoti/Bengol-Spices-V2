@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getLeaderboard } from "../../../../api/services";
+import EntityAvatar from "../../../../components/common/EntityAvatar";
 
 const Leaderboard = () => {
   const [leaders, setLeaders] = useState([]);
@@ -46,10 +47,11 @@ const Leaderboard = () => {
             className="bg-white rounded-2xl shadow-md p-5 text-center hover:shadow-lg transition">
             <div className="text-2xl mb-2">{user.medal}</div>
 
-            <img
+            <EntityAvatar
               src={user.profileImage}
-              alt={user.name}
-              className="w-16 h-16 rounded-full mx-auto object-cover mb-3"
+              name={user.name}
+              bordered={false}
+              className="w-16 h-16 rounded-full mx-auto mb-3 text-[18px]"
             />
 
             <h3 className="font-semibold text-gray-800">{user.name}</h3>
@@ -125,10 +127,11 @@ const Leaderboard = () => {
                   {/* Agent */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img
+                      <EntityAvatar
                         src={user.profileImage}
-                        alt={user.name}
-                        className="w-9 h-9 rounded-full object-cover"
+                        name={user.name}
+                        bordered={false}
+                        className="w-9 h-9 rounded-full text-[12px]"
                       />
                       <div>
                         <p className="font-medium text-gray-800">{user.name}</p>
@@ -190,10 +193,11 @@ const Leaderboard = () => {
 
               {/* AGENT */}
               <div className="flex items-center gap-3 mt-2">
-                <img
+                <EntityAvatar
                   src={user.profileImage}
-                  alt={user.name}
-                  className="w-10 h-10 rounded-full object-cover"
+                  name={user.name}
+                  bordered={false}
+                  className="w-10 h-10 rounded-full text-[12px]"
                 />
 
                 <div>

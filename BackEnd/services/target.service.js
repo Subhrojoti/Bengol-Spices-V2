@@ -64,19 +64,39 @@ export const updateTargetProgress = async ({
 
       // 🟡 ORDER
       if (type === "ORDER" && order) {
-        for (const item of order.products) {
+        const rules = target.productCommissions || [];
+        const hasRules = rules.length > 0;
+
+        for (const item of order.products || []) {
           // 🔥 FIX: skip items with no productId instead of crashing the
           // whole loop (a single bad item used to abort progress updates
           // for every other active target in this call).
           if (!item.productId) continue;
 
-          const rule = target.productCommissions.find(
-            (r) => r.productId.toString() === item.productId.toString(),
+          const quantity = Number(item.quantity) || 0;
+
+          // 🔥 FIX: achievedValue only ever advanced inside `if (rule)`, so
+          // an ORDER target with no product commissions could never move —
+          // and commissions are explicitly optional. "Place 50 packets,
+          // reward ₹200" was impossible for any agent to complete, with no
+          // sign anything was wrong. When a target carries no rules, every
+          // ordered unit now counts. When it does carry rules those rules
+          // still scope what counts, so targets already configured that way
+          // behave exactly as before.
+          if (!hasRules) {
+            progress.achievedValue += quantity;
+            continue;
+          }
+
+          const rule = rules.find(
+            (r) =>
+              r.productId &&
+              r.productId.toString() === item.productId.toString(),
           );
 
           if (rule) {
-            const commission = item.quantity * rule.commissionPerUnit;
-            progress.achievedValue += item.quantity;
+            const commission = quantity * (Number(rule.commissionPerUnit) || 0);
+            progress.achievedValue += quantity;
             progress.earnedAmount += commission;
             newlyEarned += commission; // ✅ log real commission, not the flat reward
           }

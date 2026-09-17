@@ -1,266 +1,135 @@
-import { useState, useEffect } from "react";
-import {
-  Box,
-  Container,
-  Paper,
-  TextField,
-  Typography,
-  Button,
-  MobileStepper,
-  CircularProgress,
-  InputAdornment,
-  IconButton,
-} from "@mui/material";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminLogin } from "../../../api/services";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import slide1 from "../../../assets/Slides/Slide1.png";
-import slide2 from "../../../assets/Slides/Slide2.png";
-import slide3 from "../../../assets/Slides/Slide3.png";
+import { Eye, EyeOff, KeyRound, Loader2, Mail, ShieldCheck } from "lucide-react";
+import AuthShell, { AuthField } from "./AuthShell";
+import { adminLogin } from "../../../api/services";
 
-const spiceImages = [
-  {
-    img: slide1,
-    title: "Bengol Spices",
-    desc: "Authentic spices sourced with tradition and purity.",
-  },
-  {
-    img: slide2,
-    title: "Rich Flavours",
-    desc: "Bold aromas and vibrant blends for everyday cooking.",
-  },
-  {
-    img: slide3,
-    title: "Premium Quality",
-    desc: "Carefully selected ingredients for modern kitchens.",
-  },
+const THEME = {
+  panel: "bg-[#0b1220]",
+  glowA: "radial-gradient(circle, #1d4ed8 0%, transparent 70%)",
+  glowB: "radial-gradient(circle, #0ea5e9 0%, transparent 70%)",
+};
+
+const STATEMENTS = [
+  "Approve agents, dispatch orders and keep the catalogue straight, from one place.",
+  "Every order, return and payment across the business, current to the minute.",
+  "Set targets, grant access and see exactly what each of them changed.",
 ];
 
-export default function Login() {
-  const [activeStep, setActiveStep] = useState(0);
+export default function AdminLogin() {
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [touched, setTouched] = useState(false);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveStep((prev) => (prev + 1) % spiceImages.length);
-    }, 4000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const errors = {
+    email: form.email.trim() ? "" : "Email is required",
+    password: form.password ? "" : "Password is required",
   };
 
-  const handleLogin = async () => {
-    const { email, password } = form;
+  const invalid = Boolean(errors.email || errors.password);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setTouched(true);
+
+    if (invalid) return;
 
     try {
       setLoading(true);
-      const data = await adminLogin(email, password);
+      const data = await adminLogin(form.email.trim(), form.password);
 
-      if (data.success) {
-        localStorage.setItem("adminToken", data.token);
-        localStorage.setItem("role", "ADMIN");
-
-        navigate("/admin/dashboard", { replace: true });
+      if (!data?.success || !data?.token) {
+        /* The old page checked success and then did nothing when it was
+           false — the button simply stopped, with no explanation. */
+        toast.error(data?.message || "Those credentials were not accepted");
+        return;
       }
+
+      localStorage.setItem("adminToken", data.token);
+      localStorage.setItem("role", "ADMIN");
+      navigate("/admin/dashboard", { replace: true });
     } catch (error) {
-      console.error(error);
-      toast.error("Invalid email or password");
+      toast.error(
+        error?.response?.data?.message || "Invalid email or password",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, #e0f2fe 0%, #7dd3fc 45%, #0284c7 100%)",
+    <AuthShell
+      theme={THEME}
+      eyebrow="Admin Console"
+      headline="Run the whole operation from one console."
+      statements={STATEMENTS}
+      altLinks={[
+        { to: "/employee/login", label: "Employee sign in" },
+        { to: "/agent/login", label: "Agent sign in" },
+        { to: "/delivery/login", label: "Delivery partner sign in" },
+      ]}>
+      <div className="mb-8">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[12px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+          <ShieldCheck size={13} />
+          Administrator
+        </span>
 
-        display: "flex",
-        alignItems: "center",
-      }}>
-      <Container maxWidth="md">
-        <Box sx={{ position: "relative", height: 540 }}>
-          {/* LEFT SLIDER */}
-          <Paper
-            elevation={10}
-            sx={{
-              width: "80%",
-              height: "100%",
-              borderRadius: 2,
-              overflow: "hidden",
-              position: "relative",
-              display: { xs: "none", md: "block" },
-            }}>
-            {spiceImages.map((item, index) => (
-              <Box
-                key={index}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  opacity: activeStep === index ? 1 : 0,
-                  transition: "opacity 0.8s ease",
-                }}>
-                <Box
-                  component="img"
-                  src={item.img}
-                  alt={item.title}
-                  sx={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
+        <h2 className="mt-4 text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
+          Sign in
+        </h2>
+        <p className="mt-1.5 text-[14px] text-slate-500">
+          Use the administrator credentials issued for this environment.
+        </p>
+      </div>
 
-                {/* Overlay */}
-                <Box
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    backgroundColor: "rgba(0,0,0,0.45)",
-                  }}
-                />
+      {/* A real form, so Enter submits — the old page only responded to a
+          click on the button. */}
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <AuthField
+          label="Email address"
+          type="email"
+          name="email"
+          autoComplete="username"
+          placeholder="admin@bengolspices.com"
+          icon={<Mail size={16} />}
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          error={touched ? errors.email : ""}
+        />
 
-                {/* Text */}
-                <Box
-                  sx={{
-                    position: "absolute",
-                    bottom: 40,
-                    left: 40,
-                    right: 40,
-                    color: "#fff",
-                  }}>
-                  <Typography variant="h5" fontWeight={700}>
-                    {item.title}
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                    {item.desc}
-                  </Typography>
-                </Box>
-              </Box>
-            ))}
-
-            {/* DOTS */}
-            <MobileStepper
-              variant="dots"
-              steps={spiceImages.length}
-              position="static"
-              activeStep={activeStep}
-              sx={{
-                position: "absolute",
-                bottom: 12,
-                left: 32,
-                background: "transparent",
-              }}
-              nextButton={null}
-              backButton={null}
-            />
-          </Paper>
-
-          {/* OVERLAPPING LOGIN CARD */}
-          <Paper
-            elevation={14}
-            sx={{
-              width: 400,
-              p: 4,
-              borderRadius: 2,
-              position: "absolute",
-              right: 0,
-              top: "50%",
-              transform: "translateY(-50%)",
-              backgroundColor: "#fff",
-            }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              Admin Login
-            </Typography>
-
-            <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
-              Sign in to manage your Bengol Spices account
-            </Typography>
-
-            <TextField
-              fullWidth
-              variant="standard"
-              label="E-mail"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              margin="normal"
-            />
-
-            <TextField
-              fullWidth
-              variant="standard"
-              type={showPassword ? "text" : "password"}
-              label="Password"
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              margin="normal"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword((prev) => !prev)}
-                      edge="end"
-                      size="small"
-                      sx={{ color: "text.secondary" }}>
-                      {showPassword ? (
-                        <VisibilityOff fontSize="small" />
-                      ) : (
-                        <Visibility fontSize="small" />
-                      )}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <Button
+        <AuthField
+          label="Password"
+          type={showPassword ? "text" : "password"}
+          name="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          icon={<KeyRound size={16} />}
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          error={touched ? errors.password : ""}
+          trailing={
+            <button
               type="button"
-              fullWidth
-              variant="contained"
-              onClick={handleLogin}
-              disabled={loading}
-              sx={{
-                mt: 4,
-                py: 1.3,
-                backgroundColor: "#b45309",
-                fontWeight: 600,
-                textTransform: "none",
-                "&:hover": { backgroundColor: "#92400e" },
-                "&.Mui-disabled": { backgroundColor: "#b45309", opacity: 0.75 },
-              }}>
-              {loading ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                  }}>
-                  Logging in
-                  <CircularProgress
-                    size={16}
-                    thickness={5}
-                    sx={{ color: "#fff" }}
-                  />
-                </Box>
-              ) : (
-                "Login"
-              )}
-            </Button>
-          </Paper>
-        </Box>
-      </Container>
-    </Box>
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700">
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3.5 text-[14.5px] font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-900/15 disabled:opacity-60">
+          {loading && <Loader2 size={16} className="animate-spin" />}
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

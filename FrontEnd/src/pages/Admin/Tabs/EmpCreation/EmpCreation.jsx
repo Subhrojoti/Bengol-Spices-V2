@@ -1,140 +1,162 @@
-import React, { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Dialog } from "@mui/material";
 import { toast } from "react-toastify";
+import {
+  AlertCircle,
+  Check,
+  Eye,
+  EyeOff,
+  ImagePlus,
+  KeyRound,
+  Loader2,
+  Mail,
+  RefreshCcw,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
+import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+import { PERMISSION_GROUPS, PERMISSION_KEYS } from "../../../../config/permissions";
 import {
   createEmployee,
   getAllEmployees,
   updateEmployeePermissions,
   deleteEmployee,
 } from "../../../../api/services";
-import { Tabs, Tab, Switch, Typography, Tooltip } from "@mui/material";
-import ImageIcon from "@mui/icons-material/Image";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
-const HEADER_HEIGHT = 64;
-
-const PERMISSIONS = [
-  { key: "canManageProducts", label: "Manage Products" },
-  { key: "canAssignDelivery", label: "Assign Delivery" },
-  { key: "canConfirmOrders", label: "Confirm Orders" },
-  { key: "canGetAllOrders", label: "View All Orders" },
-  { key: "canGetAllDeliveryPartners", label: "View Delivery Partners" },
-  { key: "canAssignReturn", label: "Assign Returns" },
-  { key: "canViewDashboardSummary", label: "View Dashboard Summary" },
-  { key: "canCancelOrders", label: "Cancel Orders" },
-  { key: "canManageAgents", label: "Manage Agents" },
-  { key: "canSeePaymentInfo", label: "View Payment Info" },
-  { key: "canSetTargets", label: "Manage Daily Targets" },
-  { key: "canManageNotifications", label: "Manage Notifications" },
-  { key: "canAssignLocations", label: "Assign Locations" },
-  { key: "canPayoutIncentives", label: "Manage Incentives" },
-  { key: "canManageDeliveryPartners", label: "Manage Delivery Partners" },
+const PASSWORD_RULES = [
+  { label: "8+ characters", test: (v) => v.length >= 8 },
+  { label: "Lowercase letter", test: (v) => /[a-z]/.test(v) },
+  { label: "Uppercase letter", test: (v) => /[A-Z]/.test(v) },
+  { label: "Number", test: (v) => /\d/.test(v) },
+  { label: "Symbol", test: (v) => /[^A-Za-z0-9]/.test(v) },
 ];
 
-const EmpCreation = () => {
-  const [activeTab, setActiveTab] = useState("create");
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png"];
+
+const TH = "px-6 py-3 text-[12px] font-bold uppercase tracking-wide text-slate-500";
+
+const initialsOf = (name) =>
+  (name || "")
+    .trim()
+    .split(/\s+/)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "E";
+
+const Card = ({ className = "", children }) => (
+  <div
+    className={`rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)] ${className}`}>
+    {children}
+  </div>
+);
+
+const Toggle = ({ checked, onChange, disabled }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={onChange}
+    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
+      checked ? "bg-blue-600" : "bg-slate-300"
+    }`}>
+    {/* `left-0.5` is load-bearing. Without an anchor the thumb falls back to
+        its static position, which a button centres, so it sat mid-pill when
+        off and slid clean outside the pill when on. */}
+    <span
+      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+        checked ? "translate-x-4" : "translate-x-0"
+      }`}
+    />
+  </button>
+);
+
+const Input = ({ label, hint, icon, trailing, ...props }) => (
+  <div>
+    <label className="mb-1.5 block text-[13.5px] font-semibold text-slate-700">
+      {label}
+    </label>
+    <div className="relative">
+      {icon && (
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          {icon}
+        </span>
+      )}
+      <input
+        {...props}
+        className={`w-full rounded-xl border border-slate-200 bg-white py-2.5 text-[14.5px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 ${
+          icon ? "pl-9" : "pl-3.5"
+        } ${trailing ? "pr-10" : "pr-3.5"}`}
+      />
+      {trailing}
+    </div>
+    {hint && <p className="mt-1.5 text-[12.5px] text-slate-400">{hint}</p>}
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
+
+const CreateEmployee = ({ onCreated }) => {
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [photo, setPhoto] = useState(null);
+  const [preview, setPreview] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [employees, setEmployees] = useState([]);
-  const [empLoading, setEmpLoading] = useState(false);
-  const [permissionLoadingId, setPermissionLoadingId] = useState(null);
-  const [confirmModal, setConfirmModal] = useState(null);
-  const [selectedPermissions, setSelectedPermissions] = useState({});
-  const [deleteLoadingId, setDeleteLoadingId] = useState(null);
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    profilePic: null,
-  });
-
-  // Fetch Employee details
+  /* Object URLs must be revoked, and must not be minted during render —
+     the old code called createObjectURL inline on every render pass. */
   useEffect(() => {
-    if (activeTab === "all") {
-      fetchEmployees();
+    if (!photo) {
+      setPreview("");
+      return undefined;
     }
-  }, [activeTab]);
 
-  const fetchEmployees = async () => {
-    try {
-      setEmpLoading(true);
-      const response = await getAllEmployees();
+    const url = URL.createObjectURL(photo);
+    setPreview(url);
 
-      if (response.success) {
-        setEmployees(response.employees || []);
-      } else {
-        toast.error("Failed to fetch employees");
-      }
-    } catch (error) {
-      toast.error("Error fetching employees");
-    } finally {
-      setEmpLoading(false);
-    }
-  };
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
 
-  console.log("Updating permission for:", confirmModal);
+  const passwordChecks = useMemo(
+    () => PASSWORD_RULES.map((r) => ({ ...r, ok: r.test(form.password) })),
+    [form.password],
+  );
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  const passwordValid = passwordChecks.every((c) => c.ok);
 
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error("Profile photo must be a JPG or PNG image");
       return;
     }
 
-    setForm((prev) => ({
-      ...prev,
-      profilePic: file,
-    }));
-  };
-
-  const handleConfirmPermission = async () => {
-    if (!confirmModal?.employeeId) {
-      toast.error("Invalid employee ID");
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("Profile photo must be smaller than 5 MB");
       return;
     }
 
-    console.log("Updating permission for:", confirmModal.employeeId);
-
-    try {
-      setPermissionLoadingId(confirmModal.employeeId);
-
-      const response = await updateEmployeePermissions(
-        confirmModal.employeeId,
-        selectedPermissions,
-      );
-
-      if (response.success) {
-        toast.success("Permissions updated successfully");
-        fetchEmployees();
-      } else {
-        toast.error("Failed to update permissions");
-      }
-    } catch (error) {
-      toast.error("Error updating permissions");
-    } finally {
-      setPermissionLoadingId(null);
-      setConfirmModal(null);
-    }
-  };
-
-  const handlePermissionChange = (key) => {
-    setSelectedPermissions((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setPhoto(file);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.name || !form.email || !form.password) {
-      toast.error("All fields except profile picture are required");
+    if (!form.name.trim() || !form.email.trim() || !form.password) {
+      toast.error("Name, email and password are required");
+      return;
+    }
+
+    if (!passwordValid) {
+      toast.error("Password does not meet the requirements below");
       return;
     }
 
@@ -142,20 +164,16 @@ const EmpCreation = () => {
       setLoading(true);
 
       await createEmployee({
-        name: form.name,
-        email: form.email,
+        name: form.name.trim(),
+        email: form.email.trim(),
         password: form.password,
-        profilePic: form.profilePic,
+        profilePic: photo,
       });
 
-      toast.success("Employee created successfully");
-
-      setForm({
-        name: "",
-        email: "",
-        password: "",
-        profilePic: null,
-      });
+      toast.success("Employee created. Their ID was emailed to them.");
+      setForm({ name: "", email: "", password: "" });
+      setPhoto(null);
+      onCreated?.();
     } catch (error) {
       toast.error(
         error?.response?.data?.message || "Failed to create employee",
@@ -165,364 +183,642 @@ const EmpCreation = () => {
     }
   };
 
-  const handleDeleteEmployee = async (employeeId) => {
-    if (!window.confirm("Are you sure you want to delete this employee?"))
-      return;
-
-    try {
-      setDeleteLoadingId(employeeId);
-      const response = await deleteEmployee(employeeId);
-      if (response.success) {
-        toast.success("Employee deleted successfully");
-        setEmployees((prev) => prev.filter((e) => e.employeeId !== employeeId));
-      } else {
-        toast.error("Failed to delete employee");
-      }
-    } catch (error) {
-      toast.error(error?.message || "Error deleting employee");
-    } finally {
-      setDeleteLoadingId(null);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-      <div
-        className="fixed top-0 left-[3%] right-0 z-10 bg-white border-b border-slate-200 px-8 flex items-center justify-between"
-        style={{ height: HEADER_HEIGHT }}>
-        <h1 className="text-base font-bold tracking-tight text-lg text-slate-800">
-          Employee Management
-        </h1>
-
-        <Tabs
-          value={activeTab}
-          onChange={(_, value) => setActiveTab(value)}
-          sx={{
-            minHeight: 48,
-
-            "& .MuiTab-root": {
-              minHeight: 48,
-              textTransform: "none",
-              fontWeight: 500,
-              fontSize: "0.875rem",
-              color: "#000 !important", // force black
-            },
-
-            "& .MuiTab-root.Mui-selected": {
-              color: "#000 !important", // keep black when selected
-              fontWeight: 600,
-            },
-          }}
-          slotProps={{
-            indicator: {
-              sx: {
-                height: 3,
-                borderRadius: 2,
-                backgroundColor: "#2563eb",
-              },
-            },
-          }}>
-          <Tab value="create" label="Employee Creation" />
-          <Tab value="all" label="All Employees" />
-        </Tabs>
-      </div>
-
-      <div
-        className="h-full flex items-center justify-center px-6 min-h-screen overflow-y-auto"
-        style={{ paddingTop: HEADER_HEIGHT }}>
-        {activeTab === "create" ? (
-          <div className="w-full max-w-md">
-            <div className="bg-white rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.05)] border border-slate-200 overflow-hidden">
-              <div className="px-8 py-5 bg-gradient-to-br from-blue-200 to-gray-100">
-                <h2 className="text-black text-base font-semibold text-lg tracking-tight">
-                  New Employee Account
-                </h2>
-                <p className="text-black/70 text-xs mt-2">
-                  Create a new account for secure access.
-                </p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="px-8 py-8 space-y-6">
-                <ModernInput
-                  label="Full Name"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                />
-
-                <ModernInput
-                  label="Email Address"
-                  type="email"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                />
-
-                <div>
-                  <ModernInput
-                    label="Password"
-                    type="password"
-                    name="password"
-                    value={form.password}
-                    onChange={handleChange}
-                  />
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    At least 8 characters with uppercase, lowercase, number and
-                    symbol.
-                  </p>
-                </div>
-
-                <label className="flex items-center gap-4 p-4 rounded-lg cursor-pointer border-2 border-dashed border-slate-300 hover:border-blue-500">
-                  <div className="w-20 h-20 flex items-center justify-center rounded-md bg-white border border-slate-200 overflow-hidden">
-                    {form.profilePic ? (
-                      <img
-                        src={URL.createObjectURL(form.profilePic)}
-                        alt="preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon className="text-slate-400" fontSize="large" />
-                    )}
-                  </div>
-
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-medium text-slate-700">
-                      Profile Photo (Optional)
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Click to upload image (JPG only, max 5 MB)
-                    </span>
-                  </div>
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={handleFileChange}
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full mt-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium
-                             hover:bg-blue-700
-                             active:scale-[0.995]
-                             disabled:opacity-60
-                             transition-all duration-200">
-                  {loading ? "Creating..." : "Create Employee"}
-                </button>
-              </form>
-            </div>
-          </div>
-        ) : (
-          <div className="w-full my-10 max-w-8xl h-auto bg-white rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.05)] border border-slate-200 overflow-hidden">
-            <div className="px-8 py-6 border-b border-slate-200 flex justify-between items-center">
-              <div>
-                <h2 className="text-base font-medium text-slate-800 tracking-tight">
-                  All Employees
-                </h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  {employees.length} employees found
-                </p>
-              </div>
-            </div>
-
-            {empLoading ? (
-              <div className="p-10 text-center text-slate-500 text-sm">
-                Loading employees...
-              </div>
-            ) : employees.length === 0 ? (
-              <div className="p-10 text-center text-slate-500 text-sm">
-                No employees found.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full  min-w-max text-sm">
-                  <thead className="bg-slate-50 text-left text-slate-600 text-xs uppercase tracking-wide">
-                    <tr>
-                      <th className="px-8 py-4">Employee ID</th>
-                      <th className="px-8 py-4">Name</th>
-                      <th className="px-8 py-4">Email</th>
-                      <th className="px-8 py-4">Role</th>
-                      <th className="px-8 py-4">Permissions</th>
-                      <th className="px-8 py-4">Status</th>
-                      <th className="px-8 py-4">Created</th>
-                      <th className="px-8 py-4">Action</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-200">
-                    {employees.map((emp) => (
-                      <tr
-                        key={emp._id}
-                        className="hover:bg-slate-50 transition-colors">
-                        <td className="px-8 py-4 font-medium text-slate-800">
-                          {emp.employeeId || "-"}
-                        </td>
-
-                        <td className="px-8 py-4 text-slate-700">{emp.name}</td>
-
-                        <td className="px-8 py-4 text-slate-600">
-                          {emp.email}
-                        </td>
-
-                        <td className="px-8 py-4">
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600">
-                            {emp.role}
-                          </span>
-                        </td>
-
-                        <td className="px-8 py-4">
-                          {(() => {
-                            const permissions = emp.permissions || {};
-                            const permissionValues = Object.values(permissions);
-                            const enabledCount =
-                              permissionValues.filter(Boolean).length;
-                            const totalPermissions = PERMISSIONS.length;
-
-                            let accessLabel = "No Access";
-
-                            if (enabledCount === totalPermissions) {
-                              accessLabel = "Full Access";
-                            } else if (enabledCount > 0) {
-                              accessLabel = "Limited Access";
-                            }
-
-                            return (
-                              <button
-                                disabled={
-                                  permissionLoadingId === emp.employeeId
-                                }
-                                onClick={() => {
-                                  setConfirmModal(emp);
-
-                                  const perms = emp.permissions || {};
-
-                                  const updatedPermissions = PERMISSIONS.reduce(
-                                    (acc, perm) => {
-                                      acc[perm.key] = perms[perm.key] || false;
-                                      return acc;
-                                    },
-                                    {},
-                                  );
-
-                                  setSelectedPermissions(updatedPermissions);
-                                }}
-                                className={`px-3 py-1 rounded-full text-xs font-medium transition
-                                  ${
-                                    enabledCount === totalPermissions
-                                      ? "bg-green-50 text-green-600"
-                                      : enabledCount > 0
-                                        ? "bg-yellow-50 text-yellow-600"
-                                        : "bg-red-50 text-red-600"
-                                  }`}>
-                                {permissionLoadingId === emp.employeeId
-                                  ? "Updating..."
-                                  : accessLabel}
-                              </button>
-                            );
-                          })()}
-                        </td>
-
-                        <td className="px-8 py-4">
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600">
-                            {emp.status}
-                          </span>
-                        </td>
-
-                        <td className="px-8 py-4 text-slate-500">
-                          {new Date(emp.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-8 py-4">
-                          <Tooltip title="Delete Employee">
-                            <button
-                              disabled={deleteLoadingId === emp.employeeId}
-                              onClick={() =>
-                                handleDeleteEmployee(emp.employeeId)
-                              }
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40">
-                              <DeleteOutlineIcon fontSize="small" />
-                            </button>
-                          </Tooltip>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {confirmModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
-            <h3 className="text-base font-medium text-slate-800">
-              Manage Permissions
-            </h3>
-
-            <div className="space-y-3 max-h-72 overflow-y-auto">
-              {PERMISSIONS.map((perm) => (
-                <div
-                  key={perm.key}
-                  className="flex items-center justify-between bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-lg transition">
-                  <span className="text-sm text-slate-700">{perm.label}</span>
-
-                  <Switch
-                    checked={selectedPermissions[perm.key] || false}
-                    onChange={() => handlePermissionChange(perm.key)}
-                    size="small"
-                    sx={{
-                      "& .MuiSwitch-switchBase.Mui-checked": {
-                        color: "#2564ebd7", // blue thumb
-                      },
-                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                        {
-                          backgroundColor: "#2563eb", // blue track
-                        },
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">
-                Cancel
-              </button>
-
-              <button
-                onClick={handleConfirmPermission}
-                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
-                Update Permissions
-              </button>
+    <div className="mx-auto w-full max-w-lg">
+      <Card className="overflow-hidden">
+        <div className="border-b border-slate-100 px-7 py-5">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
+              <UserPlus size={18} />
+            </span>
+            <div>
+              <h2 className="text-[16px] font-semibold leading-tight text-slate-900">
+                New Employee Account
+              </h2>
+              <p className="mt-0.5 text-[13.5px] text-slate-500">
+                They sign in with the employee ID emailed to them.
+              </p>
             </div>
           </div>
         </div>
-      )}
+
+        <form onSubmit={handleSubmit} className="space-y-5 px-7 py-6" noValidate>
+          <Input
+            label="Full Name"
+            name="name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Pritam Ghosh"
+            autoComplete="off"
+          />
+
+          <Input
+            label="Email Address"
+            type="email"
+            name="email"
+            icon={<Mail size={15} />}
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            placeholder="name@bengolspices.com"
+            autoComplete="off"
+          />
+
+          <div>
+            <Input
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              name="password"
+              icon={<KeyRound size={15} />}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Create a strong password"
+              autoComplete="new-password"
+              trailing={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600">
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              }
+            />
+
+            <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
+              {passwordChecks.map((rule) => (
+                <span
+                  key={rule.label}
+                  className={`inline-flex items-center gap-1 text-[12.5px] transition ${
+                    rule.ok ? "text-emerald-600" : "text-slate-400"
+                  }`}>
+                  {rule.ok ? <Check size={11} /> : <X size={11} />}
+                  {rule.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-[13.5px] font-semibold text-slate-700">
+              Profile Photo <span className="font-normal text-slate-400">(optional)</span>
+            </p>
+
+            <label className="flex cursor-pointer items-center gap-4 rounded-xl border-2 border-dashed border-slate-200 p-3.5 transition hover:border-blue-400 hover:bg-blue-50/40">
+              <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                {preview ? (
+                  <img src={preview} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <ImagePlus size={20} className="text-slate-400" />
+                )}
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-medium text-slate-700">
+                  {photo ? photo.name : "Click to upload"}
+                </span>
+                <span className="block text-[12.5px] text-slate-400">
+                  JPG or PNG, up to 5 MB
+                </span>
+              </span>
+
+              {photo && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPhoto(null);
+                  }}
+                  className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+                  <X size={15} />
+                </button>
+              )}
+
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                hidden
+                onChange={handleFile}
+              />
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-[14.5px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60">
+            {loading && <Loader2 size={15} className="animate-spin" />}
+            {loading ? "Creating…" : "Create Employee"}
+          </button>
+        </form>
+      </Card>
     </div>
   );
 };
 
-const ModernInput = ({ label, ...props }) => (
-  <div className="space-y-2">
-    <label className="block text-sm font-semibold text-slate-700 tracking-tight">
-      {label}
-    </label>
-    <input
-      {...props}
-      required
-      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm
-                 focus:border-blue-600
-                 focus:ring-2 focus:ring-blue-600/20
-                 outline-none
-                 transition-all duration-200"
-    />
-  </div>
-);
+/* ------------------------------------------------------------------ */
+
+const PermissionsDialog = ({ employee, open, busy, onClose, onSave }) => {
+  const [draft, setDraft] = useState({});
+
+  useEffect(() => {
+    if (!employee) return;
+
+    const current = employee.permissions || {};
+    setDraft(
+      PERMISSION_KEYS.reduce((acc, key) => {
+        acc[key] = current[key] === true;
+        return acc;
+      }, {}),
+    );
+  }, [employee]);
+
+  const grantedCount = PERMISSION_KEYS.filter((k) => draft[k]).length;
+
+  const original = useMemo(() => {
+    const current = employee?.permissions || {};
+    return PERMISSION_KEYS.map((k) => (current[k] === true ? "1" : "0")).join("");
+  }, [employee]);
+
+  const dirty =
+    PERMISSION_KEYS.map((k) => (draft[k] ? "1" : "0")).join("") !== original;
+
+  const setAll = (value) =>
+    setDraft(
+      PERMISSION_KEYS.reduce((acc, key) => {
+        acc[key] = value;
+        return acc;
+      }, {}),
+    );
+
+  return (
+    <Dialog
+      open={open}
+      onClose={busy ? undefined : onClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{ paper: { sx: { borderRadius: 3, overflow: "hidden" } } }}>
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-5">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+            <ShieldCheck size={18} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[16px] font-semibold leading-tight text-slate-900">
+              Permissions
+            </h2>
+            <p className="mt-0.5 truncate text-[13.5px] text-slate-500">
+              {employee?.name} · {employee?.employeeId}
+            </p>
+          </div>
+        </div>
+
+        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[12.5px] font-semibold tabular-nums text-slate-600">
+          {grantedCount}/{PERMISSION_KEYS.length}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-6 py-2.5">
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          className="rounded-lg px-2.5 py-1 text-[13px] font-medium text-blue-600 transition hover:bg-blue-50">
+          Select all
+        </button>
+        <button
+          type="button"
+          onClick={() => setAll(false)}
+          className="rounded-lg px-2.5 py-1 text-[13px] font-medium text-slate-500 transition hover:bg-slate-100">
+          Clear all
+        </button>
+        <p className="ml-auto text-[12.5px] text-slate-400">
+          Changing these signs the employee out
+        </p>
+      </div>
+
+      <div className="max-h-[52vh] overflow-y-auto px-6 py-4">
+        {PERMISSION_GROUPS.map((group) => (
+          <div key={group.group} className="mb-5 last:mb-0">
+            <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-slate-400">
+              {group.group}
+            </p>
+            <div className="space-y-1">
+              {group.items.map((perm) => (
+                <label
+                  key={perm.key}
+                  className="flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 transition hover:bg-slate-50">
+                  <span className="text-[14px] text-slate-700">{perm.label}</span>
+                  <Toggle
+                    checked={Boolean(draft[perm.key])}
+                    disabled={busy}
+                    onChange={() =>
+                      setDraft((prev) => ({ ...prev, [perm.key]: !prev[perm.key] }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end gap-2.5 border-t border-slate-100 px-6 py-4">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={busy}
+          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onSave(draft)}
+          disabled={busy || !dirty}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+          {busy && <Loader2 size={14} className="animate-spin" />}
+          {busy ? "Saving…" : dirty ? "Save changes" : "No changes"}
+        </button>
+      </div>
+    </Dialog>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+
+const EmployeeList = () => {
+  const [employees, setEmployees] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const [permissionTarget, setPermissionTarget] = useState(null);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [deactivating, setDeactivating] = useState(false);
+
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setStatus("loading");
+
+    try {
+      const res = await getAllEmployees();
+      setEmployees(res?.employees || []);
+      setStatus("ready");
+    } catch (error) {
+      console.error("Failed to fetch employees", error);
+      setStatus("error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return employees;
+
+    return employees.filter((e) =>
+      [e.employeeId, e.name, e.email]
+        .filter(Boolean)
+        .some((f) => String(f).toLowerCase().includes(term)),
+    );
+  }, [employees, search]);
+
+  const savePermissions = async (draft) => {
+    if (!permissionTarget) return;
+
+    try {
+      setSavingPermissions(true);
+
+      const res = await updateEmployeePermissions(
+        permissionTarget.employeeId,
+        draft,
+      );
+
+      if (res?.success === false) throw new Error(res?.message);
+
+      setEmployees((prev) =>
+        prev.map((e) =>
+          e.employeeId === permissionTarget.employeeId
+            ? { ...e, permissions: { ...e.permissions, ...draft } }
+            : e,
+        ),
+      );
+
+      toast.success(`Permissions updated for ${permissionTarget.name}`);
+      setPermissionTarget(null);
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to update permissions",
+      );
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+
+    try {
+      setDeactivating(true);
+      await deleteEmployee(deactivateTarget.employeeId);
+
+      setEmployees((prev) =>
+        prev.filter((e) => e.employeeId !== deactivateTarget.employeeId),
+      );
+
+      toast.success(`${deactivateTarget.name} has been deactivated`);
+      setDeactivateTarget(null);
+    } catch (error) {
+      toast.error(error?.message || "Failed to deactivate employee");
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  if (status === "error") {
+    return (
+      <Card className="p-12 text-center">
+        <AlertCircle size={26} className="mx-auto text-slate-400" />
+        <h3 className="mt-3 font-semibold text-slate-800">
+          Could not load employees
+        </h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Check your connection and try again.
+        </p>
+        <button
+          onClick={() => load()}
+          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+          <RefreshCcw size={14} />
+          Retry
+        </button>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <p className="text-[14px] text-slate-500">
+          <span className="font-semibold tabular-nums text-slate-900">
+            {employees.length}
+          </span>{" "}
+          active employee{employees.length === 1 ? "" : "s"}
+        </p>
+
+        <div className="relative ml-auto">
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ID, name or email"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[14px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:w-72"
+          />
+        </div>
+
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[14px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+          <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
+
+      <Card className="overflow-hidden">
+        {status === "loading" ? (
+          <div className="animate-pulse divide-y divide-slate-100">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-4">
+                <div className="h-9 w-9 rounded-full bg-slate-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-40 rounded bg-slate-200" />
+                  <div className="h-2.5 w-56 rounded bg-slate-100" />
+                </div>
+                <div className="h-6 w-24 rounded-full bg-slate-200" />
+              </div>
+            ))}
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="p-14 text-center">
+            <Users size={26} className="mx-auto text-slate-300" />
+            <p className="mt-3 text-sm font-medium text-slate-700">
+              {employees.length === 0
+                ? "No employees yet"
+                : "No employees match your search"}
+            </p>
+            <p className="mt-1 text-[14px] text-slate-400">
+              {employees.length === 0
+                ? "Create one from the Employee Creation tab."
+                : "Try a different ID, name or email."}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/80">
+                  <th className={TH}>Employee</th>
+                  <th className={TH}>Employee ID</th>
+                  <th className={TH}>Role</th>
+                  <th className={TH}>Access</th>
+                  <th className={TH}>Created</th>
+                  <th className={`${TH} text-right`}>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {visible.map((emp) => {
+                  const granted = PERMISSION_KEYS.filter(
+                    (k) => emp.permissions?.[k] === true,
+                  ).length;
+
+                  const tone =
+                    granted === PERMISSION_KEYS.length
+                      ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+                      : granted > 0
+                        ? "bg-amber-50 text-amber-700 ring-amber-600/20"
+                        : "bg-slate-100 text-slate-500 ring-slate-500/20";
+
+                  const label =
+                    granted === PERMISSION_KEYS.length
+                      ? "Full access"
+                      : granted > 0
+                        ? `${granted} of ${PERMISSION_KEYS.length}`
+                        : "No access";
+
+                  return (
+                    <tr key={emp._id} className="transition hover:bg-slate-50/70">
+                      <td className="px-6 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-50 text-[13px] font-bold text-violet-700">
+                            {initialsOf(emp.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-[14.5px] font-semibold text-slate-900">
+                              {emp.name}
+                            </p>
+                            <p className="truncate text-[13.5px] text-slate-500">
+                              {emp.email}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-3.5 font-mono text-[13.5px] tabular-nums text-slate-500">
+                        {emp.employeeId || "—"}
+                      </td>
+
+                      <td className="px-6 py-3.5">
+                        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-[12.5px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                          {emp.role}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-3.5">
+                        <button
+                          onClick={() => setPermissionTarget(emp)}
+                          title="Manage permissions"
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold ring-1 ring-inset transition hover:brightness-95 ${tone}`}>
+                          <ShieldCheck size={12} />
+                          {label}
+                        </button>
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-3.5 text-[14px] text-slate-500">
+                        {emp.createdAt
+                          ? new Date(emp.createdAt).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+
+                      <td className="px-6 py-3.5">
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => setDeactivateTarget(emp)}
+                            title="Deactivate employee"
+                            className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <PermissionsDialog
+        employee={permissionTarget}
+        open={Boolean(permissionTarget)}
+        busy={savingPermissions}
+        onClose={() => setPermissionTarget(null)}
+        onSave={savePermissions}
+      />
+
+      {/* The API soft-deletes: it flips the account to INACTIVE and the list
+          only returns ACTIVE ones. Calling that "delete" overstated it. */}
+      <ConfirmDialog
+        open={Boolean(deactivateTarget)}
+        busy={deactivating}
+        tone="danger"
+        icon={<Trash2 size={18} />}
+        title="Deactivate this employee?"
+        description="They lose access immediately and disappear from this list. There is no way to reactivate them from the admin panel yet."
+        detail={
+          deactivateTarget && (
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[13px] font-bold text-slate-600 ring-1 ring-slate-200">
+                {initialsOf(deactivateTarget.name)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-semibold text-slate-900">
+                  {deactivateTarget.name}
+                </p>
+                <p className="truncate text-[13px] text-slate-500">
+                  {deactivateTarget.employeeId} · {deactivateTarget.email}
+                </p>
+              </div>
+            </div>
+          )
+        }
+        confirmLabel={deactivating ? "Deactivating…" : "Deactivate"}
+        onConfirm={confirmDeactivate}
+        onClose={() => setDeactivateTarget(null)}
+      />
+    </>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+
+const TABS = [
+  { key: "create", label: "Create", icon: UserPlus },
+  { key: "all", label: "All Employees", icon: Users },
+];
+
+const EmpCreation = () => {
+  const [activeTab, setActiveTab] = useState("create");
+  const [listKey, setListKey] = useState(0);
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <div className="sticky top-0 z-10 bg-slate-50/95 px-5 pb-4 pt-5 backdrop-blur-sm lg:px-8">
+        <div
+          role="tablist"
+          aria-label="Employee sections"
+          className="inline-flex items-center gap-1 rounded-xl bg-slate-200/60 p-1">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const selected = activeTab === tab.key;
+
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setActiveTab(tab.key)}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[14px] font-medium transition-all ${
+                  selected
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}>
+                <Icon size={15} className={selected ? "text-blue-600" : "text-slate-400"} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="px-5 pb-10 lg:px-8">
+        {activeTab === "create" ? (
+          <CreateEmployee
+            onCreated={() => {
+              setListKey((k) => k + 1);
+              setActiveTab("all");
+            }}
+          />
+        ) : (
+          <EmployeeList key={listKey} />
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default EmpCreation;

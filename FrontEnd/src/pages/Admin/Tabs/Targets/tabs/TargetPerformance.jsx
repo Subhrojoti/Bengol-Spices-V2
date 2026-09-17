@@ -1,298 +1,413 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Box,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  CircularProgress,
-  Avatar,
-} from "@mui/material";
-import StoreIcon from "@mui/icons-material/Store";
-import BarChartIcon from "@mui/icons-material/BarChart";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import PaymentsIcon from "@mui/icons-material/Payments";
+  AlertCircle,
+  Banknote,
+  CheckCircle2,
+  Clock3,
+  Crosshair,
+  RefreshCcw,
+  ShoppingCart,
+  Store,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { getTargetPerformance } from "../../../../../api/services";
 
+const TYPE_META = {
+  STORE_CREATION: {
+    label: "Store Creation",
+    unit: "stores",
+    icon: Store,
+    tint: "#eaf1fc",
+    ink: "#2a78d6",
+  },
+  ORDER: {
+    label: "Order Placement",
+    unit: "units",
+    icon: ShoppingCart,
+    tint: "#f0edfd",
+    ink: "#5b4bc4",
+  },
+  PAYMENT: {
+    label: "Collect Payment",
+    unit: "collections",
+    icon: Banknote,
+    tint: "#e6f7f0",
+    ink: "#12805a",
+  },
+};
+
+const n = (v) => Number(v || 0);
+const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
+
+const dayTime = (value) =>
+  value
+    ? new Date(value).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
+
+const initialsOf = (name, fallback) =>
+  (name || fallback || "")
+    .trim()
+    .split(/\s+/)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "A";
+
+const Card = ({ className = "", children }) => (
+  <div
+    className={`rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)] ${className}`}>
+    {children}
+  </div>
+);
+
+const Stat = ({ label, value, icon, tint, ink }) => (
+  <Card className="p-4">
+    <div className="flex items-center gap-3">
+      <span
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ backgroundColor: tint, color: ink }}>
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-lg font-semibold leading-none tabular-nums text-slate-900">
+          {value}
+        </p>
+        <p className="mt-1 truncate text-xs text-slate-400">{label}</p>
+      </div>
+    </div>
+  </Card>
+);
+
+/** Progress ring. Colour tracks how close the agent is, not their identity. */
+const Ring = ({ percent, size = 54 }) => {
+  const stroke = 5;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.min(percent, 100) / 100) * circumference;
+
+  const colour =
+    percent >= 100 ? "#12805a" : percent >= 50 ? "#2a78d6" : "#a06c00";
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={colour}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-all duration-500"
+        />
+      </svg>
+      <span className="absolute inset-0 grid place-items-center text-[12.5px] font-semibold tabular-nums text-slate-800">
+        {Math.round(percent)}%
+      </span>
+    </div>
+  );
+};
+
+const Skeleton = () => (
+  <div className="animate-pulse space-y-4">
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-20 rounded-2xl bg-slate-200/70" />
+      ))}
+    </div>
+    {Array.from({ length: 2 }).map((_, i) => (
+      <div key={i} className="h-56 rounded-2xl bg-slate-200/70" />
+    ))}
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
+
 export default function TargetPerformance() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchPerformance();
-  }, []);
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setStatus("loading");
 
-  const fetchPerformance = async () => {
     try {
       const res = await getTargetPerformance();
-      const rawData = res?.data || [];
-
-      const grouped = Object.values(
-        rawData.reduce((acc, item) => {
-          const agentId = item.agentId;
-
-          if (!acc[agentId]) {
-            acc[agentId] = {
-              agentId,
-              agentName: agentId,
-              completedTarget: 0,
-              totalTarget: 0,
-              totalEarned: 0,
-              targets: {},
-            };
-          }
-
-          acc[agentId].completedTarget += item.achievedValue || 0;
-          acc[agentId].totalTarget += item.count || item.achievedValue;
-          acc[agentId].totalEarned += item.earnedAmount || 0;
-
-          const type = item.type;
-          if (!acc[agentId].targets[type]) {
-            acc[agentId].targets[type] = 0;
-          }
-          acc[agentId].targets[type] += item.achievedValue || 0;
-
-          return acc;
-        }, {}),
-      );
-
-      setData(grouped);
-    } catch (err) {
-      console.error(err);
+      setRows(Array.isArray(res?.data) ? res.data : []);
+      setStatus("ready");
+    } catch (error) {
+      console.error("Failed to load target performance", error);
+      setStatus("error");
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
 
-  // ================= HELPERS =================
-  const getColor = (value) => {
-    if (value >= 80) return "#22c55e";
-    if (value >= 40) return "#f59e0b";
-    return "#ef4444";
-  };
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const formatType = (type) => {
-    switch (type) {
-      case "STORE_CREATION":
-        return "Store";
-      case "ORDER":
-        return "Orders";
-      case "PAYMENT":
-        return "Payments";
-      default:
-        return type;
-    }
-  };
+  /* Grouped by the target itself. Progress is measured against that
+     target's own targetValue — the old screen had no target attached to
+     compare against, so every agent rendered as 100% complete. */
+  const targets = useMemo(() => {
+    const map = {};
 
-  const getIcon = (type) => {
-    switch (type) {
-      case "STORE_CREATION":
-        return <StoreIcon sx={{ fontSize: 14 }} />;
-      case "ORDER":
-        return <ShoppingCartIcon sx={{ fontSize: 14 }} />;
-      case "PAYMENT":
-        return <PaymentsIcon sx={{ fontSize: 14 }} />;
-      default:
-        return null;
-    }
-  };
+    rows.forEach((row) => {
+      const target = row.target;
+      if (!target) return;
 
-  const getBg = (type) => {
-    switch (type) {
-      case "STORE_CREATION":
-        return "#e0f2fe";
-      case "ORDER":
-        return "#ede9fe";
-      case "PAYMENT":
-        return "#dcfce7";
-      default:
-        return "#f1f5f9";
-    }
-  };
+      const key = target._id;
 
-  // ================= LOADING =================
-  if (loading) {
+      if (!map[key]) {
+        map[key] = {
+          ...target,
+          agents: [],
+          completed: 0,
+          totalEarned: 0,
+        };
+      }
+
+      const goal = n(target.targetValue);
+      const achieved = n(row.achievedValue);
+
+      map[key].agents.push({
+        agentId: row.agentId,
+        agentName: row.agentName || row.agentId,
+        achieved,
+        earned: n(row.earnedAmount),
+        isCompleted: row.isCompleted,
+        percent: goal > 0 ? Math.min((achieved / goal) * 100, 100) : 0,
+        updatedAt: row.updatedAt,
+      });
+
+      if (row.isCompleted) map[key].completed += 1;
+      map[key].totalEarned += n(row.earnedAmount);
+    });
+
+    return Object.values(map).map((t) => ({
+      ...t,
+      agents: t.agents.sort((a, b) => b.percent - a.percent),
+    }));
+  }, [rows]);
+
+  const summary = useMemo(
+    () => ({
+      targets: targets.length,
+      agents: new Set(rows.map((r) => r.agentId)).size,
+      completed: rows.filter((r) => r.isCompleted).length,
+      earned: rows.reduce((sum, r) => sum + n(r.earnedAmount), 0),
+    }),
+    [rows, targets],
+  );
+
+  if (status === "loading") return <Skeleton />;
+
+  if (status === "error") {
     return (
-      <Box
-        sx={{
-          height: "60vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}>
-        <CircularProgress />
-      </Box>
+      <Card className="p-12 text-center">
+        <AlertCircle size={26} className="mx-auto text-slate-400" />
+        <h3 className="mt-3 font-semibold text-slate-800">
+          Could not load performance
+        </h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Check your connection and try again.
+        </p>
+        <button
+          onClick={() => load()}
+          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+          <RefreshCcw size={14} />
+          Retry
+        </button>
+      </Card>
     );
   }
 
-  // ================= UI =================
+  if (targets.length === 0) {
+    return (
+      <Card className="p-16 text-center">
+        <Crosshair size={28} className="mx-auto text-slate-300" />
+        <p className="mt-3 text-sm font-medium text-slate-700">
+          No target running right now
+        </p>
+        <p className="mt-1 text-[14px] text-slate-400">
+          Performance appears here once a target is live and agents start
+          working towards it.
+        </p>
+        <button
+          onClick={() => load(true)}
+          className="mt-5 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+          <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </Card>
+    );
+  }
+
   return (
-    <Box sx={{ p: 3, bgcolor: "#f8fafc", borderRadius: 3 }}>
-      {/* ✅ FALLBACK UI */}
-      {data.length === 0 ? (
-        <Box
-          sx={{
-            height: "75vh",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#94a3b8",
-          }}>
-          <Avatar
-            sx={{
-              bgcolor: "#e2e8f0",
-              width: 60,
-              height: 60,
-              mb: 2,
-            }}>
-            <BarChartIcon sx={{ fontSize: 40, color: "#64748b" }} />
-          </Avatar>
+    <div className="space-y-4">
+      {/* ===== SUMMARY ===== */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <Stat
+          label="Targets running"
+          value={summary.targets}
+          icon={<Crosshair size={17} />}
+          tint="#eaf1fc"
+          ink="#2a78d6"
+        />
+        <Stat
+          label="Agents taking part"
+          value={summary.agents}
+          icon={<Users size={17} />}
+          tint="#f0edfd"
+          ink="#5b4bc4"
+        />
+        <Stat
+          label="Completions"
+          value={summary.completed}
+          icon={<CheckCircle2 size={17} />}
+          tint="#e6f7f0"
+          ink="#12805a"
+        />
+        <Stat
+          label="Earned so far"
+          value={inr(summary.earned)}
+          icon={<Trophy size={17} />}
+          tint="#fdf3e0"
+          ink="#a06c00"
+        />
+      </div>
 
-          <Typography fontSize={16} fontWeight={600}>
-            No Data Available
-          </Typography>
+      <div className="flex justify-end">
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+          <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </div>
 
-          <Typography variant="body">
-            Target performance data will appear here
-          </Typography>
-        </Box>
-      ) : (
-        <Grid container spacing={2}>
-          {data.map((agent, index) => {
-            const total = agent.totalTarget || 0;
-            const completed = agent.completedTarget || 0;
-            const progress =
-              total > 0 ? Math.round((completed / total) * 100) : 0;
+      {/* ===== PER TARGET ===== */}
+      {targets.map((target) => {
+        const meta = TYPE_META[target.type] || TYPE_META.STORE_CREATION;
+        const Icon = meta.icon;
+        const goal = n(target.targetValue);
 
-            const color = getColor(progress);
+        return (
+          <Card key={target._id} className="overflow-hidden">
+            <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-5">
+              <span
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                style={{ backgroundColor: meta.tint, color: meta.ink }}>
+                <Icon size={18} />
+              </span>
 
-            return (
-              <Grid
-                item
-                key={index}
-                sx={{
-                  width: 260,
-                }}>
-                <Card
-                  sx={{
-                    borderRadius: 4,
-                    height: 290,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    p: 1,
-                    background: "linear-gradient(180deg, #ffffff, #f1f5f9)",
-                    boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
-                    transition: "0.25s",
-                    "&:hover": {
-                      transform: "translateY(-4px)",
-                      boxShadow: "0 12px 30px rgba(0,0,0,0.1)",
-                    },
-                  }}>
-                  <CardContent>
-                    {/* HEADER */}
-                    <Box display="flex" alignItems="center" mb={2}>
-                      <Avatar
-                        sx={{
-                          bgcolor: "#6366f1",
-                          width: 38,
-                          height: 38,
-                          fontSize: 14,
-                          mr: 1,
-                        }}>
-                        {agent.agentName?.charAt(0)}
-                      </Avatar>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-[16px] font-semibold text-slate-900">
+                  {target.name}
+                </h3>
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[13px] text-slate-500">
+                  <span>{meta.label}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="tabular-nums">
+                    {goal} {meta.unit} to finish
+                  </span>
+                  <span className="text-slate-300">·</span>
+                  <span className="inline-flex items-center gap-1 tabular-nums">
+                    <Trophy size={11} className="text-slate-400" />
+                    {inr(target.rewardAmount)}
+                  </span>
+                </p>
+              </div>
 
-                      <Box>
-                        <Typography fontWeight={600} fontSize={14}>
-                          {agent.agentName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Agent
-                        </Typography>
-                      </Box>
-                    </Box>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[12.5px] font-semibold tabular-nums text-slate-600">
+                  {target.completed}/{target.agents.length} completed
+                </span>
+                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[12.5px] font-semibold tabular-nums text-emerald-700">
+                  {inr(target.totalEarned)} earned
+                </span>
+              </div>
+            </div>
 
-                    {/* RADIAL PROGRESS */}
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      position="relative"
-                      mb={2}>
-                      <CircularProgress
-                        variant="determinate"
-                        value={progress}
-                        size={80}
-                        thickness={5}
-                        sx={{
-                          color,
-                        }}
-                      />
+            <p className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/60 px-5 py-2 text-[12.5px] text-slate-500">
+              <Clock3 size={11} className="text-slate-400" />
+              {dayTime(target.startDate)} → {dayTime(target.endDate)}
+            </p>
 
-                      <Box
-                        position="absolute"
-                        display="flex"
-                        flexDirection="column"
-                        alignItems="center">
-                        <Typography fontWeight={700} fontSize={16}>
-                          {progress}%
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
+            <div className="divide-y divide-slate-100">
+              {target.agents.map((agent) => (
+                <div
+                  key={agent.agentId}
+                  className="flex items-center gap-4 px-5 py-3.5 transition hover:bg-slate-50/70">
+                  <Ring percent={agent.percent} />
+
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-[12px] font-bold text-slate-600">
+                    {initialsOf(agent.agentName, agent.agentId)}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold text-slate-900">
+                      {agent.agentName}
+                    </p>
+                    <p className="font-mono text-[12.5px] tabular-nums text-slate-500">
+                      {agent.agentId}
+                    </p>
+                  </div>
+
+                  <div className="hidden min-w-0 flex-1 sm:block">
+                    <div className="mb-1 flex items-baseline justify-between gap-2 text-[12.5px]">
+                      <span className="tabular-nums text-slate-500">
+                        {agent.achieved} of {goal} {meta.unit}
+                      </span>
+                      {agent.isCompleted && (
+                        <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+                          <CheckCircle2 size={11} />
                           Done
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    {/* TARGET BREAKDOWN */}
-                    <Box display="flex" flexWrap="wrap" gap={1}>
-                      {Object.entries(agent.targets || {}).map(
-                        ([type, value]) => (
-                          <Box
-                            key={type}
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              px: 1,
-                              py: 0.5,
-                              borderRadius: 2,
-                              fontSize: 11,
-                              background: getBg(type),
-                            }}>
-                            {getIcon(type)}
-                            <span>
-                              {formatType(type)} ({value})
-                            </span>
-                          </Box>
-                        ),
+                        </span>
                       )}
-                    </Box>
-                  </CardContent>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          agent.isCompleted ? "bg-emerald-500" : "bg-blue-500"
+                        }`}
+                        style={{ width: `${agent.percent}%` }}
+                      />
+                    </div>
+                  </div>
 
-                  {/* FOOTER */}
-                  <Box
-                    display="flex"
-                    justifyContent="space-between"
-                    px={2}
-                    pb={1}>
-                    <Typography variant="body" color="text.secondary">
-                      {completed}/{total}
-                    </Typography>
-
-                    <Typography
-                      variant="body"
-                      sx={{ fontWeight: 700, color: "#16a34a" }}>
-                      ₹{agent.totalEarned}
-                    </Typography>
-                  </Box>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      )}
-    </Box>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[14px] font-semibold tabular-nums text-slate-900">
+                      {inr(agent.earned)}
+                    </p>
+                    <p className="text-[12px] text-slate-400">earned</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
   );
 }

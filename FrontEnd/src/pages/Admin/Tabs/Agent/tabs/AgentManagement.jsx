@@ -1,717 +1,566 @@
-import { useEffect, useState } from "react";
-import {
-  Button,
-  Box,
-  Card,
-  Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  Select,
-  MenuItem,
-  FormControl,
-  Grid,
-  Tooltip,
-  TextField,
-} from "@mui/material";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import HighlightOffIcon from "@mui/icons-material/HighlightOff";
-import PhoneIcon from "@mui/icons-material/Phone";
-import HomeIcon from "@mui/icons-material/Home";
-import BadgeIcon from "@mui/icons-material/Badge";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import DescriptionIcon from "@mui/icons-material/Description";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
-import { useNavigate } from "react-router-dom";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import IconButton from "@mui/material/IconButton";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import NumbersIcon from "@mui/icons-material/Numbers";
-import Collapse from "@mui/material/Collapse";
-import Stack from "@mui/material/Stack";
-import {
-  agentList,
-  approveAgent,
-  rejectAgent,
-} from "../../../../../api/services";
-import React from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import {
+  AlertCircle,
+  Building2,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  FileText,
+  MapPin,
+  Phone,
+  RefreshCcw,
+  Search,
+  ShieldCheck,
+  ShieldX,
+  UserRound,
+} from "lucide-react";
+import ConfirmDialog from "../../../../../components/common/ConfirmDialog";
+import { agentList, approveAgent, rejectAgent } from "../../../../../api/services";
 
-export default function AgentManagement() {
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [agents, setAgents] = useState([]);
-  const [openRow, setOpenRow] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(""); // ✅ ADDED
+const STATUS = {
+  APPROVED: { label: "Approved", pill: "bg-emerald-50 text-emerald-700 ring-emerald-600/20" },
+  PENDING: { label: "Pending", pill: "bg-amber-50 text-amber-700 ring-amber-600/20" },
+  REJECTED: { label: "Rejected", pill: "bg-rose-50 text-rose-700 ring-rose-600/20" },
+};
 
-  const navigate = useNavigate();
+const FILTERS = [
+  { key: "ALL", label: "All" },
+  { key: "PENDING", label: "Pending" },
+  { key: "APPROVED", label: "Approved" },
+  { key: "REJECTED", label: "Rejected" },
+];
 
-  const handleApprove = async (agent) => {
-    try {
-      await approveAgent(agent.agentId);
+const TH =
+  "px-5 py-3 text-[12px] font-bold uppercase tracking-wide text-slate-500";
 
-      toast.success(`Agent ${agent.name} approved`);
+const initialsOf = (name) =>
+  (name || "")
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "A";
 
-      setAgents((prev) =>
-        prev.map((a) =>
-          a.agentId === agent.agentId ? { ...a, status: "APPROVED" } : a,
-        ),
-      );
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to approve agent");
-    }
+/** Prefers the structured address, falls back to the older free-text field. */
+const formatAddress = (agent) => {
+  const d = agent?.addressDetails;
+  const parts = [d?.street, d?.city, d?.state, d?.pincode].filter(Boolean);
+  return parts.length ? parts.join(", ") : agent?.address || "—";
+};
+
+const StatusPill = ({ status }) => {
+  const cfg = STATUS[status] || {
+    label: status || "Unknown",
+    pill: "bg-slate-100 text-slate-600 ring-slate-500/20",
   };
 
-  const handleReject = async (agent) => {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12.5px] font-semibold ring-1 ring-inset ${cfg.pill}`}>
+      {cfg.label}
+    </span>
+  );
+};
+
+const Field = ({ icon, label, value, mono, copyable }) => {
+  const copy = async () => {
     try {
-      await rejectAgent(agent.agentId);
-
-      toast.error(`Agent ${agent.name} rejected`);
-
-      setAgents((prev) =>
-        prev.map((a) =>
-          a.agentId === agent.agentId ? { ...a, status: "REJECTED" } : a,
-        ),
-      );
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to reject agent");
-    }
-  };
-
-  useEffect(() => {
-    const fetchAgents = async () => {
-      try {
-        const data = await agentList();
-        setAgents(data.agents || []);
-      } catch (error) {
-        console.error("Failed to fetch agents", error);
-        setAgents([]);
-      }
-    };
-
-    fetchAgents();
-  }, []);
-
-  /* ===================== FILTER LOGIC ===================== */
-  const filteredAgents = (
-    statusFilter === "ALL"
-      ? agents
-      : agents.filter((agent) => agent.status === statusFilter)
-  ).filter((agent) =>
-    agent.name?.toLowerCase().includes(searchTerm.toLowerCase()),
-  ); // ✅ ADDED SEARCH FILTER
-
-  const getStatusChip = (status) => {
-    switch (status) {
-      case "APPROVED":
-        return <Chip label="Approved" color="success" size="small" />;
-      case "PENDING":
-        return <Chip label="Pending" color="warning" size="small" />;
-      case "REJECTED":
-        return <Chip label="Rejected" color="error" size="small" />;
-      default:
-        return <Chip label={status} size="small" />;
+      await navigator.clipboard.writeText(String(value));
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Could not copy to clipboard");
     }
   };
 
   return (
-    <Box
-      sx={{
-        height: "80vh",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}>
-      {/* ===== HEADER (FILTER + SEARCH) ===== */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "flex-start",
-          alignItems: "center",
-          gap: 4,
-          mb: 2,
-        }}>
-        {/* LEFT: FILTER */}
-        <FormControl size="large">
-          <Select
-            value={statusFilter}
-            displayEmpty
-            onChange={(e) => setStatusFilter(e.target.value)}
-            sx={{
-              borderRadius: "8px",
-              backgroundColor: "#f9fafb",
-              "& .MuiSelect-select": {
-                py: 1.1,
-                px: 1.5,
-              },
-            }}>
-            <MenuItem value="ALL">All</MenuItem>
-            <MenuItem value="PENDING">Pending</MenuItem>
-            <MenuItem value="APPROVED">Approved</MenuItem>
-            <MenuItem value="REJECTED">Rejected</MenuItem>
-          </Select>
-        </FormControl>
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 shrink-0 text-slate-400">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-400">
+          {label}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <p
+            className={`break-words text-[14px] text-slate-800 ${
+              mono ? "font-mono tabular-nums" : ""
+            }`}>
+            {value || "—"}
+          </p>
+          {copyable && value && (
+            <button
+              onClick={copy}
+              title={`Copy ${label.toLowerCase()}`}
+              className="shrink-0 text-slate-300 transition hover:text-slate-600">
+              <Copy size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
-        {/*SEARCH BAR */}
-        <TextField
-          size="small"
-          placeholder="Search by name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{
-            width: 250,
-            bgcolor: "white",
-            borderRadius: "8px",
-          }}
-        />
-      </Box>
+const DetailCard = ({ title, children }) => (
+  <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-4">
+    <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-slate-400">
+      {title}
+    </p>
+    {children}
+  </div>
+);
 
-      {/* ===================== TABLE ===================== */}
-      <Card
-        sx={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}>
-        <TableContainer
-          sx={{
-            flex: 1,
-            overflowY: "auto",
-            marginRight: "-2rem",
-            paddingRight: "2rem",
-          }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow
-                sx={{
-                  "& th": {
-                    backgroundColor: "#f3f4f6",
-                    fontWeight: 600,
-                    color: "#374151",
-                    borderBottom: "1px solid #e5e7eb",
-                  },
+const TableSkeleton = () => (
+  <div className="animate-pulse divide-y divide-slate-100">
+    {Array.from({ length: 5 }).map((_, i) => (
+      <div key={i} className="flex items-center gap-4 px-5 py-4">
+        <div className="h-3 w-24 rounded bg-slate-200" />
+        <div className="h-9 w-9 rounded-full bg-slate-200" />
+        <div className="flex-1 space-y-2">
+          <div className="h-3 w-40 rounded bg-slate-200" />
+          <div className="h-2.5 w-56 rounded bg-slate-100" />
+        </div>
+        <div className="h-6 w-20 rounded-full bg-slate-200" />
+      </div>
+    ))}
+  </div>
+);
 
-                  // ✅ LEFT CORNER
-                  "& th:first-of-type": {
-                    borderTopLeftRadius: "10px",
-                    borderBottomLeftRadius: "10px",
-                  },
+export default function AgentManagement() {
+  const [agents, setAgents] = useState([]);
+  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [refreshing, setRefreshing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [search, setSearch] = useState("");
+  const [openRow, setOpenRow] = useState(null);
 
-                  // ✅ RIGHT CORNER
-                  "& th:last-of-type": {
-                    borderTopRightRadius: "10px",
-                    borderBottomRightRadius: "10px",
-                  },
-                }}>
-                <TableCell>Agent ID</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
+  /* Pending confirmation: { agent, action: "approve" | "reject" } */
+  const [pendingAction, setPendingAction] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-            <TableBody>
-              {filteredAgents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    No agents found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAgents.map((agent) => {
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setStatus("loading");
+
+    try {
+      const data = await agentList();
+      setAgents(data?.agents || []);
+      setStatus("ready");
+    } catch (error) {
+      console.error("Failed to fetch agents", error);
+      setStatus("error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const counts = useMemo(() => {
+    const base = { ALL: agents.length, PENDING: 0, APPROVED: 0, REJECTED: 0 };
+    agents.forEach((a) => {
+      if (base[a.status] !== undefined) base[a.status] += 1;
+    });
+    return base;
+  }, [agents]);
+
+  /* Searches ID, name, email and phone — the old filter only matched the
+     name, so looking an agent up by their ID or email found nothing. */
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return agents
+      .filter((a) => statusFilter === "ALL" || a.status === statusFilter)
+      .filter((a) => {
+        if (!term) return true;
+        return [a.agentId, a.name, a.email, a.phone]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(term));
+      });
+  }, [agents, statusFilter, search]);
+
+  const runAction = async () => {
+    if (!pendingAction) return;
+
+    const { agent, action } = pendingAction;
+    const approving = action === "approve";
+
+    try {
+      setBusy(true);
+
+      if (approving) await approveAgent(agent.agentId);
+      else await rejectAgent(agent.agentId);
+
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.agentId === agent.agentId
+            ? { ...a, status: approving ? "APPROVED" : "REJECTED" }
+            : a,
+        ),
+      );
+
+      toast.success(
+        approving
+          ? `${agent.name} approved. A password setup link has been emailed.`
+          : `${agent.name} rejected. A notification has been emailed.`,
+      );
+      setPendingAction(null);
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error?.response?.data?.message ||
+          `Failed to ${approving ? "approve" : "reject"} the agent`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* ---------------------------------------------------------------- */
+
+  if (status === "error") {
+    return (
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-sm">
+        <AlertCircle size={26} className="mx-auto text-slate-400" />
+        <h3 className="mt-3 font-semibold text-slate-800">Could not load agents</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Check your connection and try again.
+        </p>
+        <button
+          onClick={() => load()}
+          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+          <RefreshCcw size={14} />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* ===== TOOLBAR ===== */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {FILTERS.map((f) => {
+            const selected = statusFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[14px] font-medium ring-1 ring-inset transition ${
+                  selected
+                    ? "bg-blue-600 text-white ring-blue-600"
+                    : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+                }`}>
+                {f.label}
+                <span
+                  className={`text-[12.5px] font-semibold tabular-nums ${
+                    selected ? "text-blue-100" : "text-slate-400"
+                  }`}>
+                  {counts[f.key] ?? 0}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative ml-auto">
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ID, name, email or phone"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[14px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:w-72"
+          />
+        </div>
+
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          title="Refresh"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[14px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+          <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
+
+      {/* ===== TABLE ===== */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)]">
+        {status === "loading" ? (
+          <TableSkeleton />
+        ) : visible.length === 0 ? (
+          <div className="p-14 text-center">
+            <UserRound size={26} className="mx-auto text-slate-300" />
+            <p className="mt-3 text-sm font-medium text-slate-700">
+              {agents.length === 0 ? "No agents yet" : "No agents match this view"}
+            </p>
+            <p className="mt-1 text-[14px] text-slate-400">
+              {agents.length === 0
+                ? "Applications will appear here once agents apply."
+                : "Try a different status or clear the search."}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/80">
+                  <th className={TH}>Agent ID</th>
+                  <th className={TH}>Agent</th>
+                  <th className={`${TH} hidden md:table-cell`}>Phone</th>
+                  <th className={TH}>Status</th>
+                  <th className={`${TH} text-right`}>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {visible.map((agent) => {
                   const isOpen = openRow === agent._id;
+                  const bank = agent.bankDetails || {};
+                  const hasBank =
+                    bank.accountHolderName ||
+                    bank.accountNumber ||
+                    bank.ifscCode ||
+                    bank.bankName;
 
-                  const bank = agent.bankDetails;
-
-                  const hasBankData =
-                    bank?.accountHolderName ||
-                    bank?.accountNumber ||
-                    bank?.ifscCode ||
-                    bank?.bankName;
+                  const docs = [
+                    { label: "Aadhaar", url: agent.documents?.aadhaar },
+                    { label: "PAN", url: agent.documents?.pan },
+                    { label: "Photo", url: agent.documents?.photo },
+                  ].filter((d) => d.url);
 
                   return (
-                    <React.Fragment key={agent._id}>
-                      <TableRow hover>
-                        <TableCell>{agent.agentId}</TableCell>
-                        <TableCell>{agent.name}</TableCell>
-                        <TableCell>{agent.email}</TableCell>
-                        <TableCell>{getStatusChip(agent.status)}</TableCell>
+                    <Fragment key={agent._id}>
+                      <tr
+                        className={`border-b border-slate-100 transition ${
+                          isOpen ? "bg-blue-50/40" : "hover:bg-slate-50/70"
+                        }`}>
+                        <td className="whitespace-nowrap px-5 py-3.5 font-mono text-[13.5px] tabular-nums text-slate-500">
+                          {agent.agentId || "—"}
+                        </td>
 
-                        {/* ACTIONS COLUMN */}
-                        <TableCell width={120} align="right">
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}>
-                            {/* SHOW ONLY FOR PENDING */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-50 text-[13px] font-bold text-blue-700">
+                              {initialsOf(agent.name)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-[14.5px] font-semibold text-slate-900">
+                                {agent.name}
+                              </p>
+                              <p className="truncate text-[13.5px] text-slate-500">
+                                {agent.email}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="hidden whitespace-nowrap px-5 py-3.5 text-[14px] tabular-nums text-slate-600 md:table-cell">
+                          {agent.phone || "—"}
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <StatusPill status={agent.status} />
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center justify-end gap-2">
                             {agent.status === "PENDING" && (
                               <>
-                                {/* APPROVE */}
-                                <Tooltip title="Approve">
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    color="success"
-                                    startIcon={<CheckCircleOutlineIcon />}
-                                    onClick={() => handleApprove(agent)}
-                                    sx={{ textTransform: "none" }}>
-                                    Approve
-                                  </Button>
-                                </Tooltip>
-
-                                {/* REJECT */}
-                                <Tooltip title="Reject">
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    color="error"
-                                    startIcon={<HighlightOffIcon />}
-                                    onClick={() => handleReject(agent)}
-                                    sx={{ textTransform: "none" }}>
-                                    Reject
-                                  </Button>
-                                </Tooltip>
+                                <button
+                                  onClick={() =>
+                                    setPendingAction({ agent, action: "approve" })
+                                  }
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[13.5px] font-semibold text-white transition hover:bg-emerald-700">
+                                  <ShieldCheck size={14} />
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setPendingAction({ agent, action: "reject" })
+                                  }
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-[13.5px] font-semibold text-rose-600 transition hover:bg-rose-50">
+                                  <ShieldX size={14} />
+                                  Reject
+                                </button>
                               </>
                             )}
 
-                            {/* EXPAND / COLLAPSE — ALWAYS VISIBLE */}
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                setOpenRow(isOpen ? null : agent._id)
-                              }>
-                              {isOpen ? (
-                                <KeyboardArrowUpIcon />
-                              ) : (
-                                <KeyboardArrowDownIcon />
-                              )}
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
+                            <button
+                              onClick={() => setOpenRow(isOpen ? null : agent._id)}
+                              aria-label={isOpen ? "Hide details" : "Show details"}
+                              aria-expanded={isOpen}
+                              className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+                              <ChevronDown
+                                size={17}
+                                className={`transition-transform duration-200 ${
+                                  isOpen ? "rotate-180" : ""
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
 
-                      {/* ================= DISCLOSURE ROW ================= */}
-                      <TableRow>
-                        <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
-                          <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                            <Box sx={{ bgcolor: "grey.50" }}>
-                              {/* ===== SUB PANEL CONTAINER ===== */}
-                              <Box
-                                sx={{
-                                  position: "relative",
-                                  p: 3,
-                                  borderRadius: 2,
-                                  bgcolor: "background.paper",
-                                  boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-                                  overflow: "hidden",
-                                }}>
-                                {/* LEFT ACCENT STRIP */}
-                                <Box
-                                  sx={{
-                                    position: "absolute",
-                                    left: 0,
-                                    top: 0,
-                                    bottom: 0,
-                                    width: 4,
-                                    bgcolor: "primary.main",
-                                  }}
-                                />
+                      {isOpen && (
+                        <tr className="border-b border-slate-100">
+                          <td colSpan={5} className="bg-blue-50/30 p-0">
+                            <div className="px-5 py-5">
+                              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                                <DetailCard title="Contact">
+                                  <div className="space-y-3.5">
+                                    <Field
+                                      icon={<Phone size={14} />}
+                                      label="Phone"
+                                      value={agent.phone}
+                                      mono
+                                    />
+                                    <Field
+                                      icon={<MapPin size={14} />}
+                                      label="Address"
+                                      value={formatAddress(agent)}
+                                    />
+                                    {agent.rejectionReason && (
+                                      <div className="rounded-lg bg-rose-50 px-3 py-2">
+                                        <p className="text-[12px] font-semibold uppercase tracking-wide text-rose-500">
+                                          Rejection reason
+                                        </p>
+                                        <p className="text-[14px] text-rose-700">
+                                          {agent.rejectionReason}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </DetailCard>
 
-                                {/* ✅ FIX: alignItems="stretch" */}
-                                <Grid
-                                  container
-                                  spacing={4}
-                                  alignItems="stretch">
-                                  {/* ===== LEFT CARD: BASIC DETAILS ===== */}
-                                  <Grid item xs={12} md={6}>
-                                    <Box
-                                      sx={{
-                                        p: 2.5,
-                                        borderRadius: 2,
-                                        bgcolor: "grey.100",
-                                        height: "100%", // ✅ FIX
-                                        display: "flex", // ✅ FIX
-                                        flexDirection: "column", // ✅ FIX
-                                      }}>
-                                      <Stack spacing={2.5} sx={{ flex: 1 }}>
-                                        {[
-                                          {
-                                            icon: (
-                                              <PhoneIcon fontSize="small" />
-                                            ),
-                                            label: "Phone",
-                                            value: agent.phone,
-                                          },
-                                          {
-                                            icon: <HomeIcon fontSize="small" />,
-                                            label: "Address",
-                                            value: agent.address,
-                                          },
-                                          {
-                                            icon: (
-                                              <BadgeIcon fontSize="small" />
-                                            ),
-                                            label: "Role",
-                                            value: agent.role,
-                                          },
-                                        ].map(({ icon, label, value }) => (
-                                          <Stack
-                                            key={label}
-                                            direction="row"
-                                            spacing={2}
-                                            alignItems="flex-start">
-                                            <Box
-                                              sx={{
-                                                minWidth: 32,
-                                                height: 32,
-                                                borderRadius: "50%",
-                                                color: "primary.main",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                              }}>
-                                              {icon}
-                                            </Box>
+                                <DetailCard title="Documents">
+                                  {docs.length ? (
+                                    <div className="space-y-2">
+                                      {docs.map((doc) => (
+                                        <a
+                                          key={doc.label}
+                                          href={doc.url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-[14px] text-slate-700 transition hover:border-blue-300 hover:bg-blue-50/50">
+                                          <span className="flex items-center gap-2">
+                                            <FileText size={14} className="text-slate-400" />
+                                            {doc.label}
+                                          </span>
+                                          <ExternalLink size={13} className="text-slate-400" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[14px] text-slate-400">
+                                      No documents uploaded
+                                    </p>
+                                  )}
+                                </DetailCard>
 
-                                            <Box>
-                                              <Typography
-                                                variant="caption"
-                                                color="text.secondary">
-                                                {label}
-                                              </Typography>
-                                              <Typography
-                                                variant="body2"
-                                                fontWeight={500}>
-                                                {value}
-                                              </Typography>
-                                            </Box>
-                                          </Stack>
-                                        ))}
-
-                                        {agent.rejectionReason && (
-                                          <Stack direction="row" spacing={2}>
-                                            <Box
-                                              sx={{
-                                                minWidth: 32,
-                                                height: 32,
-                                                borderRadius: "50%",
-                                                bgcolor: "error.light",
-                                                color: "error.main",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                              }}>
-                                              <ErrorOutlineIcon fontSize="small" />
-                                            </Box>
-
-                                            <Box>
-                                              <Typography
-                                                variant="caption"
-                                                color="error">
-                                                Rejection Reason
-                                              </Typography>
-                                              <Typography
-                                                variant="body2"
-                                                color="error">
-                                                {agent.rejectionReason}
-                                              </Typography>
-                                            </Box>
-                                          </Stack>
-                                        )}
-                                      </Stack>
-                                    </Box>
-                                  </Grid>
-
-                                  {/* ===== RIGHT CARD: DOCUMENTS + BANK ===== */}
-                                  <Grid item xs={12} md={6}>
-                                    <Grid
-                                      container
-                                      spacing={2}
-                                      sx={{ height: "100%" }}>
-                                      {/* ===== DOCUMENTS ===== */}
-                                      <Grid item xs={12} md={6}>
-                                        <Box
-                                          sx={{
-                                            p: 2.5,
-                                            borderRadius: 2,
-                                            bgcolor: "grey.100",
-                                            height: "100%",
-                                          }}>
-                                          <Typography
-                                            variant="subtitle2"
-                                            mb={1}>
-                                            Documents
-                                          </Typography>
-
-                                          <Stack spacing={1}>
-                                            {[
-                                              {
-                                                label: "Aadhaar",
-                                                url: agent.documents?.aadhaar,
-                                              },
-                                              {
-                                                label: "PAN",
-                                                url: agent.documents?.pan,
-                                              },
-                                              {
-                                                label: "Photo",
-                                                url: agent.documents?.photo,
-                                              },
-                                            ].map(
-                                              (doc) =>
-                                                doc.url && (
-                                                  <Stack
-                                                    key={doc.label}
-                                                    direction="row"
-                                                    justifyContent="space-between"
-                                                    alignItems="center"
-                                                    sx={{
-                                                      p: 1,
-                                                      borderRadius: 1.5,
-                                                      bgcolor:
-                                                        "background.paper",
-                                                      border: "1px solid",
-                                                      borderColor: "divider",
-                                                    }}>
-                                                    <Stack
-                                                      direction="row"
-                                                      spacing={1.5}>
-                                                      <DescriptionIcon
-                                                        fontSize="small"
-                                                        color="action"
-                                                      />
-                                                      <Typography variant="body2">
-                                                        {doc.label}
-                                                      </Typography>
-                                                    </Stack>
-
-                                                    <IconButton
-                                                      size="small"
-                                                      color="primary"
-                                                      onClick={() =>
-                                                        window.open(
-                                                          doc.url,
-                                                          "_blank",
-                                                        )
-                                                      }>
-                                                      <VisibilityIcon fontSize="small" />
-                                                    </IconButton>
-                                                  </Stack>
-                                                ),
-                                            )}
-                                          </Stack>
-                                        </Box>
-                                      </Grid>
-
-                                      {/* ===== BANK DETAILS ===== */}
-                                      <Grid item xs={12} md={6}>
-                                        <Box
-                                          sx={{
-                                            p: 2.5,
-                                            borderRadius: 2,
-                                            bgcolor: "grey.100",
-                                            height: "100%",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                          }}>
-                                          <Typography
-                                            variant="subtitle2"
-                                            mb={2}>
-                                            Bank Details
-                                          </Typography>
-
-                                          <Box sx={{ flex: 1 }}>
-                                            {hasBankData ? (
-                                              <Grid container spacing={2}>
-                                                {/* COLUMN 1 */}
-                                                <Grid item xs={12} md={6}>
-                                                  <Stack spacing={2}>
-                                                    {[
-                                                      {
-                                                        icon: (
-                                                          <BadgeIcon fontSize="small" />
-                                                        ),
-                                                        label: "Account Holder",
-                                                        value:
-                                                          bank?.accountHolderName,
-                                                      },
-                                                      {
-                                                        icon: (
-                                                          <DescriptionIcon fontSize="small" />
-                                                        ),
-                                                        label: "Account Number",
-                                                        value:
-                                                          bank?.accountNumber,
-                                                      },
-                                                    ].map(
-                                                      ({
-                                                        icon,
-                                                        label,
-                                                        value,
-                                                      }) =>
-                                                        value && (
-                                                          <Stack
-                                                            key={label}
-                                                            direction="row"
-                                                            spacing={2}
-                                                            alignItems="flex-start">
-                                                            <Box
-                                                              sx={{
-                                                                minWidth: 32,
-                                                                height: 32,
-                                                                borderRadius:
-                                                                  "50%",
-                                                                color:
-                                                                  "primary.main",
-                                                                display: "flex",
-                                                                alignItems:
-                                                                  "center",
-                                                                justifyContent:
-                                                                  "center",
-                                                              }}>
-                                                              {icon}
-                                                            </Box>
-
-                                                            <Box>
-                                                              <Typography
-                                                                variant="caption"
-                                                                color="text.secondary">
-                                                                {label}
-                                                              </Typography>
-                                                              <Typography
-                                                                variant="body2"
-                                                                fontWeight={
-                                                                  500
-                                                                }>
-                                                                {value}
-                                                              </Typography>
-                                                            </Box>
-                                                          </Stack>
-                                                        ),
-                                                    )}
-                                                  </Stack>
-                                                </Grid>
-
-                                                {/* COLUMN 2 */}
-                                                <Grid item xs={12} md={6}>
-                                                  <Stack spacing={2}>
-                                                    {[
-                                                      {
-                                                        icon: (
-                                                          <NumbersIcon fontSize="small" />
-                                                        ),
-                                                        label: "IFSC Code",
-                                                        value: bank?.ifscCode,
-                                                      },
-                                                      {
-                                                        icon: (
-                                                          <AccountBalanceIcon fontSize="small" />
-                                                        ),
-                                                        label: "Bank Name",
-                                                        value: bank?.bankName,
-                                                      },
-                                                    ].map(
-                                                      ({
-                                                        icon,
-                                                        label,
-                                                        value,
-                                                      }) =>
-                                                        value && (
-                                                          <Stack
-                                                            key={label}
-                                                            direction="row"
-                                                            spacing={2}
-                                                            alignItems="flex-start">
-                                                            <Box
-                                                              sx={{
-                                                                minWidth: 32,
-                                                                height: 32,
-                                                                borderRadius:
-                                                                  "50%",
-                                                                color:
-                                                                  "primary.main",
-                                                                display: "flex",
-                                                                alignItems:
-                                                                  "center",
-                                                                justifyContent:
-                                                                  "center",
-                                                              }}>
-                                                              {icon}
-                                                            </Box>
-
-                                                            <Box>
-                                                              <Typography
-                                                                variant="caption"
-                                                                color="text.secondary">
-                                                                {label}
-                                                              </Typography>
-                                                              <Typography
-                                                                variant="body2"
-                                                                fontWeight={
-                                                                  500
-                                                                }>
-                                                                {value}
-                                                              </Typography>
-                                                            </Box>
-                                                          </Stack>
-                                                        ),
-                                                    )}
-                                                  </Stack>
-                                                </Grid>
-                                              </Grid>
-                                            ) : (
-                                              // ✅ FALLBACK UI
-                                              <Box
-                                                sx={{
-                                                  height: "100%",
-                                                  display: "flex",
-                                                  alignItems: "flex-start",
-                                                  justifyContent: "center",
-                                                  pt: 1,
-                                                }}>
-                                                <Typography
-                                                  variant="body2"
-                                                  color="text.secondary">
-                                                  No bank details available
-                                                </Typography>
-                                              </Box>
-                                            )}
-                                          </Box>
-                                        </Box>
-                                      </Grid>
-                                    </Grid>
-                                  </Grid>
-                                </Grid>
-                              </Box>
-                            </Box>
-                          </Collapse>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell
-                          colSpan={5}
-                          sx={{ height: 12, border: 0, p: 0 }}
-                        />
-                      </TableRow>
-                    </React.Fragment>
+                                <DetailCard title="Bank Details">
+                                  {hasBank ? (
+                                    <div className="space-y-3.5">
+                                      <Field
+                                        icon={<UserRound size={14} />}
+                                        label="Account holder"
+                                        value={bank.accountHolderName}
+                                      />
+                                      <Field
+                                        icon={<FileText size={14} />}
+                                        label="Account number"
+                                        value={bank.accountNumber}
+                                        mono
+                                        copyable
+                                      />
+                                      <Field
+                                        icon={<Building2 size={14} />}
+                                        label="IFSC"
+                                        value={bank.ifscCode}
+                                        mono
+                                        copyable
+                                      />
+                                      <Field
+                                        icon={<Building2 size={14} />}
+                                        label="Bank"
+                                        value={bank.bankName}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <p className="text-[14px] text-slate-400">
+                                      No bank details submitted
+                                    </p>
+                                  )}
+                                </DetailCard>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Card>
-    </Box>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ===== CONFIRMATION ===== */}
+      <ConfirmDialog
+        open={Boolean(pendingAction)}
+        busy={busy}
+        tone={pendingAction?.action === "approve" ? "success" : "danger"}
+        icon={
+          pendingAction?.action === "approve" ? (
+            <ShieldCheck size={19} />
+          ) : (
+            <ShieldX size={19} />
+          )
+        }
+        title={
+          pendingAction?.action === "approve"
+            ? "Approve this agent?"
+            : "Reject this agent?"
+        }
+        description={
+          pendingAction?.action === "approve"
+            ? "They will be emailed a link to set their password and can sign in straight away."
+            : "They will be emailed to say their application was rejected."
+        }
+        detail={
+          pendingAction && (
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[13px] font-bold text-slate-600 ring-1 ring-slate-200">
+                {initialsOf(pendingAction.agent.name)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-semibold text-slate-900">
+                  {pendingAction.agent.name}
+                </p>
+                <p className="truncate text-[13px] text-slate-500">
+                  {pendingAction.agent.agentId} · {pendingAction.agent.email}
+                </p>
+              </div>
+            </div>
+          )
+        }
+        confirmLabel={
+          busy
+            ? "Working…"
+            : pendingAction?.action === "approve"
+              ? "Approve agent"
+              : "Reject agent"
+        }
+        onConfirm={runAction}
+        onClose={() => setPendingAction(null)}
+      />
+    </>
   );
 }

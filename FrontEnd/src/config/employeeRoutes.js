@@ -22,6 +22,13 @@ import CustomNotification from "../pages/Admin/Tabs/CustomNotification/CustomNot
 import NotificationsActive from "@mui/icons-material/NotificationsActive";
 import AssignLocation from "../pages/Admin/Tabs/AssignLocation/AssignLocation";
 
+/**
+ * `permission` guards the route. A string means "must hold this permission";
+ * an array means "must hold at least one of these".
+ *
+ * Keep the profile entry first — routeConfig uses employeeRoutes[0] as the
+ * default landing page for a bare /employee visit.
+ */
 export const employeeRoutes = [
   {
     path: "profile",
@@ -32,6 +39,7 @@ export const employeeRoutes = [
   {
     label: "Dashboard",
     path: "dashboard",
+    group: "Overview",
     icon: DashboardIcon,
     permission: "canViewDashboardSummary",
     component: AdminDashboard,
@@ -39,20 +47,33 @@ export const employeeRoutes = [
   {
     label: "Agent",
     path: "agent",
+    group: "People",
     icon: Groups3Icon,
-    permissions: ["canManageAgents", "canPayoutIncentives"],
+    // was `permissions:` (plural) — the guard reads `permission`, so this tab
+    // was reachable by every employee regardless of their access.
+    permission: ["canManageAgents", "canPayoutIncentives"],
     component: Agent,
   },
   {
     label: "Delivery Partner",
     path: "delivery",
+    group: "People",
     icon: LocalShipping,
     permission: ["canGetAllDeliveryPartners", "canManageDeliveryPartners"],
     component: Delivery,
   },
   {
+    label: "Assign Location",
+    path: "assign-location",
+    group: "People",
+    permission: "canAssignLocations",
+    icon: AddLocationIcon,
+    component: AssignLocation,
+  },
+  {
     label: "Orders",
     path: "order-management",
+    group: "Operations",
     icon: AllInbox,
     permission: "canGetAllOrders",
     component: OrderManagement,
@@ -60,6 +81,7 @@ export const employeeRoutes = [
   {
     label: "Returns",
     path: "return-management",
+    group: "Operations",
     permission: "canAssignReturn",
     icon: OutboxOutlined,
     component: ReturnManagement,
@@ -67,6 +89,7 @@ export const employeeRoutes = [
   {
     label: "Product Creation",
     path: "products",
+    group: "Catalog",
     icon: Inventory2Icon,
     permission: "canManageProducts",
     component: ProductCreation,
@@ -74,6 +97,7 @@ export const employeeRoutes = [
   {
     label: "All Products",
     path: "allproducts",
+    group: "Catalog",
     icon: ListAltIcon,
     permission: "canManageProducts",
     component: AllProducts,
@@ -81,6 +105,7 @@ export const employeeRoutes = [
   {
     label: "Payment Info",
     path: "payment-summary",
+    group: "Performance",
     icon: PaymentIcon,
     permission: "canSeePaymentInfo",
     component: PaymentInfo,
@@ -88,6 +113,7 @@ export const employeeRoutes = [
   {
     label: "Targets",
     path: "target-management",
+    group: "Performance",
     permission: "canSetTargets",
     icon: AdsClickIcon,
     component: Targets,
@@ -95,15 +121,9 @@ export const employeeRoutes = [
   {
     label: "Custom Notification",
     path: "custom-notification",
+    group: "Performance",
     permission: "canManageNotifications",
     icon: NotificationsActive,
     component: CustomNotification,
-  },
-  {
-    label: "Assign Location",
-    path: "assign-location",
-    permission: "canAssignLocations",
-    icon: AddLocationIcon,
-    component: AssignLocation,
   },
 ];
