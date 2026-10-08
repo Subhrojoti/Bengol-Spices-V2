@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { footerRoutes, HERO_OVERLAY_PATHS } from "../../config/footerRoutes";
-import logoMain from "../../assets/logo/Logo_Final.png";
+import logoMain from "../../assets/logo/Logo_Final.webp";
 
 const HIDDEN_TABS = ["privacy", "terms", "cookies"];
 
+/* The home page lives at "/". It also answers at /home, which older links
+   use, but one address has to be the real one or search engines split the
+   page's ranking between the two — so the menu always points at "/". */
+const hrefFor = (path) => (path === "home" ? "/" : `/${path}`);
+
+const isCurrent = (path, pathname) =>
+  path === "home"
+    ? pathname === "/" || pathname === "/home"
+    : pathname === `/${path}`;
+
 const HomeHeader = () => {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -18,13 +27,9 @@ const HomeHeader = () => {
     [],
   );
 
-  const firstTab = visibleTabs[0]?.path;
-
-  useEffect(() => {
-    if (location.pathname === "/" && firstTab) {
-      navigate(`/${firstTab}`, { replace: true });
-    }
-  }, [location.pathname, firstTab, navigate]);
+  /* "/" used to be bounced to /home here, in the browser. The router now
+     renders the home page at "/" itself, so the bounce only cost a redirect
+     and gave the same page two addresses. */
 
   /* Home, About, Careers and Help all open on a dark hero, so on those the
      bar starts transparent and only takes on a surface once you scroll past
@@ -64,10 +69,8 @@ const HomeHeader = () => {
     };
   }, [menuOpen]);
 
-  const go = (path) => {
-    navigate(path);
-    setMenuOpen(false);
-  };
+  // Tapping the page you are already on changes no route, so close by hand
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <>
@@ -90,13 +93,16 @@ const HomeHeader = () => {
 
         <div className="mx-auto flex h-[72px] max-w-7xl items-center gap-4 px-5 md:px-10 lg:px-16">
           {/* BRAND */}
-          <button
-            onClick={() => go("/home")}
+          <Link
+            to="/"
+            onClick={closeMenu}
             className="flex shrink-0 items-center gap-2.5"
             aria-label="Bengol Spices, home">
             <img
               src={logoMain}
               alt=""
+              width={44}
+              height={44}
               className="h-11 w-11 rounded-xl bg-white/90 object-contain p-1"
             />
             <span className="hidden sm:block">
@@ -107,17 +113,20 @@ const HomeHeader = () => {
                 Pvt. Ltd.
               </span>
             </span>
-          </button>
+          </Link>
 
-          {/* DESKTOP NAV */}
-          <nav className="ml-auto hidden items-center gap-1 md:flex">
+          {/* DESKTOP NAV — links, so they can be crawled and opened in a tab */}
+          <nav
+            aria-label="Main"
+            className="ml-auto hidden items-center gap-1 md:flex">
             {visibleTabs.map((route) => {
-              const isActive = location.pathname === `/${route.path}`;
+              const isActive = isCurrent(route.path, location.pathname);
 
               return (
-                <button
+                <Link
                   key={route.path}
-                  onClick={() => go(`/${route.path}`)}
+                  to={hrefFor(route.path)}
+                  aria-current={isActive ? "page" : undefined}
                   className={`group relative rounded-lg px-3.5 py-2 text-[13.5px] font-medium transition ${
                     isActive
                       ? "text-amber-300"
@@ -130,7 +139,7 @@ const HomeHeader = () => {
                       isActive ? "opacity-100" : "opacity-0 group-hover:opacity-40"
                     }`}
                   />
-                </button>
+                </Link>
               );
             })}
           </nav>
@@ -153,6 +162,8 @@ const HomeHeader = () => {
               <img
                 src={logoMain}
                 alt=""
+                width={40}
+                height={40}
                 className="h-10 w-10 rounded-xl bg-white/90 object-contain p-1"
               />
               <span className="text-[16px] font-semibold text-white">
@@ -170,12 +181,14 @@ const HomeHeader = () => {
 
           <nav className="flex-1 overflow-y-auto px-5 pb-8 pt-4">
             {visibleTabs.map((route, i) => {
-              const isActive = location.pathname === `/${route.path}`;
+              const isActive = isCurrent(route.path, location.pathname);
 
               return (
-                <button
+                <Link
                   key={route.path}
-                  onClick={() => go(`/${route.path}`)}
+                  to={hrefFor(route.path)}
+                  onClick={closeMenu}
+                  aria-current={isActive ? "page" : undefined}
                   className={`flex w-full items-center justify-between border-b border-white/5 py-4 text-left text-[24px] font-semibold transition ${
                     isActive ? "text-amber-300" : "text-white/85 hover:text-white"
                   }`}>
@@ -183,7 +196,7 @@ const HomeHeader = () => {
                   <span className="font-sans text-[12px] font-normal text-white/25">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                </button>
+                </Link>
               );
             })}
           </nav>

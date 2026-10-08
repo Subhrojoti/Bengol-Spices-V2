@@ -29,6 +29,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { getDashboardSummary } from "../../../../api/services";
+import NeedsAttention from "./NeedsAttention";
+import { useChartChrome } from "../../../../theme/useChartChrome";
 
 /* ------------------------------------------------------------------ *
  * Chart palette.
@@ -45,7 +47,6 @@ import { getDashboardSummary } from "../../../../api/services";
  * ------------------------------------------------------------------ */
 const SERIES = { sales: "#2a78d6", profit: "#eb6834" };
 const SINGLE = { product: "#2a78d6", agent: "#eb6834", state: "#2a78d6" };
-const CHROME = { grid: "#e1e0d9", axis: "#898781" };
 const STATUS = {
   inProgress: "#2a78d6",
   delivered: "#0ca30c",
@@ -104,8 +105,8 @@ const StatCard = ({ label, value, hint, icon, tint, ink }) => (
     <div className="flex items-start justify-between gap-3">
       <p className="text-[14px] font-medium text-slate-500">{label}</p>
       <span
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
     </div>
@@ -122,8 +123,8 @@ const CountTile = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -221,10 +222,16 @@ export default function AdminDashboard() {
   const [meta, setMeta] = useState(null);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [refreshing, setRefreshing] = useState(false);
+  // Bumped by Refresh, so the "needs attention" block reloads with the rest
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Grid lines, axis labels and hover highlight, for light or dark
+  const CHROME = useChartChrome();
 
   const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setStatus("loading");
+    if (isRefresh) {
+      setRefreshing(true);
+      setRefreshKey((key) => key + 1);
+    } else setStatus("loading");
 
     try {
       const res = await getDashboardSummary();
@@ -353,6 +360,9 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* ===== WHAT IS WAITING ON THE OFFICE ===== */}
+      <NeedsAttention refreshKey={refreshKey} />
+
       {/* ===== FINANCIAL KPIs ===== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
@@ -466,7 +476,7 @@ export default function AdminDashboard() {
                   stroke={SERIES.sales}
                   strokeWidth={2}
                   fill="url(#fillSales)"
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: "#ffffff" }}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: CHROME.dotStroke }}
                 />
                 <Area
                   type="monotone"
@@ -475,7 +485,7 @@ export default function AdminDashboard() {
                   stroke={SERIES.profit}
                   strokeWidth={2}
                   fill="url(#fillProfit)"
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: "#ffffff" }}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: CHROME.dotStroke }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -608,7 +618,7 @@ export default function AdminDashboard() {
                 />
                 <Tooltip
                   content={<ChartTooltip format={inr} />}
-                  cursor={{ fill: "rgba(15,23,42,0.04)" }}
+                  cursor={{ fill: CHROME.cursor }}
                 />
                 <Bar dataKey="sales" name="Sales" radius={[4, 4, 0, 0]} maxBarSize={44}>
                   {insights.stateSales.map((entry, i) => (

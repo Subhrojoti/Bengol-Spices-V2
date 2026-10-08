@@ -2,7 +2,11 @@ import Invoice from "../models/Invoice.js";
 import Order from "../models/Order.js";
 import { generateInvoiceNumber } from "../utils/invoiceNumber.js";
 import { generateInvoicePDFBuffer } from "../utils/generateInvoicePdf.js";
-import { uploadPdfToCloudinary } from "../utils/uploadPdf.js";
+import {
+  isGuessableInvoiceUrl,
+  removeGuessableInvoiceFile,
+  uploadPdfToCloudinary,
+} from "../utils/uploadPdf.js";
 
 /* =============================
    CREATE INVOICE FROM ORDER
@@ -131,6 +135,8 @@ export const regenerateInvoicePDF = async (invoice, order = null) => {
 
     const pdfBuffer = await generateInvoicePDFBuffer(invoice, sourceOrder);
 
+    const previousUrl = invoice.pdfUrl;
+
     const pdfUrl = await uploadPdfToCloudinary(
       pdfBuffer,
       invoice.invoiceNumber, // 🔥 prevents duplicate
@@ -139,8 +145,68 @@ export const regenerateInvoicePDF = async (invoice, order = null) => {
     invoice.pdfUrl = pdfUrl;
     await invoice.save();
 
+    /* The copy stored before file names were made unguessable (see
+       utils/uploadPdf.js) is taken down, now that the new one is saved and
+       the invoice points at it. */
+    if (isGuessableInvoiceUrl(previousUrl, invoice.invoiceNumber)) {
+      await removeGuessableInvoiceFile(invoice.invoiceNumber);
+    }
+
     return pdfUrl;
   } catch (error) {
     console.error("❌ PDF GENERATION ERROR:", error);
   }
+};
+
+/* =============================
+   MOVE OLD INVOICE FILES TO UNGUESSABLE NAMES
+
+   Invoices made before file names carried a secret code are still stored
+   under their own number, where anyone can fetch them by counting. Each is
+   made again under its new name and the old copy removed. One at a time and
+   in the background: nothing waits on it, and a file that cannot be moved
+   is logged and left for the next run (or for the next time somebody
+   downloads that invoice, which moves it too).
+============================= */
+
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const secureStoredInvoices = async () => {
+  const candidates = await Invoice.find({ pdfUrl: { $regex: "/invoices/" } })
+    .select("_id invoiceNumber pdfUrl")
+    .lean();
+
+  const pending = candidates.filter((invoice) =>
+    isGuessableInvoiceUrl(invoice.pdfUrl, invoice.invoiceNumber),
+  );
+
+  if (!pending.length) return { found: 0, moved: 0 };
+
+  console.log(
+    `Invoice files: moving ${pending.length} to unguessable names in the background`,
+  );
+
+  let moved = 0;
+
+  for (const { _id } of pending) {
+    try {
+      // Read fresh: it may have been moved by a download or a payment since
+      const invoice = await Invoice.findById(_id);
+
+      if (!invoice || !isGuessableInvoiceUrl(invoice.pdfUrl, invoice.invoiceNumber)) {
+        continue;
+      }
+
+      const pdfUrl = await regenerateInvoicePDF(invoice);
+      if (pdfUrl && !isGuessableInvoiceUrl(pdfUrl, invoice.invoiceNumber)) moved += 1;
+    } catch (error) {
+      console.error("INVOICE FILE MOVE FAILED:", error?.message || error);
+    }
+
+    await pause(300);
+  }
+
+  console.log(`Invoice files: ${moved} of ${pending.length} moved`);
+
+  return { found: pending.length, moved };
 };

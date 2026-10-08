@@ -14,8 +14,8 @@ export const Stat = ({ label, value, icon, tint, ink, hint }) => (
   <Card className="p-3 sm:p-4">
     <div className="flex items-center gap-3">
       <span
-        className="hidden h-9 w-9 shrink-0 place-items-center rounded-xl sm:grid"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip hidden h-9 w-9 shrink-0 place-items-center rounded-xl sm:grid"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">

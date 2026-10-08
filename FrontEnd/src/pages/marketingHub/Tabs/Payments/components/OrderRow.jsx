@@ -1,8 +1,7 @@
 import { Button, Tooltip, IconButton } from "@mui/material";
 import DescriptionIcon from "@mui/icons-material/Description";
 import { downloadInvoice } from "../../../../../api/services";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "sonner";
 
 const OrderRow = ({ order, onPayNow }) => {
   const handleDownloadInvoice = async () => {

@@ -73,16 +73,31 @@ const ContentSkeleton = () => (
 
 /* ─── Main ──────────────────────────────────────────────────────────── */
 
+const categoriesOf = (list) => [...new Set(list.map((item) => item.category))];
+
 const HelpAndSupport = () => {
+  /* The build writes this page out as static HTML with the questions
+     already in it (scripts/prerender.mjs), and leaves the same list on the
+     page for this component. Starting from it means the page a search
+     engine reads, and the page a visitor first sees, already has its
+     answers instead of a loading skeleton. Absent in development, where
+     this is simply undefined and everything loads as before. */
+  const seeded = globalThis.__PRERENDER__?.faqs;
+
   const [openId, setOpenId] = useState(null);
-  const [activeCategory, setActiveCategory] = useState("GENERAL");
-  const [faqs, setFaqs] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState(
+    () => (seeded && categoriesOf(seeded)[0]) || "GENERAL",
+  );
+  const [faqs, setFaqs] = useState(seeded ?? []);
+  const [categories, setCategories] = useState(() =>
+    seeded ? categoriesOf(seeded) : [],
+  );
+  const [loading, setLoading] = useState(!seeded);
   const [query, setQuery] = useState("");
 
   const searchRef = useRef(null);
 
+  // Still fetched every time, so an edited FAQ shows without a rebuild
   useEffect(() => {
     const fetchFaqs = async () => {
       try {
@@ -93,15 +108,18 @@ const HelpAndSupport = () => {
 
           setFaqs(data);
 
-          const uniqueCategories = [
-            ...new Set(data.map((item) => item.category)),
-          ];
+          const uniqueCategories = categoriesOf(data);
 
           setCategories(uniqueCategories);
 
-          if (uniqueCategories.length) {
-            setActiveCategory(uniqueCategories[0]);
-          }
+          /* Keep the topic the visitor is on if it still exists. Without
+             the seeded list they have not had a chance to pick one yet, so
+             this lands on the first topic exactly as before. */
+          setActiveCategory((current) =>
+            uniqueCategories.includes(current)
+              ? current
+              : (uniqueCategories[0] ?? current),
+          );
         }
       } catch (err) {
         console.error(err);
@@ -132,6 +150,21 @@ const HelpAndSupport = () => {
 
     return active.filter((item) => item.category === activeCategory);
   }, [faqs, activeCategory, searching, trimmedQuery]);
+
+  /* All published answers are kept in the page and the ones outside the
+     current topic or search are simply hidden, the way tab panels are. A
+     search engine reading the page then finds every question and answer,
+     not just the first topic's, and not just the question that happens to
+     be open. */
+  const publishedFaqs = useMemo(
+    () => faqs.filter((item) => item.isActive),
+    [faqs],
+  );
+
+  const visibleIds = useMemo(
+    () => new Set(visibleFaqs.map((item) => item._id)),
+    [visibleFaqs],
+  );
 
   const countFor = (cat) =>
     faqs.filter((item) => item.category === cat && item.isActive).length;
@@ -300,12 +333,14 @@ const HelpAndSupport = () => {
                 {/* ACCORDION */}
                 <div className="mt-6 space-y-3">
                   {visibleFaqs.length > 0 ? (
-                    visibleFaqs.map((item) => {
-                      const isOpen = openId === item._id;
+                    publishedFaqs.map((item) => {
+                      const shown = visibleIds.has(item._id);
+                      const isOpen = shown && openId === item._id;
 
                       return (
                         <div
                           key={item._id}
+                          hidden={!shown}
                           className={`overflow-hidden rounded-2xl border bg-white transition-colors ${
                             isOpen
                               ? "border-amber-300 shadow-[0_20px_50px_-32px_rgba(28,22,17,0.5)]"
@@ -332,19 +367,20 @@ const HelpAndSupport = () => {
                             </span>
                           </button>
 
-                          {isOpen && (
-                            <div className="px-5 pb-6 md:px-6">
-                              <div className="border-t border-[#f0e8dc] pt-4 text-[14.5px] leading-7 text-[#5b5147]">
-                                {item.answer}
-                              </div>
-
-                              {searching && (
-                                <p className="mt-4 text-[11.5px] uppercase tracking-[0.08em] text-[#b6a894]">
-                                  {item.category}
-                                </p>
-                              )}
+                          {/* Collapsed, not removed: the answer is still
+                              in the page for search engines and for
+                              find-in-page. */}
+                          <div hidden={!isOpen} className="px-5 pb-6 md:px-6">
+                            <div className="border-t border-[#f0e8dc] pt-4 text-[14.5px] leading-7 text-[#5b5147]">
+                              {item.answer}
                             </div>
-                          )}
+
+                            {searching && (
+                              <p className="mt-4 text-[11.5px] uppercase tracking-[0.08em] text-[#b6a894]">
+                                {item.category}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       );
                     })

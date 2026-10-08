@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Building2,
@@ -17,6 +17,8 @@ import {
   UserRound,
 } from "lucide-react";
 import ConfirmDialog from "../../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 import { agentList, approveAgent, rejectAgent } from "../../../../../api/services";
 
 const STATUS = {
@@ -183,6 +185,8 @@ export default function AgentManagement() {
       });
   }, [agents, statusFilter, search]);
 
+  const [pager, pagerTop] = usePagination(visible, { resetKey: `${statusFilter}|${search}` });
+
   const runAction = async () => {
     if (!pendingAction) return;
 
@@ -319,7 +323,8 @@ export default function AgentManagement() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div ref={pagerTop} className="scroll-mt-24 overflow-x-auto">
             <table className="w-full min-w-[720px] text-left">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -332,7 +337,7 @@ export default function AgentManagement() {
               </thead>
 
               <tbody>
-                {visible.map((agent) => {
+                {pager.pageItems.map((agent) => {
                   const isOpen = openRow === agent._id;
                   const bank = agent.bankDetails || {};
                   const hasBank =
@@ -535,6 +540,12 @@ export default function AgentManagement() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            {...pager.controls}
+            label="agents"
+            className="border-t border-slate-200 px-4 py-3"
+          />
+          </>
         )}
       </div>
 

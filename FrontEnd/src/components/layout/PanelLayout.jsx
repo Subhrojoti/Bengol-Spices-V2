@@ -5,6 +5,8 @@ import { Outlet, matchPath, useLocation } from "react-router-dom";
 import PanelNav from "./PanelNav";
 import PanelHeader from "./PanelHeader";
 import CommandPalette from "./CommandPalette";
+import { useThemeMode } from "../../theme/useThemeMode";
+import { DARK_PAGE } from "../../theme";
 
 const COLLAPSED_WIDTH = 72;
 const EXPANDED_WIDTH = 264;
@@ -47,6 +49,7 @@ const PanelLayout = ({
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const location = useLocation();
+  const { dark } = useThemeMode();
 
   const [pinned, setPinned] = useState(() => readPinned(storageKey));
   const [hovered, setHovered] = useState(false);
@@ -113,7 +116,12 @@ const PanelLayout = ({
 
   return (
     <Box
-      sx={{ display: "flex", height: "100vh", overflow: "hidden", bgcolor: "#f1f5f9" }}>
+      sx={{
+        display: "flex",
+        height: "100vh",
+        overflow: "hidden",
+        bgcolor: dark ? DARK_PAGE : "#f1f5f9",
+      }}>
       {/* ===== DESKTOP RAIL ===== */}
       {isDesktop && (
         <Box
@@ -131,8 +139,14 @@ const PanelLayout = ({
             zIndex: 40,
             overflow: "hidden",
             transition: "width 200ms ease",
-            borderRight: "1px solid rgba(15,23,42,0.08)",
-            boxShadow: expanded ? "0 12px 40px rgba(15,23,42,0.12)" : "none",
+            borderRight: dark
+              ? "1px solid rgba(148,163,184,0.14)"
+              : "1px solid rgba(15,23,42,0.08)",
+            boxShadow: expanded
+              ? dark
+                ? "0 12px 40px rgba(0,0,0,0.5)"
+                : "0 12px 40px rgba(15,23,42,0.12)"
+              : "none",
           }}>
           {nav("desktop")}
         </Box>

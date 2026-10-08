@@ -1,44 +1,46 @@
 import { BrowserRouter } from "react-router-dom";
-import { ToastContainer } from "react-toastify";
-import { CheckCircle2, Info, TriangleAlert, XCircle } from "lucide-react";
+import { Toaster } from "sonner";
 import AppRouter from "./routes/AppRouter";
 import ErrorBoundary from "./components/common/ErrorBoundary";
+import RouteMeta from "./seo/RouteMeta";
+import ThemeModeProvider from "./theme/ThemeMode";
+import { useThemeMode } from "./theme/useThemeMode";
 
-/* Replaces react-toastify's stock glyphs with the same icon set the rest of
-   the panels use, so a toast looks like it belongs to the app. */
-const ToastIcon = ({ type }) => {
-  const common = { size: 18, strokeWidth: 2.2 };
+/* One toaster for every panel. Rendered outside the app tree, so the font
+   is set here to match the rest of the UI. The width goes here too: the
+   library writes it inline, where a stylesheet cannot reach it. It follows
+   the panel's light or dark mode. */
+function AppToaster() {
+  const { dark } = useThemeMode();
 
-  switch (type) {
-    case "success":
-      return <CheckCircle2 {...common} color="#0ca30c" />;
-    case "error":
-      return <XCircle {...common} color="#d03b3b" />;
-    case "warning":
-      return <TriangleAlert {...common} color="#b47c00" />;
-    default:
-      return <Info {...common} color="#2a78d6" />;
-  }
-};
+  return (
+    <Toaster
+      theme={dark ? "dark" : "light"}
+      position="top-right"
+      richColors
+      closeButton
+      visibleToasts={4}
+      toastOptions={{ duration: 3500 }}
+      style={{ fontFamily: "inherit", "--width": "380px" }}
+    />
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <ErrorBoundary>
-        <AppRouter />
-      </ErrorBoundary>
-      <ToastContainer
-        position="top-right"
-        autoClose={3500}
-        newestOnTop
-        closeOnClick
-        pauseOnHover
-        pauseOnFocusLoss={false}
-        draggable
-        hideProgressBar={false}
-        theme="light"
-        icon={ToastIcon}
-      />
+      {/* The MUI theme and light/dark mode. Inside the router because the
+          mode depends on the address: only the panels have a dark theme. */}
+      <ThemeModeProvider>
+        {/* Title, description and the index/noindex instruction per route */}
+        <RouteMeta />
+
+        <ErrorBoundary>
+          <AppRouter />
+        </ErrorBoundary>
+
+        <AppToaster />
+      </ThemeModeProvider>
     </BrowserRouter>
   );
 }

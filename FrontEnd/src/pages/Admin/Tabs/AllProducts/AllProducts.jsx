@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowUpDown,
@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
 import EntityAvatar from "../../../../components/common/EntityAvatar";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import EditProductDetails from "./EditProductDetails";
 import { getAllProducts, deleteProduct } from "../../../../api/services";
 import usePanelBasePath from "../../../../hooks/usePanelBasePath";
@@ -43,8 +45,8 @@ const Stat = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -114,7 +116,7 @@ const ProductCard = ({ product, onView, onEdit, onDelete }) => {
         )}
 
         {product.status === "INACTIVE" && (
-          <span className="absolute left-3 top-3 rounded-full bg-slate-900/80 px-2 py-0.5 text-[11px] font-semibold text-white">
+          <span className="absolute left-3 top-3 rounded-full bg-slate-900/80 px-2 py-0.5 dark:bg-black/70 text-[11px] font-semibold text-white">
             Inactive
           </span>
         )}
@@ -268,6 +270,11 @@ export default function AllProducts() {
 
     return sorted;
   }, [products, search, category, sort]);
+
+  const [pager, pagerTop] = usePagination(visible, {
+    pageSize: 12,
+    resetKey: `${search}|${category}|${sort}`,
+  });
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -436,8 +443,10 @@ export default function AllProducts() {
             of {products.length}
           </p>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visible.map((product) => (
+          <div
+            ref={pagerTop}
+            className="grid scroll-mt-24 grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {pager.pageItems.map((product) => (
               <ProductCard
                 key={product._id}
                 product={product}
@@ -447,6 +456,8 @@ export default function AllProducts() {
               />
             ))}
           </div>
+
+          <Pagination {...pager.controls} label="products" pageSizeOptions={[12, 24, 48]} />
         </>
       )}
 

@@ -16,11 +16,10 @@ import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { Link as RouterLink } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { deliveryLogin } from "../../../api/services";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import slide4 from "../../../assets/Slides/Slide4.png";
-import slide5 from "../../../assets/Slides/Slide5.png";
-import slide6 from "../../../assets/Slides/Slide6.png";
+import { toast } from "sonner";
+import slide4 from "../../../assets/Slides/Slide4.webp";
+import slide5 from "../../../assets/Slides/Slide5.webp";
+import slide6 from "../../../assets/Slides/Slide6.webp";
 
 const deliveryImages = [
   {

@@ -14,6 +14,14 @@ export const FONT_STACK = [
   "sans-serif",
 ].join(", ");
 
+const typography = {
+  fontFamily: FONT_STACK,
+  button: {
+    textTransform: "none",
+    fontWeight: 500,
+  },
+};
+
 export const theme = createTheme({
   palette: {
     primary: {
@@ -29,11 +37,44 @@ export const theme = createTheme({
     },
     divider: "#e5e7eb",
   },
-  typography: {
-    fontFamily: FONT_STACK,
-    button: {
-      textTransform: "none",
-      fontWeight: 500,
+  typography,
+});
+
+/* The dark counterpart, for the MUI pieces (dialogs, menus, drawers, text
+   fields, and most of the agent's Marketing Hub).
+
+   The page and card colours are the same two the Tailwind side uses
+   (DARK_PAGE and DARK_SURFACE in tailwind.theme.js), so a MUI dialog and a
+   Tailwind card sitting next to each other are the same colour. */
+export const DARK_PAGE = "#0b1220";
+export const DARK_SURFACE = "#111a2b";
+
+export const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+    primary: {
+      // The same brand copper as the light theme: white labels sit on it
+      main: "#C97A3A",
+    },
+    background: {
+      default: DARK_PAGE,
+      paper: DARK_SURFACE,
+    },
+    text: {
+      primary: "#e2e8f0",
+      secondary: "#94a3b8",
+    },
+    divider: "#2a3649",
+  },
+  typography,
+  components: {
+    /* In dark mode MUI lays a translucent white gradient over every Paper to
+       suggest elevation, which makes each dialog and menu a slightly
+       different grey from the cards around it. One surface colour instead. */
+    MuiPaper: {
+      styleOverrides: {
+        root: { backgroundImage: "none" },
+      },
     },
   },
 });

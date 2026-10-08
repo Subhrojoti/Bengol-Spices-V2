@@ -16,6 +16,8 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 const StoresList = ({
   stores,
@@ -34,6 +36,8 @@ const StoresList = ({
     activeFilter === "ALL"
       ? stores
       : stores.filter((s) => s.storeType === activeFilter);
+
+  const [pager, pagerTop] = usePagination(filteredStores, { resetKey: activeFilter });
 
   const handleFilterChange = (_, newFilter) => {
     if (newFilter !== null) setActiveFilter(newFilter);
@@ -58,7 +62,7 @@ const StoresList = ({
             onChange={handleFilterChange}
             size="small"
             sx={{
-              backgroundColor: "#fff",
+              backgroundColor: "var(--panel-surface, #fff)",
               borderRadius: 2,
               boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
               "& .MuiToggleButton-root": {
@@ -67,7 +71,7 @@ const StoresList = ({
                 fontSize: 12,
                 px: 1.5,
                 py: 0.5,
-                border: "1px solid #e5e7eb",
+                border: "1px solid var(--panel-line, #e5e7eb)",
                 color: "#6b7280",
                 "&.Mui-selected": {
                   backgroundColor: "#f59e0b",
@@ -101,7 +105,7 @@ const StoresList = ({
             color: showFilter ? "#fff" : "#f59e0b",
             backgroundColor: showFilter ? "#f59e0b" : "transparent",
             "&:hover": {
-              backgroundColor: showFilter ? "#b45309" : "#fef3c7",
+              backgroundColor: showFilter ? "#b45309" : "var(--panel-amber-tint, #fef3c7)",
               borderColor: "#f59e0b",
             },
           }}>
@@ -115,7 +119,7 @@ const StoresList = ({
                 height: 18,
                 fontSize: 10,
                 fontWeight: 700,
-                backgroundColor: "#fff",
+                backgroundColor: "var(--panel-surface, #fff)",
                 color: "#f59e0b",
               }}
             />
@@ -125,7 +129,9 @@ const StoresList = ({
 
       {/* STORES GRID */}
       <Box
+        ref={pagerTop}
         sx={{
+          scrollMarginTop: 96,
           display: "grid",
           gridTemplateColumns: {
             xs: "repeat(2, 1fr)",
@@ -134,7 +140,7 @@ const StoresList = ({
           },
           gap: { xs: 1.5, sm: 3 },
         }}>
-        {filteredStores.map((store) => (
+        {pager.pageItems.map((store) => (
           <Card
             key={store._id}
             onClick={() => onSelectStore(store)}
@@ -147,7 +153,7 @@ const StoresList = ({
               border:
                 selectedStore?._id === store._id
                   ? "2px solid #f59e0b"
-                  : "1px solid #eee",
+                  : "1px solid var(--panel-line, #eee)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
               transition: "0.3s",
               "&:hover": {
@@ -158,7 +164,7 @@ const StoresList = ({
             <Box
               sx={{
                 height: { xs: 110, sm: 150 },
-                backgroundColor: "#dcdcdc",
+                backgroundColor: "var(--panel-muted, #dcdcdc)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -267,7 +273,9 @@ const StoresList = ({
                   size="small"
                   sx={{
                     backgroundColor:
-                      store.storeType === "WHOLESALER" ? "#ddd6fe" : "#cffafe",
+                      store.storeType === "WHOLESALER"
+                        ? "var(--chip-violet, #ddd6fe)"
+                        : "var(--chip-cyan, #cffafe)",
                     fontWeight: 600,
                     fontSize: { xs: 9, sm: 11 },
                     height: { xs: 18, sm: 24 },
@@ -279,7 +287,9 @@ const StoresList = ({
                   size="small"
                   sx={{
                     backgroundColor:
-                      store.status === "ACTIVE" ? "#bbf7d0" : "#e2e8f0",
+                      store.status === "ACTIVE"
+                        ? "var(--chip-green, #bbf7d0)"
+                        : "var(--panel-muted, #e2e8f0)",
                     fontWeight: 600,
                     fontSize: { xs: 9, sm: 11 },
                     height: { xs: 18, sm: 24 },
@@ -345,6 +355,13 @@ const StoresList = ({
           </Card>
         ))}
       </Box>
+
+      <Pagination
+        {...pager.controls}
+        label="stores"
+        pageSizeOptions={[10, 20, 50]}
+        className="mt-5"
+      />
     </Box>
   );
 };

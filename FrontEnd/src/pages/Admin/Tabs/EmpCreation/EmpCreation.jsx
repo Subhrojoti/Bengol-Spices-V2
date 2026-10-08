@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@mui/material";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Check,
@@ -19,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import { PERMISSION_GROUPS, PERMISSION_KEYS } from "../../../../config/permissions";
 import {
   createEmployee,
@@ -493,6 +495,8 @@ const EmployeeList = () => {
     );
   }, [employees, search]);
 
+  const [pager, pagerTop] = usePagination(visible, { resetKey: search });
+
   const savePermissions = async (draft) => {
     if (!permissionTarget) return;
 
@@ -628,7 +632,8 @@ const EmployeeList = () => {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div ref={pagerTop} className="scroll-mt-24 overflow-x-auto">
             <table className="w-full min-w-[820px] text-left">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -642,7 +647,7 @@ const EmployeeList = () => {
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {visible.map((emp) => {
+                {pager.pageItems.map((emp) => {
                   const granted = PERMISSION_KEYS.filter(
                     (k) => emp.permissions?.[k] === true,
                   ).length;
@@ -725,6 +730,12 @@ const EmployeeList = () => {
               </tbody>
             </table>
           </div>
+          <Pagination
+            {...pager.controls}
+            label="employees"
+            className="border-t border-slate-200 px-4 py-3"
+          />
+          </>
         )}
       </Card>
 

@@ -11,8 +11,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { changePassword } from "../../../api/services";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "sonner";
 
 const PasswordReset = ({ open, onClose }) => {
   const initialFormState = {

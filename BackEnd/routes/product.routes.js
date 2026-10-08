@@ -8,7 +8,7 @@ import {
   getSinglePublicProduct,
   updateProduct,
 } from "../controllers/product.controller.js";
-import { protect } from "../middleware/auth.js";
+import { optionalAuth, protect } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
 import { checkPermission } from "../middleware/permission.js";
 
@@ -56,7 +56,8 @@ router.delete(
 );
 
 //Public Route
-router.get("/public/allProduct", getAllPublicProducts);
-router.get("/public/:productId", getSinglePublicProduct);
+// Open to everyone; trade prices are included only for a signed-in caller
+router.get("/public/allProduct", optionalAuth, getAllPublicProducts);
+router.get("/public/:productId", optionalAuth, getSinglePublicProduct);
 
 export default router;

@@ -1,7 +1,7 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { MapPin, ShieldCheck } from "lucide-react";
-import logo from "../../assets/logo/Logo_Final.png";
-import fssaiLogo from "../../assets/logo/FSSAI_Logo.png";
+import logo from "../../assets/logo/Logo_Final.webp";
+import fssaiLogo from "../../assets/logo/FSSAI_Logo.webp";
 
 const COLUMNS = [
   {
@@ -25,7 +25,6 @@ const COLUMNS = [
 ];
 
 const Footer = () => {
-  const navigate = useNavigate();
 
   /* 🔥 The old footer hardcoded "© 2025", so it was already a year out of
      date on the live site. */
@@ -38,13 +37,16 @@ const Footer = () => {
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1.1fr] lg:gap-8">
           {/* BRAND */}
           <div className="col-span-2 lg:col-span-1">
-            <button
-              onClick={() => navigate("/home")}
+            <Link
+              to="/"
               className="flex items-center gap-2.5"
               aria-label="Bengol Spices, home">
               <img
                 src={logo}
                 alt=""
+                width={40}
+                height={40}
+                loading="lazy"
                 className="h-10 w-10 rounded-lg bg-white/90 object-contain p-1"
               />
               <span className="text-left">
@@ -55,7 +57,7 @@ const Footer = () => {
                   Pvt. Ltd.
                 </span>
               </span>
-            </button>
+            </Link>
 
             <p className="mt-4 max-w-xs text-[13.5px] leading-relaxed text-white/50">
               Connecting importers, wholesalers, agents and retailers through a
@@ -69,6 +71,9 @@ const Footer = () => {
                 <img
                   src={fssaiLogo}
                   alt="FSSAI"
+                  width={240}
+                  height={180}
+                  loading="lazy"
                   className="h-full w-full object-contain"
                 />
               </span>

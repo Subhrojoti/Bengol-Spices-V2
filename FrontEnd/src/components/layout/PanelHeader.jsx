@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EntityAvatar from "../common/EntityAvatar";
+import ThemeToggle from "../common/ThemeToggle";
 
 /**
  * The panel's top bar.
@@ -101,6 +102,9 @@ const PanelHeader = ({
         className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 md:hidden">
         <Search size={17} />
       </button>
+
+      {/* LIGHT / DARK */}
+      <ThemeToggle />
 
       {/* BELL */}
       {bell && <div className="shrink-0">{bell}</div>}

@@ -1,0 +1,5 @@
+# Server credentials and the production API secrets - never committed
+deploy.env
+backend.env
+*.pem
+*.key

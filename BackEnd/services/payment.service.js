@@ -227,6 +227,22 @@ export const beginGatewayPayment = async (key, fields) => {
   return { ok: false, record: await GatewayPayment.findOne({ key }).lean() };
 };
 
+/* A Razorpay or QR payment that was taken but could not be applied, and
+   was not refunded automatically: an unexpected failure nobody retried, a
+   refund Razorpay refused, or an attempt that crashed part-way and has sat
+   in PROCESSING ever since. These are what the office has to look at. */
+const STALE_ATTEMPT_MS = 10 * 60 * 1000;
+
+export const paymentsNeedingAttention = () => ({
+  $or: [
+    { status: { $in: ["FAILED", "REFUND_FAILED"] } },
+    {
+      status: "PROCESSING",
+      updatedAt: { $lt: new Date(Date.now() - STALE_ATTEMPT_MS) },
+    },
+  ],
+});
+
 export const markGatewayPayment = (record, fields) =>
   GatewayPayment.updateOne({ _id: record._id }, { $set: fields });
 

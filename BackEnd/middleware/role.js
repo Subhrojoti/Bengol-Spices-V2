@@ -39,13 +39,18 @@ export const isAdminOrEmployee = (req, res, next) => {
   });
 };
 
+/* Nothing routes through this today; checkPermission("canManageProducts")
+   is what the product routes use. It is kept working rather than left as a
+   trap: it read req.user.canManageProducts, which is never set. The auth
+   middleware puts an employee's permissions on req.user.permissions, so the
+   old check was always undefined and every employee was refused. */
 export const isAdminOrAllowedEmployee = (req, res, next) => {
-  // console.log("DEBUG - User Role:", req.user.role);
-  // console.log("DEBUG - Can Manage:", req.user.canManageProducts);
-
   if (req.user.role === "ADMIN") return next();
 
-  if (req.user.role === "EMPLOYEE" && req.user.canManageProducts === true) {
+  if (
+    req.user.role === "EMPLOYEE" &&
+    req.user.permissions?.canManageProducts === true
+  ) {
     return next();
   }
 

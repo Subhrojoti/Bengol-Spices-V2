@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   BadgeCheck,
   Box,
@@ -26,10 +26,10 @@ import {
   BtnClearFormatting,
 } from "react-simple-wysiwyg";
 import { createProduct, getAllProducts } from "../../../../api/services";
+import { UOM_OPTIONS } from "../../../../utils/uom";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png"];
-const UOM_OPTIONS = ["kg", "gm", "ltr"];
 
 /* Matches what the Product schema actually marks required. The old form had
    this inverted: it required the three optional tier prices and let category,
@@ -432,15 +432,19 @@ export default function ProductCreation() {
                 />
               </Field>
 
-              <Field label="Unit of Measure" required error={show("uom")}>
+              <Field
+                label="Unit of Measure"
+                required
+                error={show("uom")}
+                hint={form.uom === "packet" ? "prices are per packet" : undefined}>
                 <select
                   value={form.uom}
                   onChange={set("uom")}
                   className={inputClass(show("uom"))}>
                   <option value="">Select</option>
                   {UOM_OPTIONS.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
+                    <option key={u.value} value={u.value}>
+                      {u.label}
                     </option>
                   ))}
                 </select>

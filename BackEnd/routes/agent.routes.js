@@ -9,11 +9,16 @@ import { upload } from "../middleware/upload.js";
 import { setPassword } from "../controllers/auth.controller.js";
 import { protect } from "../middleware/auth.js";
 import { isAgent } from "../middleware/role.js";
+import {
+  limitApplications,
+  limitPasswordRequests,
+} from "../middleware/rateLimit.js";
 
 const router = express.Router();
 
 router.post(
   "/apply",
+  limitApplications, // before the upload, so a refused request stores nothing
   (req, res, next) => {
     upload.fields([
       { name: "aadhaar", maxCount: 1 },
@@ -33,7 +38,7 @@ router.post(
   applyAgent,
 );
 
-router.post("/auth/set-password", setPassword);
+router.post("/auth/set-password", limitPasswordRequests, setPassword);
 
 // 🔒 AGENT ONLY ROUTE
 router.get(

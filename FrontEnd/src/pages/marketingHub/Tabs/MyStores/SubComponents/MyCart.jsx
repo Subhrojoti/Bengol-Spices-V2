@@ -25,8 +25,8 @@ import {
   verifyRazorpayInitialPayment,
 } from "../../../../../api/services";
 import { setLeftView } from "../../../../../redux/slices/myStoresUi/myStoresUi";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "sonner";
+import { loadRazorpay } from "../../../../../utils/razorpay";
 
 const MyCart = ({ onBack }) => {
   const dispatch = useDispatch();
@@ -121,7 +121,7 @@ const MyCart = ({ onBack }) => {
             width: 80,
             height: 80,
             borderRadius: "50%",
-            backgroundColor: "#f3f4f6",
+            backgroundColor: "var(--panel-subtle, #f3f4f6)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -232,6 +232,16 @@ const MyCart = ({ onBack }) => {
 
       /* -------- RAZORPAY FLOW -------- */
 
+      /* The checkout script is no longer loaded on every page. It is fetched
+         here, before any payment is created, so a blocked or offline script
+         stops the flow cleanly instead of failing after money has moved. */
+      if (!(await loadRazorpay())) {
+        toast.error(
+          "Could not open the payment window. Check your connection and try again.",
+        );
+        return;
+      }
+
       const razorpayRes = await createRazorpayInitialPayment(finalPaidAmount);
 
       if (!razorpayRes?.success) {
@@ -269,7 +279,7 @@ const MyCart = ({ onBack }) => {
         },
 
         theme: {
-          color: "#111827",
+          color: "var(--panel-ink, #111827)",
         },
       };
 
@@ -399,9 +409,9 @@ const MyCart = ({ onBack }) => {
         width={{ xs: "100%", md: 360 }}
         p={{ xs: 2, md: 4 }}
         sx={{
-          backgroundColor: "#f3f4f6",
-          borderLeft: { md: "1px solid #e5e7eb" },
-          borderTop: { xs: "1px solid #e5e7eb", md: "none" },
+          backgroundColor: "var(--panel-subtle, #f3f4f6)",
+          borderLeft: { md: "1px solid var(--panel-line, #e5e7eb)" },
+          borderTop: { xs: "1px solid var(--panel-line, #e5e7eb)", md: "none" },
         }}>
         <Typography variant="h5" fontWeight={700} mb={3}>
           Summary
@@ -415,7 +425,7 @@ const MyCart = ({ onBack }) => {
             position: { xs: "sticky", md: "static" },
             bottom: 0,
             zIndex: 10,
-            backgroundColor: "#f3f4f6",
+            backgroundColor: "var(--panel-subtle, #f3f4f6)",
           }}>
           <Typography>ITEMS {cartItems.length}</Typography>
           <Typography>₹{subtotal}</Typography>
@@ -455,7 +465,9 @@ const MyCart = ({ onBack }) => {
           variant="contained"
           sx={{
             height: 52,
-            backgroundColor: "#111827",
+            // near-black on white; a raised grey on the dark page, where
+            // near-black would disappear
+            backgroundColor: "var(--panel-strong, #111827)",
             fontWeight: 700,
           }}
           disabled={!cartItems.length || loading}

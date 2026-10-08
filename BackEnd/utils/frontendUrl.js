@@ -14,6 +14,9 @@
 
 const LIVE_SITE = "https://www.bengolspices.com";
 
+// Both names the live website can be opened under
+export const LIVE_ORIGINS = [LIVE_SITE, "https://bengolspices.com"];
+
 // A trailing slash would never match a browser's Origin header
 export const frontendOrigins = () =>
   (process.env.FRONTEND_URL || "")

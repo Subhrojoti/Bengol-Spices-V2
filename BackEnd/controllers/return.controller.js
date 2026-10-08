@@ -4,6 +4,7 @@ import Counter from "../models/Counter.js";
 import Agent from "../models/Agent.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import { createNotification } from "../services/notification.service.js";
+import mongoose from "mongoose";
 
 export const initiateReturn = async (req, res) => {
   try {
@@ -157,7 +158,10 @@ export const assignReturnPickup = async (req, res) => {
       });
     }
 
-    const partner = await DeliveryPartner.findById(partnerId);
+    // A malformed id used to reach the database and answer 500
+    const partner = mongoose.isValidObjectId(partnerId)
+      ? await DeliveryPartner.findById(partnerId)
+      : null;
 
     if (!partner || partner.status !== "ACTIVE") {
       return res.status(400).json({
@@ -184,11 +188,14 @@ export const assignReturnPickup = async (req, res) => {
       note: `Pickup assigned to ${partner.name}`,
     });
 
-    // 🔥 FIX: the equivalent order-delivery assignment (assignDeliveryPartner
-    // in order.controller.js) notifies the delivery partner of a new
-    // assignment — this return-pickup assignment never did, so a partner
-    // had no way to know a pickup was waiting for them unless they
-    // happened to check the app.
+    await returnRequest.save();
+
+    /* The partner is told only once the assignment is saved, and a
+       notification that cannot be written no longer fails the assignment.
+       It used to go out first: a failed save still told the partner about a
+       pickup that was not theirs, and a failed notification refused an
+       assignment that was otherwise fine. Same order as assigning a
+       delivery (assignDeliveryPartner in order.controller.js). */
     await createNotification({
       title: "New Return Pickup Assigned",
       message: `You have a new return pickup (${returnRequest.returnId}) assigned`,
@@ -197,9 +204,9 @@ export const assignReturnPickup = async (req, res) => {
       meta: {
         returnId: returnRequest.returnId,
       },
-    });
-
-    await returnRequest.save();
+    }).catch((notifyError) =>
+      console.error("RETURN PICKUP NOTIFICATION FAILED:", notifyError),
+    );
 
     return res.json({
       success: true,

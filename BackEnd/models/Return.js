@@ -155,5 +155,7 @@ const returnSchema = new mongoose.Schema(
    ============================= */
 
 returnSchema.index({ status: 1 });
+// One delivery partner's pickups, by status: the delivery app's return list
+returnSchema.index({ "pickup.partnerId": 1, status: 1 });
 
 export default mongoose.model("Return", returnSchema);

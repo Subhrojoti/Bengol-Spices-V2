@@ -14,12 +14,16 @@ import { createNotification } from "../services/notification.service.js";
 import { razorpayInstance } from "../config/razorpay.js";
 import Agent from "../models/Agent.js";
 import { updateTargetProgress } from "../services/target.service.js";
+import { TIER_FIELDS, getLocationOverrides } from "../utils/pricing.js";
+import { quantityWithUnit } from "../utils/uom.js";
+import { publish } from "../services/liveEvents.js";
 import mongoose from "mongoose";
 import GatewayPayment from "../models/GatewayPayment.js";
 import {
   applyDuePayment,
   beginGatewayPayment,
   markGatewayPayment,
+  paymentsNeedingAttention,
   refundGatewayPayment,
   respondToClaimedGatewayPayment,
   settleFailedGatewayPayment,
@@ -30,16 +34,18 @@ import {
    Returns the correct price for a product given the store's category.
    Falls back to item.unitPrice if no tiered price is set (backward safe).
    ============================= */
-const resolvePrice = (productDoc, storeType, fallbackUnitPrice) => {
+const resolvePrice = (productDoc, storeType, fallbackUnitPrice, override) => {
   if (!productDoc) return fallbackUnitPrice;
 
-  const priceMap = {
-    RETAILER: productDoc.retailerPrice,
-    WHOLESALER: productDoc.wholesalerPrice,
-    DISTRIBUTOR: productDoc.distributorPrice,
-  };
+  const field = TIER_FIELDS[storeType];
 
-  const tieredPrice = priceMap[storeType];
+  // A price the admin set for this territory wins over everything
+  const locationPrice = override?.[field];
+  if (typeof locationPrice === "number" && locationPrice > 0) {
+    return locationPrice;
+  }
+
+  const tieredPrice = productDoc[field];
 
   // ✅ Only use tiered price if it's set and valid (> 0)
   if (tieredPrice !== null && tieredPrice !== undefined && tieredPrice > 0) {
@@ -145,7 +151,7 @@ export const reserveStock = async (lines) => {
       return {
         ok: false,
         message: product
-          ? `Not enough stock for ${product.name}. Asked for ${line.quantity}, only ${product.stock} ${product.uom || "units"} left.`
+          ? `Not enough stock for ${product.name}. Asked for ${line.quantity}, only ${quantityWithUnit(product.stock, product.uom)} left.`
           : "A product in this order is no longer available",
       };
     }
@@ -209,6 +215,32 @@ export const placeOrder = async (req, res) => {
       });
     }
 
+    /* 🔒 A payment made online is only ever recorded by the two pay-first
+       flows (verifyPaymentAndPlaceOrder and verifyQrAndPlaceOrder), after
+       Razorpay itself has confirmed the money. They mark the request before
+       handing it to this function.
+
+       This route can also be called directly, and it used to take
+       paymentMode and the Razorpay reference on trust. A hand-made request
+       saying "ONLINE" with any made-up payment id placed an order recorded
+       as paid through the gateway: money the company never received, and
+       which the agent was never asked to hand over as cash. Called
+       directly, an order can only be paid in cash, which is all the web
+       panel and the agent app have ever sent here. */
+    if (
+      req.gatewayPaymentVerified !== true &&
+      (paymentMode !== "CASH" ||
+        razorpay_order_id ||
+        razorpay_payment_id ||
+        razorpay_signature)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Online and QR payments are confirmed on the payment screen. Pay from there, or choose Cash.",
+      });
+    }
+
     /* =============================
        STORE VALIDATION + OWNERSHIP
        ============================= */
@@ -228,6 +260,12 @@ export const placeOrder = async (req, res) => {
 
     // ✅ Capture storeType for price resolution below
     const storeType = store.storeType; // "RETAILER" | "WHOLESALER" | "DISTRIBUTOR"
+
+    // Location prices the admin set for this agent's territory, if any
+    const locationPrices = await getLocationOverrides(
+      agentId,
+      store.address?.state,
+    );
 
     /* =============================
        PRODUCT VALIDATION & AMOUNT
@@ -264,7 +302,10 @@ export const placeOrder = async (req, res) => {
       let productDoc = null;
 
       if (item.productId) {
-        productDoc = await Product.findById(item.productId);
+        // A malformed id used to reach the database and answer 500
+        productDoc = mongoose.isValidObjectId(item.productId)
+          ? await Product.findById(item.productId)
+          : null;
       } else {
         productDoc = await Product.findOne({
           name: item.name,
@@ -289,13 +330,24 @@ export const placeOrder = async (req, res) => {
       if (productDoc) {
         item.productId = productDoc._id;
         item.name = productDoc.name;
+        /* The unit the product is sold by now, not whatever the app had
+           when it last loaded the catalogue: a product the office has just
+           changed from "gm" to "packet" is recorded as packets straight
+           away, and a request made by hand cannot label the line anything
+           it likes. */
+        item.uom = productDoc.uom || item.uom;
         item.image = productDoc.images?.front?.url;
         item.gstPercentage = productDoc.gstPercentage || 0;
 
         // ✅ NEW: Auto-resolve correct price based on store type
         // If tiered price exists for this storeType → use it
         // If not → keep item.unitPrice as sent by agent (backward safe)
-        item.unitPrice = resolvePrice(productDoc, storeType, item.unitPrice);
+        item.unitPrice = resolvePrice(
+          productDoc,
+          storeType,
+          item.unitPrice,
+          locationPrices.get(String(productDoc._id)),
+        );
 
         stockLines.push({
           productId: productDoc._id,
@@ -370,15 +422,42 @@ export const placeOrder = async (req, res) => {
        ============================= */
 
     const currentYear = new Date().getFullYear();
+    const orderCounter = `order_${currentYear}`;
 
-    const counter = await Counter.findByIdAndUpdate(
-      `order_${currentYear}`,
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true },
-    );
+    const nextOrderId = async () => {
+      const counter = await Counter.findByIdAndUpdate(
+        orderCounter,
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true },
+      );
 
-    const serial = String(counter.seq).padStart(4, "0");
-    const orderId = `ORD${currentYear}-${serial}`;
+      return `ORD${currentYear}-${String(counter.seq).padStart(4, "0")}`;
+    };
+
+    /* The counter can fall behind the orders that exist (orders brought in
+       from a backup or by hand without their counter). Every number it then
+       hands out is already taken. Moved up to the newest order's number, so
+       the next one is free. */
+    const catchUpOrderCounter = async () => {
+      const newest = await Order.findOne({
+        orderId: { $regex: `^ORD${currentYear}-\\d+$` },
+      })
+        .sort({ createdAt: -1 })
+        .select("orderId")
+        .lean();
+
+      const serial = Number(newest?.orderId?.split("-")[1]);
+
+      if (Number.isFinite(serial)) {
+        await Counter.updateOne(
+          { _id: orderCounter },
+          { $max: { seq: serial } },
+          { upsert: true },
+        );
+      }
+    };
+
+    const orderId = await nextOrderId();
 
     /* =============================
        DUE DATE (7 DAYS)
@@ -391,7 +470,7 @@ export const placeOrder = async (req, res) => {
        CREATE ORDER
        ============================= */
 
-    const order = await Order.create({
+    const orderFields = {
       orderId,
       consumerId,
       store: store._id,
@@ -434,7 +513,31 @@ export const placeOrder = async (req, res) => {
         },
       ],
       paymentStatus: dueAmount === 0 ? "COMPLETED" : "PENDING",
-    });
+    };
+
+    /* A number that turns out to be taken is not a reason to refuse the
+       order. It used to be: the agent was shown the database's own
+       "E11000 duplicate key" error, and so was everyone after them until
+       the counter had crept past the numbers in use. The counter is caught
+       up and the order saved under the next free number instead. */
+    let order = null;
+
+    for (let attempt = 0; attempt < 5 && !order; attempt++) {
+      try {
+        order = await Order.create(orderFields);
+      } catch (createError) {
+        if (createError.code !== 11000 || !createError.keyPattern?.orderId) {
+          throw createError;
+        }
+
+        await catchUpOrderCounter();
+        orderFields.orderId = await nextOrderId();
+      }
+    }
+
+    if (!order) {
+      throw new Error("Could not give this order a number. Please try again.");
+    }
 
     /* The order now owns the stock it reserved. Releasing it on a later
        failure put stock back for goods that were still going out, and the
@@ -475,6 +578,27 @@ export const placeOrder = async (req, res) => {
         paymentError,
       );
     }
+
+    /* Tell every open admin/employee panel now, before the invoice PDF is
+       built and uploaded, which can take a few seconds */
+    publish(
+      "ORDER_PLACED",
+      {
+        order: {
+          orderId: order.orderId,
+          storeName: order.deliveryAddress.storeName,
+          city: order.deliveryAddress.city,
+          agentId: order.agentId,
+          totalAmount: order.totalAmount,
+          paidAmount: order.paidAmount,
+          dueAmount: order.dueAmount,
+          paymentMode: order.paymentMode,
+          itemCount: order.products.length,
+          createdAt: order.createdAt,
+        },
+      },
+      "canGetAllOrders",
+    );
 
     /* =============================
        Auto Invoice Generation
@@ -617,9 +741,13 @@ export const getAllOrders = async (req, res) => {
     // ✅ match using STRING orderId
     const orderIds = orders.map((order) => order.orderId);
 
+    // Only the two fields used below; each invoice also carries every line
+    // item and payment, which this list never shows
     const invoices = await Invoice.find({
       orderId: { $in: orderIds },
-    });
+    })
+      .select("orderId invoiceNumber")
+      .lean();
 
     const invoiceMap = {};
     invoices.forEach((inv) => {
@@ -697,16 +825,37 @@ export const confirmOrder = async (req, res) => {
       });
     }
 
-    order.status = "CONFIRMED";
-
-    order.statusHistory.push({
-      status: "CONFIRMED",
-      changedBy: {
-        id: req.user.employeeId || req.user.id,
-        role: req.user.role, // VERY IMPORTANT
+    /* One conditional update, not read → change → save. The save wrote
+       "CONFIRMED" over whatever the order had become in the meantime: an
+       order cancelled a moment earlier (its stock already handed back) came
+       back to life as confirmed, and two people confirming together both
+       succeeded and logged it twice. The filter only matches an order that
+       is still PLACED. */
+    const confirmed = await Order.findOneAndUpdate(
+      { _id: order._id, status: "PLACED" },
+      {
+        $set: { status: "CONFIRMED" },
+        $push: {
+          statusHistory: {
+            status: "CONFIRMED",
+            changedAt: new Date(),
+            changedBy: {
+              id: req.user.employeeId || req.user.id,
+              role: req.user.role, // VERY IMPORTANT
+            },
+          },
+        },
       },
-    });
-    await order.save();
+      { new: true },
+    );
+
+    if (!confirmed) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This order was changed a moment ago. Refresh to see where it stands.",
+      });
+    }
 
     res.json({
       success: true,
@@ -726,7 +875,8 @@ export const cancelOrder = async (req, res) => {
     const { orderId } = req.params;
     const { reason } = req.body;
 
-    if (!reason || reason.trim() === "") {
+    // Text only: anything else used to throw on .trim() and answer 500
+    if (typeof reason !== "string" || reason.trim() === "") {
       return res.status(400).json({
         success: false,
         message: "Cancellation reason is required",
@@ -775,34 +925,59 @@ export const cancelOrder = async (req, res) => {
       cancelledByName = admin?.name || "Admin";
     }
 
-    // 🔥 Update status
-    order.status = "CANCELLED";
+    /* The status checks above read the order, and this writes it back. Two
+       cancels arriving together - a double click, or a retried request -
+       both read a status that was not yet CANCELLED, both passed, and both
+       handed the same stock back, inventing inventory that does not exist.
 
-    order.cancellation = {
-      reason: reason.trim(),
-      cancelledAt: new Date(),
-      cancelledBy: {
-        id: cancelledById,
-        name: cancelledByName,
-        role: cancelledByRole,
+       The transition is now one atomic conditional update: the filter only
+       matches an order that is not already cancelled or delivered, so the
+       second request changes nothing and gets null back. Stock is released
+       only by the request that actually performed the transition. */
+    const cancelled = await Order.findOneAndUpdate(
+      { _id: order._id, status: { $nin: ["CANCELLED", "DELIVERED"] } },
+      {
+        $set: {
+          status: "CANCELLED",
+          cancellation: {
+            reason: reason.trim(),
+            cancelledAt: new Date(),
+            cancelledBy: {
+              id: cancelledById,
+              name: cancelledByName,
+              role: cancelledByRole,
+            },
+          },
+        },
+        $push: {
+          statusHistory: {
+            status: "CANCELLED",
+            // Set here rather than leaning on the schema default, so the
+            // entry carries a time whatever the driver does with defaults
+            // on a $push.
+            changedAt: new Date(),
+            changedBy: {
+              id: cancelledById,
+              role: cancelledByRole,
+            },
+          },
+        },
       },
-    };
+      { new: true },
+    );
 
-    order.statusHistory.push({
-      status: "CANCELLED",
-      changedBy: {
-        id: cancelledById,
-        role: cancelledByRole,
-      },
-    });
-
-    await order.save();
+    // Another request cancelled it (or it was delivered) in between
+    if (!cancelled) {
+      return res.status(400).json({
+        success: false,
+        message: "Order is already cancelled",
+      });
+    }
 
     /* Goods never left, so the stock this order was holding goes back.
-       Released only after the cancellation is saved: an order that failed to
-       save must not hand stock back, or it would be sold twice. The guards
-       above already reject a second cancel, so this cannot double-restore. */
-    const linesToReturn = (order.products || [])
+       Released only after the cancellation is recorded: an order that failed
+       to save must not hand stock back, or it would be sold twice. */
+    const linesToReturn = (cancelled.products || [])
       .filter((item) => item.productId && Number(item.quantity) > 0)
       .map((item) => ({
         productId: item.productId,
@@ -861,7 +1036,10 @@ export const assignDeliveryPartner = async (req, res) => {
       });
     }
 
-    const partner = await DeliveryPartner.findById(partnerId);
+    // A malformed id used to reach the database and answer 500
+    const partner = mongoose.isValidObjectId(partnerId)
+      ? await DeliveryPartner.findById(partnerId)
+      : null;
 
     if (!partner || partner.status !== "ACTIVE") {
       return res.status(404).json({
@@ -870,31 +1048,58 @@ export const assignDeliveryPartner = async (req, res) => {
       });
     }
     // Check if already assigned to this partner
-    if (order.delivery?.partnerId?.toString() === partnerId) {
+    if (order.delivery?.partnerId?.toString() === String(partner._id)) {
       return res.status(400).json({
         success: false,
         message: "This partner is already assigned",
       });
     }
 
-    // ✅ Assign delivery
-    order.delivery = {
-      partnerId: partner._id,
-      assignedBy: req.user._id || req.user.id, // 🔥 FIXED (generic)
-      assignedAt: new Date(),
-    };
-
-    order.status = "ASSIGNED";
-
-    order.statusHistory.push({
-      status: "ASSIGNED",
-      changedBy: {
-        id: req.user._id || req.user.id,
-        role: req.user.role,
+    /* ✅ Assign delivery, as one conditional update rather than read →
+       change → save. The save wrote "ASSIGNED" over whatever the order had
+       become since it was read, so an order cancelled in that moment (its
+       stock already handed back) went out for delivery anyway. The filter
+       only matches an order that can still be assigned. */
+    const assigned = await Order.findOneAndUpdate(
+      { _id: order._id, status: { $in: ["CONFIRMED", "ASSIGNED"] } },
+      {
+        $set: {
+          status: "ASSIGNED",
+          // The whole block, as before: a new partner starts with a clean
+          // delivery-code attempt count
+          delivery: {
+            partnerId: partner._id,
+            assignedBy: req.user._id || req.user.id, // 🔥 FIXED (generic)
+            assignedAt: new Date(),
+            codeAttempts: 0,
+          },
+        },
+        $push: {
+          statusHistory: {
+            status: "ASSIGNED",
+            changedAt: new Date(),
+            changedBy: {
+              id: req.user._id || req.user.id,
+              role: req.user.role,
+            },
+          },
+        },
       },
-    });
+      { new: true },
+    );
 
-    // ✅ FIXED notification
+    if (!assigned) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This order was changed a moment ago. Refresh to see where it stands.",
+      });
+    }
+
+    /* Told only once the assignment is saved (it used to go out first, so a
+       failed save still told the partner about an order that was not
+       theirs). A notification that cannot be written must not undo or fail
+       the assignment: the order is already in the partner's list. */
     await createNotification({
       title: "New Order Assigned",
       message: `You have a new order (${order.orderId}) assigned`,
@@ -903,9 +1108,9 @@ export const assignDeliveryPartner = async (req, res) => {
       meta: {
         orderId: order.orderId,
       },
-    });
-
-    await order.save();
+    }).catch((notifyError) =>
+      console.error("ASSIGNMENT NOTIFICATION FAILED:", notifyError),
+    );
 
     res.json({
       success: true,
@@ -1009,25 +1214,76 @@ export const updateDeliveryStatus = async (req, res) => {
         });
       }
 
-      if (!codesMatch(deliveryCode, store.deliveryCode)) {
-        // Counted atomically, so parallel guesses cannot slip past the limit
-        const counted = await Order.findOneAndUpdate(
+      /* 🔒 Every try is taken BEFORE the code is compared, in one
+         conditional update that only succeeds while fewer than five tries
+         are on record and no lock is running.
+
+         The count used to be added after a wrong guess. Many guesses sent
+         at the same instant all read "not locked yet", were all compared,
+         and only then counted, so a script could try hundreds of codes in
+         every 15-minute window instead of five. Now the sixth request in a
+         burst finds the five tries already taken and is turned away without
+         its code ever being looked at. */
+      const lockMinutes = Math.round(CODE_LOCK_MS / 60000);
+      const lockNow = () =>
+        Order.updateOne(
           { _id: order._id },
-          { $inc: { "delivery.codeAttempts": 1 } },
-          { new: true },
+          {
+            $set: {
+              "delivery.codeAttempts": 0,
+              "delivery.codeLockedUntil": new Date(Date.now() + CODE_LOCK_MS),
+            },
+          },
         );
-        const attempts = counted?.delivery?.codeAttempts || 0;
+
+      const attempt = await Order.findOneAndUpdate(
+        {
+          _id: order._id,
+          $and: [
+            {
+              $or: [
+                { "delivery.codeLockedUntil": { $exists: false } },
+                { "delivery.codeLockedUntil": null },
+                { "delivery.codeLockedUntil": { $lte: new Date() } },
+              ],
+            },
+            {
+              $or: [
+                { "delivery.codeAttempts": { $exists: false } },
+                { "delivery.codeAttempts": null },
+                { "delivery.codeAttempts": { $lt: MAX_CODE_ATTEMPTS } },
+              ],
+            },
+          ],
+        },
+        { $inc: { "delivery.codeAttempts": 1 } },
+        { new: true },
+      );
+
+      if (!attempt) {
+        /* Five tries are on record with no lock running: the request that
+           took the fifth never got to start the lock (it was cut off).
+           Started here, so the count cannot stay stuck at five for good. */
+        const current = await Order.findById(order._id)
+          .select("delivery.codeLockedUntil")
+          .lean();
+        const running =
+          current?.delivery?.codeLockedUntil &&
+          new Date(current.delivery.codeLockedUntil) > new Date();
+
+        if (!running) await lockNow();
+
+        return res.status(429).json({
+          success: false,
+          message: `Too many wrong delivery codes. Confirming this delivery is locked for up to ${lockMinutes} minutes. Try again later, or contact the office.`,
+        });
+      }
+
+      if (!codesMatch(deliveryCode, store.deliveryCode)) {
+        const attempts = attempt.delivery?.codeAttempts || 0;
 
         if (attempts >= MAX_CODE_ATTEMPTS) {
-          await Order.updateOne(
-            { _id: order._id },
-            {
-              $set: {
-                "delivery.codeAttempts": 0,
-                "delivery.codeLockedUntil": new Date(Date.now() + CODE_LOCK_MS),
-              },
-            },
-          );
+          await lockNow();
 
           return res.status(429).json({
             success: false,
@@ -1043,22 +1299,52 @@ export const updateDeliveryStatus = async (req, res) => {
         });
       }
 
-      order.delivery.codeAttempts = 0;
-      order.delivery.codeLockedUntil = undefined;
-      order.delivery.deliveredAt = new Date();
     }
 
-    order.status = status;
-
-    order.statusHistory.push({
-      status,
-      changedBy: {
-        id: req.user.id,
-        role: req.user.role,
+    /* One conditional update, not read → change → save. The save wrote the
+       new status over whatever the order had become since it was read: an
+       order the office cancelled in that moment (its stock already handed
+       back) was marked shipped or delivered anyway, and a double tap logged
+       the same step twice. The filter only matches an order that is still
+       at the step this request started from, with this partner. */
+    const now = new Date();
+    const update = {
+      $set: { status },
+      $push: {
+        statusHistory: {
+          status,
+          changedAt: now,
+          changedBy: {
+            id: req.user.id,
+            role: req.user.role,
+          },
+        },
       },
-    });
+    };
 
-    await order.save();
+    if (status === "DELIVERED") {
+      update.$set["delivery.codeAttempts"] = 0;
+      update.$set["delivery.deliveredAt"] = now;
+      update.$unset = { "delivery.codeLockedUntil": "" };
+    }
+
+    const moved = await Order.findOneAndUpdate(
+      {
+        _id: order._id,
+        status: order.status,
+        "delivery.partnerId": order.delivery.partnerId,
+      },
+      update,
+      { new: true },
+    );
+
+    if (!moved) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This order was changed a moment ago. Refresh to see where it stands.",
+      });
+    }
 
     res.json({
       success: true,
@@ -1202,9 +1488,23 @@ export const getCompletePaymentSummary = async (req, res) => {
 
     // 📅 Date filter (order created date)
     if (fromDate || toDate) {
+      const from = fromDate ? new Date(fromDate) : null;
+      const to = toDate ? new Date(toDate) : null;
+
+      // Text that is not a date reached the database and answered 500
+      if (
+        (from && Number.isNaN(from.getTime())) ||
+        (to && Number.isNaN(to.getTime()))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "fromDate and toDate must be valid dates",
+        });
+      }
+
       orderFilter.createdAt = {};
-      if (fromDate) orderFilter.createdAt.$gte = new Date(fromDate);
-      if (toDate) orderFilter.createdAt.$lte = new Date(toDate);
+      if (from) orderFilter.createdAt.$gte = from;
+      if (to) orderFilter.createdAt.$lte = to;
     }
 
     /* =============================
@@ -1728,6 +2028,9 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
       razorpay_signature,
     };
 
+    // Razorpay has confirmed this payment above; see the check in placeOrder
+    req.gatewayPaymentVerified = true;
+
     const response = await placeOrderFor(req);
 
     /* The money has been taken but no order exists. Used to be a log line
@@ -1841,6 +2144,13 @@ export const createDuePaymentQr = async (req, res) => {
         success: false,
         message: "You are not allowed to collect payment for this order",
       });
+    }
+    // Refused before a QR is shown, as the online checkout already is. The
+    // customer used to pay first and be refunded afterwards.
+    if (order.status === "CANCELLED") {
+      return res
+        .status(400)
+        .json({ success: false, message: "This order was cancelled" });
     }
     if (order.dueAmount <= 0) {
       return res
@@ -1996,6 +2306,9 @@ export const verifyQrAndPlaceOrder = async (req, res) => {
       razorpay_payment_id: paymentIds[0] ?? null,
     };
 
+    // Razorpay has confirmed this QR was paid above; see the check in placeOrder
+    req.gatewayPaymentVerified = true;
+
     const response = await placeOrderFor(req);
 
     if (!response.data.success) {
@@ -2148,17 +2461,9 @@ export const verifyDueQrPayment = async (req, res) => {
    refund Razorpay refused, or an attempt that crashed part-way.
    ============================================================ */
 
-const STALE_ATTEMPT_MS = 10 * 60 * 1000;
-
-const needsAttentionFilter = () => ({
-  $or: [
-    { status: { $in: ["FAILED", "REFUND_FAILED"] } },
-    {
-      status: "PROCESSING",
-      updatedAt: { $lt: new Date(Date.now() - STALE_ATTEMPT_MS) },
-    },
-  ],
-});
+// The rule itself lives with the payment code, so the dashboard's count of
+// these is always the same list
+const needsAttentionFilter = paymentsNeedingAttention;
 
 // List them (Admin / Employee with canSeePaymentInfo)
 export const getPaymentIssues = async (req, res) => {

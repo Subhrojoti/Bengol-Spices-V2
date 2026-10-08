@@ -12,6 +12,7 @@ import {
   sendDeliveryPartnerRejectionMail,
 } from "../utils/email.js";
 import { getAdminDashboard } from "../services/dashboard.service.js";
+import { getAttention } from "../services/attention.service.js";
 
 /* The status change is saved before the email goes out. When the email
    failed, the admin used to get an error for a change that had already
@@ -200,6 +201,27 @@ export const getDashboardSummary = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch admin dashboard",
+    });
+  }
+};
+
+// WHAT IS WAITING ON THE OFFICE (ADMIN / EMPLOYEE with dashboard access)
+export const getAttentionSummary = async (req, res) => {
+  try {
+    const data = await getAttention(req.user);
+
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      success: true,
+      data,
+      meta: { generatedAt: new Date() },
+    });
+  } catch (error) {
+    console.error("ATTENTION SUMMARY ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to load what needs attention",
     });
   }
 };

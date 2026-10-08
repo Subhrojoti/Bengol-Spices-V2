@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Banknote,
@@ -19,6 +19,8 @@ import {
   getAllProducts,
   getAllTargets,
 } from "../../../../../api/services";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 /* The server forces a 24-hour window from the start time. */
 const WINDOW_HOURS = 24;
@@ -131,6 +133,8 @@ export default function CreateTarget() {
   const [targets, setTargets] = useState([]);
   const [listStatus, setListStatus] = useState("loading");
   const [saving, setSaving] = useState(false);
+
+  const [targetPager, targetPagerTop] = usePagination(targets);
 
   const loadTargets = useCallback(async () => {
     setListStatus("loading");
@@ -312,8 +316,8 @@ export default function CreateTarget() {
                           : "border-slate-200 bg-white hover:border-slate-300"
                       }`}>
                       <span
-                        className="mb-2 grid h-8 w-8 place-items-center rounded-lg"
-                        style={{ backgroundColor: t.tint, color: t.ink }}>
+                        className="tint-chip mb-2 grid h-8 w-8 place-items-center rounded-lg"
+                        style={{ "--tint": t.tint, "--ink": t.ink }}>
                         <Icon size={15} />
                       </span>
                       <p className="text-[13.5px] font-semibold text-slate-900">
@@ -507,7 +511,9 @@ export default function CreateTarget() {
             </button>
           </div>
 
-          <div className="max-h-[30rem] overflow-y-auto p-4 lg:max-h-[calc(100vh-18rem)]">
+          <div
+            ref={targetPagerTop}
+            className="scroll-mt-24 max-h-[30rem] overflow-y-auto p-4 lg:max-h-[calc(100vh-18rem)]">
             {listStatus === "loading" ? (
               <div className="animate-pulse space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -539,7 +545,7 @@ export default function CreateTarget() {
               </div>
             ) : (
               <div className="space-y-3">
-                {targets.map((t) => {
+                {targetPager.pageItems.map((t) => {
                   const meta =
                     TYPES.find((x) => x.key === t.type) || TYPES[0];
                   const Icon = meta.icon;
@@ -555,8 +561,8 @@ export default function CreateTarget() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2.5">
                           <span
-                            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
-                            style={{ backgroundColor: meta.tint, color: meta.ink }}>
+                            className="tint-chip grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+                            style={{ "--tint": meta.tint, "--ink": meta.ink }}>
                             <Icon size={14} />
                           </span>
                           <div className="min-w-0">
@@ -614,6 +620,15 @@ export default function CreateTarget() {
               </div>
             )}
           </div>
+
+          {listStatus === "ready" && (
+            <Pagination
+              {...targetPager.controls}
+              compact
+              label="targets"
+              className="border-t border-slate-100 px-4 py-3"
+            />
+          )}
         </Card>
       </div>
     </div>

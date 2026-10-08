@@ -40,7 +40,12 @@ export const limitLoginAttempts = (field) => (req, res, next) => {
   // Nothing to key on: let the controller reject the request as usual
   if (typeof raw !== "string" || !raw.trim()) return next();
 
-  const key = `${req.baseUrl}${req.path}:${raw.trim().toUpperCase()}`;
+  /* Folded to one case both ways. A few characters change under only one
+     of them (the Kelvin sign "K" lower-cases to "k" but upper-cases to
+     itself), so an email the login treats as the same account could be
+     written in a way this counted separately, each spelling with its own
+     ten tries. */
+  const key = `${req.baseUrl}${req.path}:${raw.trim().toLowerCase().toUpperCase()}`;
   const now = Date.now();
   const entry = attempts.get(key);
 

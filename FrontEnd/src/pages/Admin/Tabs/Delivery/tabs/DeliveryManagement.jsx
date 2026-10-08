@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowRight,
@@ -21,6 +21,8 @@ import {
 import StatusPill from "../../../../../components/common/StatusPill";
 import EntityAvatar from "../../../../../components/common/EntityAvatar";
 import ConfirmDialog from "../../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 import {
   getActiveOrders,
   getAllDeliveryPartners,
@@ -49,8 +51,8 @@ const Stat = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -230,6 +232,13 @@ export default function DeliveryManagement() {
               .some((f) => String(f).toLowerCase().includes(term)),
       );
   }, [partners, stateFilter, partnerSearch]);
+
+  const [queuePager, queuePagerTop] = usePagination(filteredItems, {
+    resetKey: `${queue}|${queueSearch}`,
+  });
+  const [partnerPager, partnerPagerTop] = usePagination(filteredPartners, {
+    resetKey: `${stateFilter}|${partnerSearch}`,
+  });
 
   const stats = useMemo(
     () => ({
@@ -485,8 +494,9 @@ export default function DeliveryManagement() {
               }
             />
           ) : (
-            <div className="space-y-2.5 p-4">
-              {filteredItems.map((item) => {
+            <>
+            <div ref={queuePagerTop} className="scroll-mt-24 space-y-2.5 p-4">
+              {queuePager.pageItems.map((item) => {
                 const active = item._id === selectedId;
                 const partner = partnerById[assignedPartnerId(item)];
                 const ready = canAssign(item);
@@ -611,6 +621,13 @@ export default function DeliveryManagement() {
                 );
               })}
             </div>
+            <Pagination
+              {...queuePager.controls}
+              compact
+              label={isOrders ? "orders" : "returns"}
+              className="border-t border-slate-100 px-4 py-3"
+            />
+            </>
           )}
         </Card>
 
@@ -669,8 +686,11 @@ export default function DeliveryManagement() {
                 }
               />
             ) : (
-              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                {filteredPartners.map((partner) => {
+              <>
+              <div
+                ref={partnerPagerTop}
+                className="grid scroll-mt-24 grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                {partnerPager.pageItems.map((partner) => {
                   const isCurrent = currentPartnerId === partner._id;
                   const partnerActive = partner.status === "ACTIVE";
                   const busy = assigningId === partner._id;
@@ -756,6 +776,13 @@ export default function DeliveryManagement() {
                   );
                 })}
               </div>
+              <Pagination
+                {...partnerPager.controls}
+                compact
+                label="partners"
+                className="border-t border-slate-100 px-4 py-3"
+              />
+              </>
             )}
           </Card>
         </div>

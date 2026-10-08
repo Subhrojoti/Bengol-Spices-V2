@@ -12,6 +12,8 @@ import {
   Users,
 } from "lucide-react";
 import { getTargetPerformance } from "../../../../../api/services";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 const TYPE_META = {
   STORE_CREATION: {
@@ -70,8 +72,8 @@ const Stat = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -102,7 +104,8 @@ const Ring = ({ percent, size = 54 }) => {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#e2e8f0"
+          stroke="currentColor"
+          className="text-slate-200"
           strokeWidth={stroke}
         />
         <circle
@@ -137,6 +140,24 @@ const Skeleton = () => (
     ))}
   </div>
 );
+
+/* One target's agents, a page at a time. Each target card pages on its own. */
+const PagedAgents = ({ agents, children }) => {
+  const [pager, pagerTop] = usePagination(agents);
+
+  return (
+    <>
+      <div ref={pagerTop} className="scroll-mt-24 divide-y divide-slate-100">
+        {pager.pageItems.map(children)}
+      </div>
+      <Pagination
+        {...pager.controls}
+        label="agents"
+        className="border-t border-slate-100 px-5 py-3"
+      />
+    </>
+  );
+};
 
 /* ------------------------------------------------------------------ */
 
@@ -218,6 +239,8 @@ export default function TargetPerformance() {
     }),
     [rows, targets],
   );
+
+  const [pager, pagerTop] = usePagination(targets, { pageSize: 5 });
 
   if (status === "loading") return <Skeleton />;
 
@@ -307,7 +330,8 @@ export default function TargetPerformance() {
       </div>
 
       {/* ===== PER TARGET ===== */}
-      {targets.map((target) => {
+      <div ref={pagerTop} className="scroll-mt-24 space-y-4">
+      {pager.pageItems.map((target) => {
         const meta = TYPE_META[target.type] || TYPE_META.STORE_CREATION;
         const Icon = meta.icon;
         const goal = n(target.targetValue);
@@ -316,8 +340,8 @@ export default function TargetPerformance() {
           <Card key={target._id} className="overflow-hidden">
             <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-5">
               <span
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-                style={{ backgroundColor: meta.tint, color: meta.ink }}>
+                className="tint-chip grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                style={{ "--tint": meta.tint, "--ink": meta.ink }}>
                 <Icon size={18} />
               </span>
 
@@ -354,8 +378,8 @@ export default function TargetPerformance() {
               {dayTime(target.startDate)} → {dayTime(target.endDate)}
             </p>
 
-            <div className="divide-y divide-slate-100">
-              {target.agents.map((agent) => (
+            <PagedAgents agents={target.agents}>
+              {(agent) => (
                 <div
                   key={agent.agentId}
                   className="flex items-center gap-4 px-5 py-3.5 transition hover:bg-slate-50/70">
@@ -403,11 +427,14 @@ export default function TargetPerformance() {
                     <p className="text-[12px] text-slate-400">earned</p>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </PagedAgents>
           </Card>
         );
       })}
+      </div>
+
+      <Pagination {...pager.controls} label="targets" pageSizeOptions={[5, 10, 25]} />
     </div>
   );
 }

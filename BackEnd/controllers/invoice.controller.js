@@ -1,6 +1,11 @@
 import Invoice from "../models/Invoice.js";
 import Order from "../models/Order.js";
 import { invoiceFileName } from "../utils/invoiceNumber.js";
+import { isGuessableInvoiceUrl } from "../utils/uploadPdf.js";
+import {
+  createInvoiceFromOrder,
+  regenerateInvoicePDF,
+} from "../services/invoice.service.js";
 
 /* 🔒 FIX: any logged-in account could download any invoice, and order IDs
    run in sequence (ORD2026-0001, -0002…), so every store's name, phone,
@@ -33,10 +38,42 @@ export const downloadInvoice = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    const invoice = await Invoice.findOne({ orderId });
+    let invoice = await Invoice.findOne({ orderId });
+
+    /* An order is saved first and its invoice is made straight after. When
+       that second step failed (the file store did not answer, the server
+       was restarted at that moment) the order was left with no invoice for
+       good, or with an invoice that had no file, and this address could
+       only ever say "not found" or fail. Nothing made it again. It is now
+       put right the first time somebody asks for it. */
+    /* Also made again when its file is still stored under the old name
+       that could be guessed from the invoice number (utils/uploadPdf.js):
+       the first download moves it. If that fails, the existing file is
+       still handed over, so nobody is refused their invoice over it. */
+    if (
+      !invoice ||
+      !invoice.pdfUrl ||
+      isGuessableInvoiceUrl(invoice.pdfUrl, invoice.invoiceNumber)
+    ) {
+      const order = await Order.findOne({ orderId });
+
+      if (order && !invoice) {
+        await createInvoiceFromOrder(order);
+        invoice = await Invoice.findOne({ orderId });
+      } else if (order) {
+        await regenerateInvoicePDF(invoice, order);
+      }
+    }
 
     if (!invoice) {
       return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    if (!invoice.pdfUrl) {
+      return res.status(503).json({
+        message:
+          "The invoice file could not be prepared just now. Please try again in a moment.",
+      });
     }
 
     // 🔥 FIX: setting Content-Disposition here did nothing — a redirect
@@ -55,6 +92,7 @@ export const downloadInvoice = async (req, res) => {
 
     return res.redirect(downloadUrl);
   } catch (error) {
+    console.error("INVOICE DOWNLOAD ERROR:", error);
     res.status(500).json({ message: "Download failed" });
   }
 };

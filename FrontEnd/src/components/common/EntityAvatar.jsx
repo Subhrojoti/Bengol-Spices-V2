@@ -79,11 +79,9 @@ const EntityAvatar = ({
   return (
     <span
       aria-hidden="true"
-      style={
-        fallback ? undefined : { backgroundColor: tint.bg, color: tint.ink }
-      }
+      style={fallback ? undefined : { "--tint": tint.bg, "--ink": tint.ink }}
       className={`grid shrink-0 place-items-center text-[14px] font-bold ${
-        fallback ? "bg-slate-100 text-slate-300" : ""
+        fallback ? "bg-slate-100 text-slate-300" : "tint-chip"
       } ${bordered ? "border border-slate-200/60" : ""} ${className}`}>
       {fallback || initials || <Store size={17} />}
     </span>

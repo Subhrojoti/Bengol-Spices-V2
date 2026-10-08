@@ -16,10 +16,16 @@ import { protect } from "../middleware/auth.js";
 import { isDeliveryPartner } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
 import { limitLoginAttempts } from "../middleware/loginLimiter.js";
+import { limitApplications } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 
-router.post("/register", upload.single("document"), registerDeliveryPartner);
+router.post(
+  "/register",
+  limitApplications, // before the upload, so a refused request stores nothing
+  upload.single("document"),
+  registerDeliveryPartner,
+);
 
 router.post("/login", limitLoginAttempts("phone"), loginDeliveryPartner);
 router.post("/logout", protect, isDeliveryPartner, logoutDeliveryPartner);

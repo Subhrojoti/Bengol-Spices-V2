@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { fetchEmployeeAccessState } from "../api/services";
 import { evaluateAccess, permissionSignature } from "../utils/accessSync";
 
@@ -60,7 +60,7 @@ const useAccessSync = ({ enabled, permissions, onSignOut }) => {
       }
 
       firedRef.current = true;
-      toast.info(verdict.message, { autoClose: SIGN_OUT_DELAY_MS });
+      toast.info(verdict.message, { duration: SIGN_OUT_DELAY_MS });
       timer = setTimeout(() => signOutRef.current?.(), SIGN_OUT_DELAY_MS);
     };
 

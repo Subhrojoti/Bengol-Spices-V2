@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Avatar, Typography } from "@mui/material";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import InventoryIcon from "@mui/icons-material/Inventory";
@@ -6,6 +6,8 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import PhoneIcon from "@mui/icons-material/Phone";
 import OrderRow from "./OrderRow";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 const StoreAccordion = ({ store, onPayNow }) => {
   const [open, setOpen] = useState(false);
@@ -19,6 +21,13 @@ const StoreAccordion = ({ store, onPayNow }) => {
     address,
     phone = [],
   } = store || {};
+
+  // A store's settled orders keep growing, so they are shown a page at a time
+  const live = useMemo(
+    () => (orders || []).filter((order) => order.status !== "CANCELLED"),
+    [orders],
+  );
+  const [pager, pagerTop] = usePagination(live);
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden mb-4 bg-white">
@@ -94,16 +103,18 @@ const StoreAccordion = ({ store, onPayNow }) => {
           open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
         }`}>
         <div className="overflow-hidden">
-          <div className="border-t bg-gray-50 px-4 py-3 space-y-2">
-            {orders
-              .filter((order) => order.status !== "CANCELLED")
-              .map((order) => (
-                <OrderRow
-                  key={order.orderNo}
-                  order={order}
-                  onPayNow={onPayNow}
-                />
-              ))}
+          <div
+            ref={pagerTop}
+            className="scroll-mt-24 border-t bg-gray-50 px-4 py-3 space-y-2">
+            {pager.pageItems.map((order) => (
+              <OrderRow
+                key={order.orderNo}
+                order={order}
+                onPayNow={onPayNow}
+              />
+            ))}
+
+            <Pagination {...pager.controls} label="orders" className="pt-1" />
           </div>
         </div>
       </div>

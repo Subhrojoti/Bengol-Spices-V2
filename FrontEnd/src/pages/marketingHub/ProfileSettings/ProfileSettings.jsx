@@ -64,7 +64,8 @@ const ProfileSettings = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "linear-gradient(90deg, #e3f2fd 0%, #fff8e1 100%)",
+            background:
+              "var(--panel-banner, linear-gradient(90deg, #e3f2fd 0%, #fff8e1 100%))",
           }}>
           {/* Left: Back + Profile */}
           <Box display="flex" alignItems="center" gap={2}>
@@ -73,7 +74,7 @@ const ProfileSettings = () => {
               onClick={() => navigate(-1)}
               size="small"
               sx={{
-                bgcolor: "white",
+                bgcolor: "var(--panel-surface, white)",
                 border: "1px solid",
                 borderColor: "divider",
               }}>

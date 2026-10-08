@@ -6,10 +6,13 @@ import {
 } from "../../../../../api/services";
 import StoreAccordion from "../components/StoreAccordian";
 import PaymentModal from "../components/PaymentModal";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 const OverDuePayments = () => {
   const [stores, setStores] = useState([]);
+  const [pager, pagerTop] = usePagination(stores);
 
   const [openPaymentModal, setOpenPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -153,15 +156,17 @@ const OverDuePayments = () => {
           </p>
         </div>
       ) : (
-        <>
-          {stores.map((store, index) => (
+        <div ref={pagerTop} className="scroll-mt-24">
+          {pager.pageItems.map((store, index) => (
             <StoreAccordion
-              key={index}
+              key={store._id || store.consumerId || index}
               store={store}
               onPayNow={handleOpenPayment}
             />
           ))}
-        </>
+
+          <Pagination {...pager.controls} label="stores" />
+        </div>
       )}
 
       <PaymentModal

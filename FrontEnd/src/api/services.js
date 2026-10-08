@@ -69,6 +69,13 @@ export const changePassword = async ({
     confirmPassword,
   });
 
+  /* Changing the password signs out every session issued before it, and
+     this one is handed a fresh token to carry on with. Without keeping it,
+     the very next request would be refused as "password was changed". */
+  if (response.data?.token) {
+    localStorage.setItem("agentToken", response.data.token);
+  }
+
   return response.data;
 };
 
@@ -127,6 +134,16 @@ export const myStores = async () => {
 
 export const fetchProducts = async () => {
   const response = await axiosInstance.get("/products/public/allProduct");
+  return response.data;
+};
+
+/* The catalogue priced for one of the agent's stores: location prices the
+   admin set for that territory, defaults everywhere else. This is what the
+   server charges, so the cart and the order always agree. */
+export const fetchStoreProducts = async (consumerId) => {
+  const response = await axiosInstance.get(
+    `/agent/store/${consumerId}/products`,
+  );
   return response.data;
 };
 
@@ -230,6 +247,13 @@ export const getSingleProduct = async (productId) => {
 
 export const getDashboardSummary = async () => {
   const response = await axiosInstance.get("/admin/dashboard-summary/");
+  return response.data;
+};
+
+/** What is waiting on the office: orders to confirm, overdue dues,
+ *  applications to review. Only the parts the caller may act on. */
+export const getAttention = async () => {
+  const response = await axiosInstance.get("/admin/attention");
   return response.data;
 };
 

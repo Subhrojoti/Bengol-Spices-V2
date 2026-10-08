@@ -30,6 +30,17 @@ const ACCOUNTS = {
   },
 };
 
+/* For the few addresses that work signed out but show more when signed in
+   (the product catalogue: anyone may see the range, only signed-in users
+   see trade prices). No Authorization header: carry on as a visitor, with
+   no req.user. A header that is present is checked in full, exactly as
+   protect does, so an expired or revoked session is told so rather than
+   silently treated as a visitor. */
+export const optionalAuth = (req, res, next) => {
+  if (!req.headers.authorization) return next();
+  return protect(req, res, next);
+};
+
 const unauthorized = (res, message) =>
   res.status(401).json({ success: false, message });
 

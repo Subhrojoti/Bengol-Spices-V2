@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Truck, UserCheck } from "lucide-react";
 
 import DeliveryManagement from "./tabs/DeliveryManagement";
@@ -10,7 +11,12 @@ const TABS = [
 ];
 
 export default function Delivery() {
-  const [active, setActive] = useState("dispatch");
+  /* A link can open a particular section: /admin/delivery?tab=approval.
+     Anything unrecognised falls back to the first section, as before. */
+  const [params] = useSearchParams();
+  const [active, setActive] = useState(() =>
+    TABS.some((t) => t.key === params.get("tab")) ? params.get("tab") : "dispatch",
+  );
 
   const Current =
     TABS.find((t) => t.key === active)?.Component || DeliveryManagement;

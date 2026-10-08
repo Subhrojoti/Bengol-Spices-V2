@@ -6,6 +6,55 @@ import { getAgentDashboard } from "../services/dashboard.service.js";
 import { getLeaderboard } from "../services/leaderboard.service.js";
 import Counter from "../models/Counter.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
+import Product from "../models/Product.js";
+import mongoose from "mongoose";
+import { TIER_FIELDS } from "../utils/pricing.js";
+
+/* Checks the location prices sent with a territory. A blank or zero tier
+   means "use the default"; a product with every tier blank is dropped.
+   Returns { entries } or { error }. */
+const parsePriceOverrides = (raw) => {
+  if (raw === null) return { entries: [] };
+  if (!Array.isArray(raw)) {
+    return { error: "priceOverrides must be a list" };
+  }
+
+  const entries = [];
+  const seen = new Set();
+
+  for (const row of raw) {
+    const productId = String(row?.productId || "");
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return { error: "A priced product has an invalid id" };
+    }
+    if (seen.has(productId)) {
+      return { error: "A product is priced twice" };
+    }
+    seen.add(productId);
+
+    const entry = { productId };
+    let anySet = false;
+
+    for (const field of Object.values(TIER_FIELDS)) {
+      const value = row[field];
+      if (value === undefined || value === null || value === "") continue;
+
+      const number = Number(value);
+      if (!Number.isFinite(number) || number < 0) {
+        return { error: "Location prices must be positive numbers" };
+      }
+      if (number === 0) continue; // "not set", not "free"
+
+      entry[field] = Math.round(number * 100) / 100;
+      anySet = true;
+    }
+
+    if (anySet) entries.push(entry);
+  }
+
+  return { entries };
+};
 
 // Same day one month earlier, clamped to that month's last day
 const oneMonthBefore = (date) => {
@@ -364,7 +413,16 @@ export const assignSalesLocation = async (req, res) => {
   try {
     const { agentId, pincodes, state, city } = req.body;
 
-    if (!agentId || !pincodes || pincodes.length === 0 || !state) {
+    // Checked by type as well: a pincode list sent as text, or a state that
+    // is not text, used to throw further down and answer 500
+    if (
+      typeof agentId !== "string" ||
+      !agentId.trim() ||
+      !Array.isArray(pincodes) ||
+      pincodes.length === 0 ||
+      typeof state !== "string" ||
+      !state.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message: "agentId, state and at least one pincode are required",
@@ -390,17 +448,44 @@ export const assignSalesLocation = async (req, res) => {
       });
     }
 
+    const update = {
+      agentId,
+      pincodes,
+      state: state.toUpperCase(),
+      city,
+      assignedBy: req.user._id,
+      assignedByModel: req.user.role === "ADMIN" ? "Admin" : "Employee",
+    };
+
+    /* Location prices, per product and store type, for this territory.
+       Only touched when the request carries the field, so a save from a
+       screen that does not know about pricing keeps what was set before. */
+    if (req.body.priceOverrides !== undefined) {
+      const parsed = parsePriceOverrides(req.body.priceOverrides);
+
+      if (parsed.error) {
+        return res.status(400).json({ success: false, message: parsed.error });
+      }
+
+      const ids = parsed.entries.map((entry) => entry.productId);
+      const known = await Product.find({ _id: { $in: ids } })
+        .select("_id")
+        .lean();
+
+      if (known.length !== ids.length) {
+        return res.status(400).json({
+          success: false,
+          message: "One of the priced products no longer exists",
+        });
+      }
+
+      update.priceOverrides = parsed.entries;
+    }
+
     // ✅ Upsert (update or create)
     const location = await AgentSalesLocation.findOneAndUpdate(
       { agentId, state: state.toUpperCase() },
-      {
-        agentId,
-        pincodes,
-        state: state.toUpperCase(),
-        city,
-        assignedBy: req.user._id,
-        assignedByModel: req.user.role === "ADMIN" ? "Admin" : "Employee",
-      },
+      update,
       { new: true, upsert: true },
     );
 
@@ -431,6 +516,13 @@ export const agentDashboard = async (req, res) => {
     // the 29th–31st rolled forward (30 March − 1 month = 2 March).
     const endDate = to ? new Date(to) : new Date();
     const startDate = from ? new Date(from) : oneMonthBefore(endDate);
+
+    if (Number.isNaN(endDate.getTime()) || Number.isNaN(startDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "from and to must be valid dates",
+      });
+    }
 
     const data = await getAgentDashboard({
       agentId,
@@ -467,6 +559,13 @@ export const leaderboard = async (req, res) => {
     const startDate = from
       ? new Date(from)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    if (Number.isNaN(endDate.getTime()) || Number.isNaN(startDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "from and to must be valid dates",
+      });
+    }
 
     const data = await getLeaderboard({
       from: startDate,

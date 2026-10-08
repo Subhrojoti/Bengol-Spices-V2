@@ -1,5 +1,23 @@
+import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import cloudinary from "../config/cloudinary.js";
+import { UNITS, isKnownUnit, normalizeUnit } from "../utils/uom.js";
+import { sanitizeDescription } from "../utils/sanitizeHtml.js";
+
+/* What the catalogue shows.
+
+   The retailer, wholesaler and distributor prices are the company's trade
+   terms. They used to be sent to anyone who asked this address, signed in
+   or not, so a competitor could read the whole price list with one request.
+   The agent app and the web panel always send their login with the
+   request, so they receive everything exactly as before; a caller with no
+   login gets the range and the listed prices, without the trade tiers. */
+const PUBLIC_FIELDS =
+  "name title description category uom price discountPrice images gstPercentage minOrderQty";
+const TRADE_FIELDS = "retailerPrice wholesalerPrice distributorPrice";
+
+const catalogueFields = (req) =>
+  req.user ? `${PUBLIC_FIELDS} ${TRADE_FIELDS}` : PUBLIC_FIELDS;
 
 /**
  * An optional price coming off a multipart form: absent, null or blank all
@@ -11,6 +29,20 @@ const toOptionalPrice = (value) => {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+/* The unit a product is sold by is one of a fixed few words (see
+   utils/uom.js). It used to be saved exactly as sent, so a request made by
+   hand could store anything, and every screen that prints "per <unit>"
+   would print it. Throws with a message the panel shows. */
+const readUnit = (value) => {
+  const unit = normalizeUnit(value);
+
+  if (!isKnownUnit(unit)) {
+    throw new Error(`Unit of measure must be one of: ${UNITS.join(", ")}`);
+  }
+
+  return unit;
 };
 
 const destroyImage = async (publicId) => {
@@ -86,10 +118,11 @@ export const createProduct = async (req, res) => {
     const product = await Product.create({
       name,
       title,
-      description,
+      // Only the formatting the editor offers is kept (utils/sanitizeHtml.js)
+      description: sanitizeDescription(description),
       category,
       sku: trimmedSku,
-      uom,
+      uom: readUnit(uom),
       price,
       discountPrice,
       gstPercentage,
@@ -160,7 +193,10 @@ export const getProductById = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findById(productId);
+    // A malformed id used to reach the database and answer 500
+    const product = mongoose.isValidObjectId(productId)
+      ? await Product.findById(productId)
+      : null;
 
     if (!product) {
       return res.status(404).json({
@@ -263,6 +299,13 @@ export const updateProduct = async (req, res) => {
       if (numericFields.includes(key)) {
         // ✅ Safely parse numeric fields — avoids string storage from multipart
         product[key] = req.body[key] !== "" ? Number(req.body[key]) : null;
+      } else if (key === "description") {
+        product.description = sanitizeDescription(req.body.description);
+      } else if (key === "uom") {
+        /* A product saved long ago with some other unit can still be edited
+           without touching it; only a change has to be a known unit. */
+        const unit = normalizeUnit(req.body.uom);
+        if (unit !== normalizeUnit(product.uom)) product.uom = readUnit(unit);
       } else {
         product[key] = req.body[key];
       }
@@ -319,7 +362,9 @@ export const deleteProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findById(productId);
+    const product = mongoose.isValidObjectId(productId)
+      ? await Product.findById(productId)
+      : null;
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -356,10 +401,7 @@ export const deleteProduct = async (req, res) => {
 export const getAllPublicProducts = async (req, res) => {
   try {
     const products = await Product.find({ status: "ACTIVE" })
-      .select(
-        // ✅ NEW: Added retailerPrice, wholesalerPrice, distributorPrice
-        "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice images gstPercentage minOrderQty",
-      )
+      .select(catalogueFields(req))
       .sort({ createdAt: -1 });
 
     return res.json({
@@ -380,13 +422,13 @@ export const getSinglePublicProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findOne({
-      _id: productId,
-      status: "ACTIVE",
-    }).select(
-      // ✅ NEW: Added retailerPrice, wholesalerPrice, distributorPrice
-      "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice images gstPercentage minOrderQty",
-    );
+    // A malformed id used to reach the database and answer 500
+    const product = mongoose.isValidObjectId(productId)
+      ? await Product.findOne({
+          _id: productId,
+          status: "ACTIVE",
+        }).select(catalogueFields(req))
+      : null;
 
     if (!product) {
       return res.status(404).json({

@@ -4,6 +4,7 @@ import {
   Banknote,
   ChevronDown,
   Clock3,
+  Download,
   IndianRupee,
   MapPin,
   Phone,
@@ -15,8 +16,12 @@ import {
   Wallet,
 } from "lucide-react";
 import { getPaymentSummary, getAllStores } from "../../../../api/services";
+import { toast } from "sonner";
 import EntityAvatar from "../../../../components/common/EntityAvatar";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import PaymentIssues from "./PaymentIssues";
+import { downloadCsv, fileDate, sheetDate } from "../../../../utils/csv";
 
 const FILTERS = [
   { key: "ALL", label: "All" },
@@ -56,6 +61,36 @@ const isOverdue = (order) => {
   return new Date(order.dueDate) < new Date();
 };
 
+/* One row per order, for the accounts team: what was billed, what has come
+   in, what is still owed and since when. Money is left as plain numbers so
+   the columns can be summed in a spreadsheet. */
+const PAYMENT_COLUMNS = [
+  { header: "Order ID", value: (o) => o.orderId },
+  { header: "Placed on", value: (o) => sheetDate(o.createdAt, true) },
+  { header: "Order status", value: (o) => String(o.orderStatus || "").replaceAll("_", " ") },
+  { header: "Store ID", value: (o) => o.consumerId },
+  { header: "Store", value: (o) => o.store },
+  { header: "Store phone", value: (o) => o.phone },
+  { header: "City", value: (o) => o.city },
+  { header: "State", value: (o) => o.state },
+  { header: "Agent ID", value: (o) => o.agentId },
+  { header: "Agent", value: (o) => o.agent?.name },
+  { header: "Agent phone", value: (o) => o.agent?.phone },
+  { header: "Billed (Rs)", value: (o) => n(o.totalAmount) },
+  { header: "Collected (Rs)", value: (o) => n(o.paidAmount) },
+  { header: "Due (Rs)", value: (o) => n(o.dueAmount) },
+  { header: "Payment status", value: (o) => o.paymentStatus },
+  { header: "Due date", value: (o) => sheetDate(o.dueDate) },
+  { header: "Overdue", value: (o) => (isOverdue(o) ? "Yes" : "No") },
+  {
+    header: "Payments received",
+    value: (o) =>
+      (o.payments || [])
+        .map((p) => `Rs ${n(p.amount)} ${p.method || ""} on ${sheetDate(p.collectedAt)}`)
+        .join("; "),
+  },
+];
+
 const Card = ({ className = "", children }) => (
   <div
     className={`rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)] ${className}`}>
@@ -67,8 +102,8 @@ const Stat = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -241,6 +276,17 @@ export default function PaymentInfo() {
     return Object.values(map).sort((a, b) => b.due - a.due);
   }, [matching, storeById]);
 
+  const [storePager, storePagerTop] = usePagination(stores, { resetKey: `${filter}|${search}` });
+
+  // Only one store is open at a time, so one pager serves its order table
+  const openStoreOrders = useMemo(
+    () => stores.find((s) => s.consumerId === openStore)?.orders || [],
+    [stores, openStore],
+  );
+  const [orderPager, orderPagerTop] = usePagination(openStoreOrders, {
+    resetKey: `${openStore}|${filter}|${search}`,
+  });
+
   if (status === "error") {
     return (
       <div className="min-h-screen bg-slate-50 p-5 lg:p-8">
@@ -342,6 +388,24 @@ export default function PaymentInfo() {
           />
         </div>
 
+        {/* Exactly what is listed below: the chosen filter and the search */}
+        <button
+          onClick={() => {
+            const view = FILTERS.find((f) => f.key === filter)?.label.toLowerCase() || "all";
+            const count = downloadCsv(
+              `bengol-payments-${view}-${fileDate()}.csv`,
+              PAYMENT_COLUMNS,
+              matching,
+            );
+            toast.success(`${count} order${count === 1 ? "" : "s"} exported`);
+          }}
+          disabled={matching.length === 0}
+          title="Export the orders listed below as a spreadsheet (CSV)"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[14px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+          <Download size={14} />
+          <span className="hidden sm:inline">Export</span>
+        </button>
+
         <button
           onClick={() => load(true)}
           disabled={refreshing}
@@ -369,8 +433,8 @@ export default function PaymentInfo() {
           </p>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {stores.map((store) => {
+        <div ref={storePagerTop} className="scroll-mt-24 space-y-4">
+          {storePager.pageItems.map((store) => {
             const open = openStore === store.consumerId;
 
             return (
@@ -446,7 +510,10 @@ export default function PaymentInfo() {
                 </button>
 
                 {open && (
-                  <div className="border-t border-slate-100 overflow-x-auto">
+                  <>
+                  <div
+                    ref={orderPagerTop}
+                    className="scroll-mt-24 border-t border-slate-100 overflow-x-auto">
                     <table className="w-full min-w-[720px] text-left">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -475,7 +542,7 @@ export default function PaymentInfo() {
                       </thead>
 
                       <tbody className="divide-y divide-slate-100">
-                        {store.orders.map((order) => {
+                        {orderPager.pageItems.map((order) => {
                           const overdue = isOverdue(order);
                           const settled = n(order.dueAmount) <= 0;
                           const payments = order.payments || [];
@@ -595,10 +662,18 @@ export default function PaymentInfo() {
                       </tbody>
                     </table>
                   </div>
+                  <Pagination
+                    {...orderPager.controls}
+                    label="orders"
+                    className="border-t border-slate-200 px-4 py-3"
+                  />
+                  </>
                 )}
               </Card>
             );
           })}
+
+          <Pagination {...storePager.controls} label="stores" />
         </div>
       )}
     </div>

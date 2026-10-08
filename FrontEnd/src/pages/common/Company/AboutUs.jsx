@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -11,11 +10,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import Slide7 from "../../../assets/Slides/Slide7.png";
-import Slide8 from "../../../assets/Slides/Slide8.png";
-import logo from "../../../assets/logo/logoGold.png";
-import logoBG from "../../../assets/logo/BS_Logo_BG.png";
-import fssaiLogo from "../../../assets/logo/FSSAI_Logo.png";
+import Slide7 from "../../../assets/Slides/Slide7.webp";
+import Slide8 from "../../../assets/Slides/Slide8.webp";
+import logo from "../../../assets/logo/logoGold.webp";
+import logoBG from "../../../assets/logo/BS_Logo_BG.webp";
+import fssaiLogo from "../../../assets/logo/FSSAI_Logo.webp";
+import useReveal from "../../../hooks/useReveal";
 
 const VALUES = [
   {
@@ -46,6 +46,7 @@ const CHAPTERS = [
       "Payments and dues recorded against every order",
     ],
     image: Slide7,
+    alt: "A wooden tray of whole and ground spices: star anise, cinnamon, cardamom, cumin, coriander, peppercorns and turmeric",
   },
   {
     kicker: "Where we reach",
@@ -57,6 +58,7 @@ const CHAPTERS = [
       "Nationwide delivery coverage",
     ],
     image: Slide8,
+    alt: "Glass jars of turmeric, red chilli, cumin, coriander, cardamom and garam masala on a kitchen shelf",
   },
 ];
 
@@ -73,24 +75,7 @@ const MAPS_LINK =
 const AboutUs = () => {
   /* Same reveal mechanism the home page uses, so the public pages move
      alike and scrolling stays free of listeners. */
-  useEffect(() => {
-    const nodes = document.querySelectorAll("[data-reveal]");
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0.12 },
-    );
-
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, []);
+  useReveal();
 
   return (
     <div className="bg-[#faf7f2]">
@@ -102,6 +87,8 @@ const AboutUs = () => {
         <img
           src={logoBG}
           alt=""
+          width={1408}
+          height={768}
           className="absolute inset-0 h-full w-full scale-105 object-cover opacity-40"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#14100c]/85 via-[#14100c]/75 to-[#14100c]" />
@@ -118,15 +105,21 @@ const AboutUs = () => {
           <img
             src={logo}
             alt="Bengol Spices"
+            width={625}
+            height={399}
             data-reveal
             className="reveal mx-auto h-28 object-contain sm:h-36 md:h-44"
           />
 
-          <p
+          {/* The page's one <h1>. It keeps the look of the small label it
+              replaced; the mission statement below stays the visual headline. */}
+          <h1
             data-reveal
             className="reveal reveal-1 mt-8 text-[12.5px] font-semibold uppercase tracking-[0.08em] text-amber-400">
+            About Bengol Spices
+            <span className="mx-2 text-amber-400/40">·</span>
             Our mission
-          </p>
+          </h1>
 
           <p
             data-reveal
@@ -195,8 +188,11 @@ const AboutUs = () => {
                 <div className="overflow-hidden rounded-3xl">
                   <img
                     src={chapter.image}
-                    alt=""
+                    alt={chapter.alt}
+                    width={1600}
+                    height={893}
                     loading="lazy"
+                    decoding="async"
                     className="h-64 w-full object-cover transition-transform duration-[900ms] ease-out hover:scale-[1.05] md:h-[420px]"
                   />
                 </div>
@@ -259,7 +255,10 @@ const AboutUs = () => {
             <div className="mt-7 flex items-center gap-4 rounded-2xl border border-[#e8dfd2] bg-white p-4">
               <img
                 src={fssaiLogo}
-                alt=""
+                alt="FSSAI"
+                width={240}
+                height={180}
+                loading="lazy"
                 className="h-14 w-auto shrink-0 object-contain"
               />
               <div className="min-w-0">

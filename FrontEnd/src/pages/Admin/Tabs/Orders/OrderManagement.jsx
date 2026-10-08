@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Dialog } from "@mui/material";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Ban,
   CheckCircle2,
   ChevronDown,
+  Download,
   FileText,
   IndianRupee,
   Inbox,
@@ -21,6 +23,8 @@ import {
 import StatusPill from "../../../../components/common/StatusPill";
 import EntityAvatar from "../../../../components/common/EntityAvatar";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import {
   getAllAgentOrders,
   getAllStores,
@@ -28,6 +32,8 @@ import {
   cancelOrder,
   downloadInvoice,
 } from "../../../../api/services";
+import { downloadCsv, fileDate, sheetDate } from "../../../../utils/csv";
+import { quantityWithUnit } from "../../../../utils/uom";
 
 /* Mirrors the server's guards so the UI offers only what will succeed.
    Cancelling used to be offered on PLACED orders alone, although the API
@@ -62,6 +68,58 @@ const dateOnly = (value) =>
       })
     : "—";
 
+/* How long ago, in the shortest form that is still clear: 12m, 5h, 3d */
+const waited = (value) => {
+  const ms = Date.now() - new Date(value).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 60) return `${Math.max(minutes, 1)}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+};
+
+// Shown in the queue before "Show all"
+const QUEUE_PREVIEW = 6;
+
+/* One row per order, for the accounts team. Money is left as plain numbers
+   so the columns can be summed in a spreadsheet. */
+const ORDER_COLUMNS = [
+  { header: "Order ID", value: (o) => o.orderId },
+  { header: "Placed on", value: (o) => sheetDate(o.createdAt, true) },
+  { header: "Status", value: (o) => String(o.status || "").replaceAll("_", " ") },
+  { header: "Store ID", value: (o) => o.consumerId },
+  { header: "Store", value: (o) => o.deliveryAddress?.storeName },
+  { header: "Owner", value: (o) => o.deliveryAddress?.ownerName },
+  { header: "Phone", value: (o) => o.deliveryAddress?.phone },
+  { header: "City", value: (o) => o.deliveryAddress?.city },
+  { header: "State", value: (o) => o.deliveryAddress?.state },
+  { header: "Pincode", value: (o) => o.deliveryAddress?.pincode },
+  { header: "Agent ID", value: (o) => o.agentId },
+  {
+    header: "Items",
+    value: (o) =>
+      (o.products || []).map((p) => `${p.name} x ${quantityWithUnit(p.quantity, p.uom)}`).join("; "),
+  },
+  { header: "Total (Rs)", value: (o) => n(o.totalAmount) },
+  { header: "Paid (Rs)", value: (o) => n(o.paidAmount) },
+  { header: "Due (Rs)", value: (o) => openDue(o) },
+  { header: "Payment mode", value: (o) => o.paymentMode },
+  { header: "Payment status", value: (o) => o.paymentStatus },
+  { header: "Due date", value: (o) => sheetDate(o.dueDate) },
+  {
+    header: "Delivered on",
+    value: (o) =>
+      sheetDate(
+        o.delivery?.deliveredAt ||
+          (o.statusHistory || []).find((h) => h.status === "DELIVERED")?.changedAt,
+        true,
+      ),
+  },
+  { header: "Invoice no.", value: (o) => o.invoiceNumber },
+  { header: "Cancelled because", value: (o) => o.cancellation?.reason },
+];
+
 const Card = ({ className = "", children }) => (
   <div
     className={`rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)] ${className}`}>
@@ -73,8 +131,8 @@ const Stat = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -226,6 +284,14 @@ export default function OrderManagement() {
   const [busyId, setBusyId] = useState(null);
   const [invoiceId, setInvoiceId] = useState(null);
 
+  // The queue of orders waiting to be confirmed: collapsed to a few by default
+  const [queueOpen, setQueueOpen] = useState(false);
+  // An order to bring into view once it has been drawn
+  const [scrollTo, setScrollTo] = useState(null);
+  // ?order=ORD2026-0012, from the dashboard or the "new order" notice
+  const [params, setParams] = useSearchParams();
+  const retriedFor = useRef(null);
+
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
@@ -255,6 +321,14 @@ export default function OrderManagement() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  /* A new order announced over the live stream: refresh quietly, with no
+     loading state, so the list updates without anyone pressing anything */
+  useEffect(() => {
+    const onLiveOrder = () => load(true);
+    window.addEventListener("live:order-placed", onLiveOrder);
+    return () => window.removeEventListener("live:order-placed", onLiveOrder);
   }, [load]);
 
   const storeById = useMemo(() => {
@@ -331,6 +405,13 @@ export default function OrderManagement() {
     return activeStore.orders.filter((o) => o.status === statusFilter);
   }, [activeStore, statusFilter]);
 
+  const [storePager, storePagerTop] = usePagination(visibleStores, { resetKey: storeSearch });
+  const [orderPager, orderPagerTop] = usePagination(visibleOrders, {
+    resetKey: `${selectedStore}|${statusFilter}`,
+  });
+  const { showItem: showStore } = storePager;
+  const { showItem: showOrder, page: orderPage } = orderPager;
+
   const stats = useMemo(
     () => ({
       total: orders.length,
@@ -342,6 +423,74 @@ export default function OrderManagement() {
     }),
     [orders],
   );
+
+  /* Oldest first: the one that has waited longest is the one to deal with.
+     Finding these used to mean opening every store in turn. */
+  const awaiting = useMemo(
+    () =>
+      orders
+        .filter((o) => o.status === "PLACED")
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    [orders],
+  );
+
+  // Opens the order's store, shows the order expanded and scrolls to it
+  const focusOrder = useCallback((order) => {
+    setSelectedStore(order.consumerId);
+    setStatusFilter("ALL");
+    setExpandedOrder(order._id);
+    setScrollTo(order._id);
+  }, []);
+
+  useEffect(() => {
+    if (!scrollTo) return;
+
+    /* The order may be on a later page of its store's orders, and the store
+       on a later page of the store list: turn to both before looking for it */
+    showOrder((o) => o._id === scrollTo);
+    showStore((s) => s.consumerId === selectedStore);
+
+    const element = document.getElementById(`order-${scrollTo}`);
+    if (!element) return; // not drawn yet; this runs again when it is
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setScrollTo(null);
+  }, [scrollTo, visibleOrders, expandedOrder, orderPage, selectedStore, showOrder, showStore]);
+
+  /* Arriving with ?order=… opens that order. A brand-new order may not be
+     in the list yet (the notice can be clicked before the list has
+     refreshed), so the list is fetched once more before giving up. The
+     parameter is then removed, so Refresh or Back does not jump again. */
+  const wanted = params.get("order");
+
+  useEffect(() => {
+    if (!wanted || status !== "ready" || refreshing) return;
+
+    const order = orders.find((o) => o.orderId === wanted);
+
+    if (!order && retriedFor.current !== wanted) {
+      retriedFor.current = wanted;
+      load(true);
+      return;
+    }
+
+    if (order) focusOrder(order);
+    else toast.error(`Order ${wanted} could not be found`);
+
+    retriedFor.current = null;
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("order");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [wanted, status, refreshing, orders, focusOrder, load, setParams]);
+
+  const exportOrders = () => {
+    const count = downloadCsv(`bengol-orders-${fileDate()}.csv`, ORDER_COLUMNS, orders);
+    toast.success(`${count} order${count === 1 ? "" : "s"} exported`);
+  };
 
   const applyStatus = (orderId, next) =>
     setOrders((prev) =>
@@ -469,6 +618,66 @@ export default function OrderManagement() {
         />
       </div>
 
+      {/* ===== WAITING TO BE CONFIRMED ===== */}
+      {awaiting.length > 0 && (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-700">
+              <CheckCircle2 size={15} />
+            </span>
+            <h2 className="text-[15px] font-semibold text-slate-800">
+              Waiting to be confirmed
+            </h2>
+            <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[12.5px] font-semibold tabular-nums text-amber-800">
+              {awaiting.length}
+            </span>
+            <span className="text-[13px] text-slate-400">
+              Longest waiting first. Select one to open it.
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(queueOpen ? awaiting : awaiting.slice(0, QUEUE_PREVIEW)).map((order) => (
+              <button
+                key={order._id}
+                onClick={() => focusOrder(order)}
+                className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition ${
+                  expandedOrder === order._id
+                    ? "border-blue-400 bg-blue-50/60 ring-2 ring-blue-100"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}>
+                <span className="min-w-0">
+                  <span className="block font-mono text-[13.5px] font-semibold text-slate-900">
+                    {order.orderId}
+                  </span>
+                  <span className="block max-w-[11rem] truncate text-[12.5px] text-slate-500">
+                    {order.deliveryAddress?.storeName || order.consumerId}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-[13.5px] font-semibold tabular-nums text-slate-900">
+                    {inr(order.totalAmount)}
+                  </span>
+                  <span className="block text-[12.5px] tabular-nums text-slate-400">
+                    {waited(order.createdAt)}
+                  </span>
+                </span>
+              </button>
+            ))}
+
+            {awaiting.length > QUEUE_PREVIEW && (
+              <button
+                onClick={() => setQueueOpen((open) => !open)}
+                className="rounded-xl border border-dashed border-slate-300 px-3 py-2 text-[13.5px] font-medium text-slate-600 transition hover:bg-slate-50">
+                {queueOpen
+                  ? "Show fewer"
+                  : `Show all ${awaiting.length}`}
+              </button>
+            )}
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* ===== STORES ===== */}
         {/* Kept in view beside a long order list, and only as tall as its own
@@ -485,13 +694,24 @@ export default function OrderManagement() {
                   {visibleStores.length} with orders
                 </p>
               </div>
-              <button
-                onClick={() => load(true)}
-                disabled={refreshing}
-                title="Refresh"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
-                <RefreshCcw size={13} className={refreshing ? "animate-spin" : ""} />
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {/* Every order, one per row, for a spreadsheet */}
+                <button
+                  onClick={exportOrders}
+                  disabled={orders.length === 0}
+                  title="Export all orders as a spreadsheet (CSV)"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+                  <Download size={13} />
+                  Export
+                </button>
+                <button
+                  onClick={() => load(true)}
+                  disabled={refreshing}
+                  title="Refresh"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+                  <RefreshCcw size={13} className={refreshing ? "animate-spin" : ""} />
+                </button>
+              </div>
             </div>
 
             <div className="relative">
@@ -521,8 +741,11 @@ export default function OrderManagement() {
               }
             />
           ) : (
-            <div className="max-h-[30rem] space-y-2.5 overflow-y-auto p-4 lg:max-h-[calc(100vh-14rem)]">
-              {visibleStores.map((store) => {
+            <>
+            <div
+              ref={storePagerTop}
+              className="scroll-mt-24 max-h-[30rem] space-y-2.5 overflow-y-auto p-4 lg:max-h-[calc(100vh-14rem)]">
+              {storePager.pageItems.map((store) => {
                 const active = store.consumerId === selectedStore;
 
                 return (
@@ -596,6 +819,13 @@ export default function OrderManagement() {
                 );
               })}
             </div>
+            <Pagination
+              {...storePager.controls}
+              compact
+              label="stores"
+              className="border-t border-slate-100 px-4 py-3"
+            />
+            </>
           )}
         </Card>
 
@@ -655,8 +885,9 @@ export default function OrderManagement() {
               hint="Choose a different status above."
             />
           ) : (
-            <div className="space-y-3 p-4">
-              {visibleOrders.map((order) => {
+            <>
+            <div ref={orderPagerTop} className="scroll-mt-24 space-y-3 p-4">
+              {orderPager.pageItems.map((order) => {
                 const isOpen = expandedOrder === order._id;
                 const historyOpen = expandedHistory === order._id;
                 const history = order.statusHistory || [];
@@ -666,6 +897,7 @@ export default function OrderManagement() {
                 return (
                   <div
                     key={order._id}
+                    id={`order-${order._id}`}
                     className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                     {/* HEADER */}
                     <button
@@ -785,7 +1017,7 @@ export default function OrderManagement() {
                                   {p.name}
                                   <span className="text-slate-400">
                                     {" "}
-                                    · {p.quantity} {p.uom}
+                                    · {quantityWithUnit(p.quantity, p.uom)}
                                   </span>
                                 </span>
                                 <span className="shrink-0 text-[14px] font-semibold tabular-nums text-slate-900">
@@ -836,6 +1068,12 @@ export default function OrderManagement() {
                 );
               })}
             </div>
+            <Pagination
+              {...orderPager.controls}
+              label="orders"
+              className="border-t border-slate-100 px-4 py-3"
+            />
+            </>
           )}
         </Card>
       </div>

@@ -14,8 +14,7 @@ import {
 import UploadIcon from "@mui/icons-material/Upload";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { deliveryPartnerRegister } from "../../../api/services";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "sonner";
 
 export default function DeliveryPartnerRegister() {
   const [form, setForm] = useState({

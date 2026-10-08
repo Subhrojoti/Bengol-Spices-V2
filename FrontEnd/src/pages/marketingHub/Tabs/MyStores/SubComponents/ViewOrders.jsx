@@ -36,12 +36,13 @@ import {
   getMyReturns,
   cancelReturn,
 } from "../../../../../api/services";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "sonner";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 /* ================= STEP ICON ================= */
 
@@ -57,7 +58,7 @@ const CustomStepIcon = ({ active, completed, icon }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: isActive ? "primary.main" : "#e5e7eb",
+        bgcolor: isActive ? "primary.main" : "var(--panel-muted, #e5e7eb)",
         color: isActive ? "primary.contrastText" : "#9ca3af",
         transition: "all 0.3s ease",
       }}>
@@ -127,7 +128,7 @@ const EmptyOrdersState = ({ onBack }) => (
     alignItems="center"
     justifyContent="center"
     height="90vh"
-    bgcolor="#f9fafb"
+    bgcolor="var(--panel-page, #f9fafb)"
     gap={3}
     px={2}>
     <Box
@@ -135,7 +136,7 @@ const EmptyOrdersState = ({ onBack }) => (
         width: 120,
         height: 120,
         borderRadius: "50%",
-        bgcolor: "#e5e7eb",
+        bgcolor: "var(--panel-muted, #e5e7eb)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -252,6 +253,10 @@ const ViewOrders = ({ onBack, onCreate }) => {
     });
   }, [orders, returns, selectedStatusFilter]);
 
+  const [pager, pagerTop] = usePagination(filteredOrders, {
+    resetKey: selectedStatusFilter || "",
+  });
+
   /* ================= API CALL ================= */
 
   useEffect(() => {
@@ -299,7 +304,7 @@ const ViewOrders = ({ onBack, onCreate }) => {
       display="flex"
       flexDirection={{ xs: "column", md: "row" }}
       height={{ xs: "auto", md: "90vh" }}
-      bgcolor="#f9fafb"
+      bgcolor="var(--panel-page, #f9fafb)"
       p={{ xs: 1, md: 2 }}
       gap={2}>
       {/* ================= LEFT PANEL ================= */}
@@ -390,7 +395,7 @@ const ViewOrders = ({ onBack, onCreate }) => {
               display="flex"
               alignItems="center"
               justifyContent="center"
-              bgcolor="#e5e7eb">
+              bgcolor="var(--panel-muted, #e5e7eb)">
               <Typography color="text.secondary">
                 Location not available
               </Typography>
@@ -489,14 +494,16 @@ const ViewOrders = ({ onBack, onCreate }) => {
           {/* ===== ORDERS LIST ===== */}
 
           <Paper
+            ref={pagerTop}
             sx={{
               flex: 1,
               p: { xs: 1, md: 2 },
               borderRadius: 3,
               overflowY: { md: "auto" },
+              scrollMarginTop: 96,
             }}>
             <Stack spacing={2}>
-              {filteredOrders.map((order) => {
+              {pager.pageItems.map((order) => {
                 const normalized = normalizeStatus(order.status);
 
                 const chipColor =
@@ -657,7 +664,7 @@ const ViewOrders = ({ onBack, onCreate }) => {
                                     sx={{
                                       width: 48,
                                       height: 48,
-                                      bgcolor: "#c3c3c3",
+                                      bgcolor: "var(--panel-muted, #c3c3c3)",
                                     }}>
                                     <InventoryIcon fontSize="small" />
                                   </Avatar>
@@ -688,6 +695,8 @@ const ViewOrders = ({ onBack, onCreate }) => {
                 );
               })}
             </Stack>
+
+            <Pagination {...pager.controls} label="orders" className="mt-4 px-1" />
           </Paper>
         </Box>
       ) : null}

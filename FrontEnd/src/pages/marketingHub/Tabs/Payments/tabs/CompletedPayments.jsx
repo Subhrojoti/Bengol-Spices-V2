@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { myStores, getStoreOrders } from "../../../../../api/services";
 import StoreAccordion from "../components/StoreAccordian";
 import { Typography } from "@mui/material";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 const CompletedPayments = () => {
   const [stores, setStores] = useState([]);
+  const [pager, pagerTop] = usePagination(stores);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -80,9 +83,17 @@ const CompletedPayments = () => {
           </p>
         </div>
       ) : (
-        stores.map((store, index) => (
-          <StoreAccordion key={index} store={store} onPayNow={() => {}} />
-        ))
+        <div ref={pagerTop} className="scroll-mt-24">
+          {pager.pageItems.map((store, index) => (
+            <StoreAccordion
+              key={store._id || store.consumerId || index}
+              store={store}
+              onPayNow={() => {}}
+            />
+          ))}
+
+          <Pagination {...pager.controls} label="stores" />
+        </div>
       )}
     </div>
   );

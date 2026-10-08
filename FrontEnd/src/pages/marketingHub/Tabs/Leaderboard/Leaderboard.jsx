@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { getLeaderboard } from "../../../../api/services";
 import EntityAvatar from "../../../../components/common/EntityAvatar";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 
 const Leaderboard = () => {
   const [leaders, setLeaders] = useState([]);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // The same page is shown by the table (desktop) and the cards (phone)
+  const [pager, pagerTop] = usePagination(data);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -85,7 +90,9 @@ const Leaderboard = () => {
       </div>
 
       {/* 📊 Table */}
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+      <div
+        ref={pagerTop}
+        className="scroll-mt-24 bg-white rounded-2xl shadow-md overflow-hidden">
         <div className="px-5 py-3 border-b text-sm text-gray-500 font-medium">
           All staff
         </div>
@@ -110,9 +117,9 @@ const Leaderboard = () => {
 
             {/* Body */}
             <tbody>
-              {data.map((user, index) => (
+              {pager.pageItems.map((user, index) => (
                 <tr
-                  key={index}
+                  key={user.agentId || index}
                   className={`border-b last:border-none hover:bg-gray-50 transition ${
                     user.rank <= 3 ? "bg-yellow-50/40" : ""
                   }`}>
@@ -173,9 +180,9 @@ const Leaderboard = () => {
         </div>
 
         <div className="md:hidden space-y-3 p-3">
-          {data.map((user, index) => (
+          {pager.pageItems.map((user, index) => (
             <div
-              key={index}
+              key={user.agentId || index}
               className={`bg-white rounded-xl shadow-sm p-3 border ${
                 user.rank <= 3 ? "bg-yellow-50/40" : ""
               }`}>
@@ -247,6 +254,12 @@ const Leaderboard = () => {
             </div>
           ))}
         </div>
+
+        <Pagination
+          {...pager.controls}
+          label="agents"
+          className="border-t border-gray-200 px-4 py-3"
+        />
 
         {/* Empty */}
         {data.length === 0 && (

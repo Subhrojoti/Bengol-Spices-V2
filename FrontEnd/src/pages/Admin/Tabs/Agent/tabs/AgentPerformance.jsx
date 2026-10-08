@@ -17,11 +17,13 @@ import {
   Users,
 } from "lucide-react";
 import { getAgentPerformance } from "../../../../../api/services";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
+import { useChartChrome } from "../../../../../theme/useChartChrome";
 
 /* Single-series bar: validated categorical slot 1. One series needs no
    legend — the panel title names it. */
 const BAR = "#2a78d6";
-const CHROME = { grid: "#e1e0d9", axis: "#898781" };
 
 const n = (v) => Number(v || 0);
 const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
@@ -46,8 +48,8 @@ const Stat = ({ label, value, hint, icon, tint, ink }) => (
     <div className="flex items-start justify-between gap-3">
       <p className="text-[14px] font-medium text-slate-500">{label}</p>
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
     </div>
@@ -119,6 +121,9 @@ export default function AgentPerformance() {
     load();
   }, [load]);
 
+  // Grid lines, axis labels and hover highlight, for light or dark
+  const CHROME = useChartChrome();
+
   const totals = useMemo(() => {
     const collected = data.reduce((sum, a) => sum + n(a.totalCollected), 0);
     const transactions = data.reduce((sum, a) => sum + n(a.transactions), 0);
@@ -144,6 +149,9 @@ export default function AgentPerformance() {
     () => [...data].sort((a, b) => n(b.totalCollected) - n(a.totalCollected)),
     [data],
   );
+
+  // The chart above shows every agent; only the table below it is paged
+  const [pager, pagerTop] = usePagination(ranked);
 
   if (status === "loading") return <Skeleton />;
 
@@ -262,7 +270,7 @@ export default function AgentPerformance() {
             />
             <Tooltip
               content={<ChartTooltip />}
-              cursor={{ fill: "rgba(15,23,42,0.04)" }}
+              cursor={{ fill: CHROME.cursor }}
             />
             <Bar
               dataKey="totalCollected"
@@ -277,7 +285,7 @@ export default function AgentPerformance() {
 
       {/* ===== TABLE ===== */}
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div ref={pagerTop} className="scroll-mt-24 overflow-x-auto">
           <table className="w-full min-w-[560px] text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -297,7 +305,7 @@ export default function AgentPerformance() {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {ranked.map((agent) => (
+              {pager.pageItems.map((agent) => (
                 <tr key={agent._id} className="transition hover:bg-slate-50/70">
                   <td className="px-5 py-3 font-mono text-[13.5px] tabular-nums text-slate-600">
                     {agent._id}
@@ -322,6 +330,11 @@ export default function AgentPerformance() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          {...pager.controls}
+          label="agents"
+          className="border-t border-slate-200 px-4 py-3"
+        />
       </Card>
     </div>
   );

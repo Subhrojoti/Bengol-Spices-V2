@@ -257,11 +257,13 @@ export const getAgentIncentiveSummary = async (req, res) => {
     const earned = summary[0]?.totalEarned || 0;
     const paid = summary[0]?.totalPaid || 0;
 
+    // Rounded to paise, as the admin list is: 30.4 − 15.2 − 15.2 is not 0
+    // in floating point, and an agent paid in full was shown a balance
     return res.json({
       success: true,
-      totalEarned: earned,
-      totalCredited: paid,
-      pending: earned - paid,
+      totalEarned: roundRupees(earned),
+      totalCredited: roundRupees(paid),
+      pending: roundRupees(earned - paid),
     });
   } catch (error) {
     res.status(500).json({

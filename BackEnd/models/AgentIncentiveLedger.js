@@ -40,4 +40,8 @@ const ledgerSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// One agent's earnings and payouts, newest first: their wallet, their
+// balance, and the balance check made before every payout
+ledgerSchema.index({ agentId: 1, createdAt: -1 });
+
 export default mongoose.model("AgentIncentiveLedger", ledgerSchema);

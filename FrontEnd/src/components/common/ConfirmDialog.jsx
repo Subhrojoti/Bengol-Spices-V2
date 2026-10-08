@@ -56,8 +56,8 @@ const ConfirmDialog = ({
       <div className="p-6">
         <div className="flex items-start gap-3.5">
           <span
-            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ backgroundColor: palette.tint, color: palette.ink }}>
+            className="tint-chip w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ "--tint": palette.tint, "--ink": palette.ink }}>
             {icon || <AlertTriangle size={19} />}
           </span>
 

@@ -33,8 +33,8 @@ const PaymentManagement = () => {
             "& .MuiTab-root": {
               textTransform: "none",
               borderRadius: { xs: "8px", md: "10px" },
-              backgroundColor: "#e5e7eb",
-              color: "#374151",
+              backgroundColor: "var(--panel-muted, #e5e7eb)",
+              color: "var(--panel-ink-soft, #374151)",
               fontWeight: 500,
 
               // ✅ MOBILE STYLES

@@ -1,18 +1,32 @@
 import crypto from "crypto";
+import mongoose from "mongoose";
 import Notification from "../models/Notification.js";
 import Employee from "../models/Employee.js";
 import Agent from "../models/Agent.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 
+// The newest this many; nobody scrolls further, and an account that has
+// been receiving them for years would otherwise download the whole lot on
+// every visit
+const NOTIFICATION_LIMIT = 300;
+
 export const getMyNotifications = async (req, res) => {
   try {
+    /* Admin has no account record, so no id and no notifications of its
+       own. Said outright rather than left to how the database happens to
+       treat a search for "no id". */
+    if (!req.user._id) return res.json([]);
+
     const data = await Notification.find({
       recipientId: req.user._id,
-    }).sort({ createdAt: -1 });
+    })
+      .sort({ createdAt: -1 })
+      .limit(NOTIFICATION_LIMIT);
 
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("GET NOTIFICATIONS ERROR:", err);
+    res.status(500).json({ error: "Failed to load notifications" });
   }
 };
 
@@ -20,6 +34,11 @@ export const markAsRead = async (req, res) => {
   try {
     // 🔒 FIX: any account could mark anyone's notification as read. Only the
     // recipient can now; admin, which has no account record, as before.
+    // A malformed id used to reach the database and answer 500
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
     const filter =
       req.user.role === "ADMIN"
         ? { _id: req.params.id }
@@ -31,7 +50,8 @@ export const markAsRead = async (req, res) => {
 
     res.json({ message: "Marked as read" });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("MARK NOTIFICATION READ ERROR:", err);
+    res.status(500).json({ error: "Failed to update the notification" });
   }
 };
 
@@ -106,12 +126,13 @@ export const sendCustomNotification = async (req, res) => {
     let users = [];
 
     // 🎯 FETCH USERS
+    // Only the ids are needed, not every applicant's documents and bank details
     if (normalizedRole === "Agent") {
-      users = await Agent.find({ status: "APPROVED" });
+      users = await Agent.find({ status: "APPROVED" }).select("_id agentId").lean();
     } else if (normalizedRole === "Employee") {
-      users = await Employee.find({ status: "ACTIVE" });
+      users = await Employee.find({ status: "ACTIVE" }).select("_id employeeId").lean();
     } else if (normalizedRole === "DeliveryPartner") {
-      users = await DeliveryPartner.find({ status: "ACTIVE" });
+      users = await DeliveryPartner.find({ status: "ACTIVE" }).select("_id").lean();
     }
 
     // ❗ No users found

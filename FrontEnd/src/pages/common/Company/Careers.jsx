@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -11,6 +11,7 @@ import {
   Truck,
   Users,
 } from "lucide-react";
+import useReveal from "../../../hooks/useReveal";
 
 const CAREERS_EMAIL = "careers@bengolspices.com";
 
@@ -78,27 +79,9 @@ const PERKS = [
 ];
 
 const Careers = () => {
-  const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState(null);
 
-  useEffect(() => {
-    const nodes = document.querySelectorAll("[data-reveal]");
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0.12 },
-    );
-
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, []);
+  useReveal();
 
   /* Opens the visitor's own mail client rather than assuming Gmail in a
      browser tab, which the old link did. */
@@ -180,21 +163,21 @@ const Careers = () => {
             <div
               data-reveal
               className="reveal reveal-3 mt-9 flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => navigate(HEADLINE_ROLES[0].action.to)}
+              <Link
+                to={HEADLINE_ROLES[0].action.to}
                 className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-6 py-3.5 text-[14.5px] font-semibold text-[#14100c] transition hover:bg-amber-300">
                 {HEADLINE_ROLES[0].action.label}
                 <ArrowRight
                   size={16}
                   className="transition-transform group-hover:translate-x-0.5"
                 />
-              </button>
+              </Link>
 
-              <button
-                onClick={() => navigate(HEADLINE_ROLES[1].action.to)}
+              <Link
+                to={HEADLINE_ROLES[1].action.to}
                 className="inline-flex items-center gap-2 rounded-full border border-white/25 px-6 py-3.5 text-[14.5px] font-semibold text-white backdrop-blur-sm transition hover:border-white/50 hover:bg-white/5">
                 {HEADLINE_ROLES[1].action.label}
-              </button>
+              </Link>
             </div>
 
             <ul
@@ -234,6 +217,8 @@ const Careers = () => {
                   <img
                     src={app.image}
                     alt=""
+                    width={1280}
+                    height={720}
                     className="block aspect-video w-full object-cover object-top"
                   />
                 </figure>
@@ -303,15 +288,15 @@ const Careers = () => {
                   ))}
                 </ul>
 
-                <button
-                  onClick={() => navigate(role.action.to)}
+                <Link
+                  to={role.action.to}
                   className="group/btn mt-7 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#1c1611] px-6 py-3.5 text-[14.5px] font-semibold text-white transition hover:bg-[#2a2119]">
                   {role.action.label}
                   <ArrowRight
                     size={16}
                     className="transition-transform group-hover/btn:translate-x-0.5"
                   />
-                </button>
+                </Link>
               </article>
             );
           })}

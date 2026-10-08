@@ -6,8 +6,9 @@ import {
 } from "../../../../../api/services";
 import StoreAccordion from "../components/StoreAccordian";
 import PaymentModal from "../components/PaymentModal";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "sonner";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 const DuePayments = () => {
   const [stores, setStores] = useState([]);
@@ -15,6 +16,8 @@ const DuePayments = () => {
   const [openPaymentModal, setOpenPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+
+  const [pager, pagerTop] = usePagination(stores);
 
   const handleOpenPayment = (order) => {
     setSelectedOrder(order);
@@ -153,15 +156,19 @@ const DuePayments = () => {
           </p>
         </div>
       ) : (
-        <>
-          {stores.map((store, index) => (
+        <div ref={pagerTop} className="scroll-mt-24">
+          {/* Keyed by the store, so a store that was opened does not stay
+              open as a different store when the page is turned */}
+          {pager.pageItems.map((store, index) => (
             <StoreAccordion
-              key={index}
+              key={store._id || store.consumerId || index}
               store={store}
               onPayNow={handleOpenPayment}
             />
           ))}
-        </>
+
+          <Pagination {...pager.controls} label="stores" />
+        </div>
       )}
 
       <PaymentModal

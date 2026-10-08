@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -10,13 +10,19 @@ import {
 } from "@mui/material";
 import { setPassword as setPasswordApi } from "../../../api/services";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const SetPassword = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const token = searchParams.get("token");
+
+  // Declared before the "no token" return: hooks must run on every render
+  const [password, setPasswordState] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   if (!token) {
     return (
@@ -31,14 +37,14 @@ const SetPassword = () => {
       </Box>
     );
   }
-  const [password, setPasswordState] = useState("");
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
-    if (loading) return;
+    /* First, always. It used to come after the "already sending" check, so
+       pressing Enter twice let the second press through as an ordinary
+       form submission: the browser reloaded the page mid-request and the
+       agent could not tell whether the password had been set. */
     e.preventDefault();
+    if (loading) return;
     setError("");
 
     if (!token) {

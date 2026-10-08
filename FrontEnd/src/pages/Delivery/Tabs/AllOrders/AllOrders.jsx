@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   Check,
   CheckCircle2,
@@ -17,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import StatusPill from "../../../../components/common/StatusPill";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import {
   getDeliveryPartnerOrders,
   getDeliveryPartnerReturns,
@@ -191,7 +193,7 @@ const DeliveryCodeDialog = ({ job, onClose, onConfirm }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 dark:bg-black/60"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) onClose();
       }}>
@@ -469,6 +471,8 @@ export default function AllOrders() {
     );
   }, [jobs, search]);
 
+  const [pager, pagerTop] = usePagination(visibleJobs, { resetKey: `${tab}|${search}` });
+
   const selected =
     visibleJobs.find((job) => job.key === selectedKey) ||
     visibleJobs[0] ||
@@ -657,8 +661,11 @@ export default function AllOrders() {
                 }
               />
             ) : (
-              <div className="max-h-[32rem] space-y-2 overflow-y-auto p-3 lg:max-h-[calc(100vh-17rem)]">
-                {visibleJobs.map((job) => {
+              <>
+              <div
+                ref={pagerTop}
+                className="scroll-mt-24 max-h-[32rem] space-y-2 overflow-y-auto p-3 lg:max-h-[calc(100vh-17rem)]">
+                {pager.pageItems.map((job) => {
                   const active = selected?.key === job.key;
                   return (
                     <button
@@ -688,6 +695,13 @@ export default function AllOrders() {
                   );
                 })}
               </div>
+              <Pagination
+                {...pager.controls}
+                compact
+                label={tab === "order" ? "deliveries" : "pickups"}
+                className="border-t border-slate-100 px-4 py-3"
+              />
+              </>
             )}
           </Card>
 

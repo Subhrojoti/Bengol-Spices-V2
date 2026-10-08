@@ -76,111 +76,163 @@
 }
 
 /* ===================================================================
-   Toasts
+   Dark theme
 
-   react-toastify's stock look is a squared-off card with a thick
-   full-width progress bar. These restyle it into the same visual
-   language as the panels: a soft card, a hairline border, a thin status
-   accent down the left edge and a 2px progress line.
+   Nearly all of it is in tailwind.theme.js, which swaps the values behind
+   the ordinary colour classes while <html> has the class "dark". What is
+   here are the few things that file cannot reach.
 
-   Styling it here rather than swapping the library keeps all 35 call
-   sites untouched.
+   --page and --surface are the two colours everything sits on (the page
+   behind the cards, and the cards). They are set, as R G B numbers, by the
+   same file; the values after the commas are the light theme's.
    =================================================================== */
 
-.Toastify__toast-container {
-  width: 380px;
-  padding: 0;
+html.dark {
+  background-color: rgb(var(--page));
 }
 
-@media (max-width: 480px) {
-  .Toastify__toast-container {
-    width: calc(100vw - 24px);
-    left: 12px;
-    right: 12px;
-    margin: 0;
-  }
+html.dark body {
+  background-color: rgb(var(--page));
+  color: #e2e8f0;
 }
 
-.Toastify__toast {
-  position: relative;
-  min-height: 0;
-  margin-bottom: 12px;
-  padding: 14px 14px 14px 18px;
-  border-radius: 14px;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+/* Each panel screen is a full-height wrapper filled with the palest grey,
+   with white cards on it. In the dark theme that same pale-grey class is a
+   highlight a step LIGHTER than a card (it is what hover states and table
+   heads use), which is right everywhere except here: the page behind the
+   cards has to be the darkest thing on screen, not lighter than them. */
+html.dark .min-h-screen.bg-slate-50,
+html.dark .min-h-screen.bg-gray-50,
+html.dark .min-h-screen.bg-slate-100,
+html.dark .min-h-screen.bg-gray-100 {
+  background-color: rgb(var(--page));
+}
+
+/* The bar of section tabs that stays at the top of a scrolling screen is
+   painted in the page colour so the content slides under it */
+html.dark .sticky.bg-slate-50\/95 {
+  background-color: rgb(var(--page) / 0.95);
+}
+
+/* The agent's Marketing Hub is built with MUI and sets its greys in code.
+   Those are written as var(--panel-…, <the light colour>), so they are
+   unchanged in the light theme; these are their dark values. */
+html.dark {
+  --panel-page: #0b1220;
+  --panel-surface: #111a2b;
+  --panel-subtle: #172135;
+  --panel-muted: #2a3649;
+  --panel-strong: #334155;
+  --panel-line: #2a3649;
+  --panel-ink: #f1f5f9;
+  --panel-ink-soft: #cbd5e1;
+  --panel-ink-muted: #94a3b8;
+  --panel-amber-tint: rgba(245, 158, 11, 0.16);
+  --panel-green-tint: rgba(16, 185, 129, 0.16);
+  --panel-green-ink: #6ee7b7;
+  --panel-banner: linear-gradient(90deg, #13233b 0%, #2a2413 100%);
+  --chip-violet: rgba(139, 92, 246, 0.3);
+  --chip-cyan: rgba(6, 182, 212, 0.26);
+  --chip-green: rgba(34, 197, 94, 0.26);
+}
+
+/* Three of its screens paint the page with a pale grey gradient */
+html.dark .min-h-screen.bg-gradient-to-br.from-gray-50 {
+  background-image: none;
+  background-color: rgb(var(--page));
+}
+
+/* The small coloured square behind an icon. Its two colours are handed
+   over as --tint and --ink by the component (a pale background and the
+   matching dark ink). In the dark theme a pale square on a dark card
+   glares, so the ink colour is used for both instead: faintly for the
+   square, lightened for the icon. */
+.tint-chip {
+  background-color: var(--tint);
+  color: var(--ink);
+}
+
+html.dark .tint-chip {
+  background-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  color: color-mix(in srgb, var(--ink) 55%, white);
+}
+
+/* The rich-text editor (product descriptions) ships its own light-only
+   colours */
+html.dark .rsw-editor {
+  border-color: rgb(var(--l-slate-200));
+  background-color: rgb(var(--f-white));
+  color: #e2e8f0;
+}
+
+html.dark .rsw-toolbar {
+  background-color: rgb(var(--f-slate-50));
+  border-color: rgb(var(--l-slate-200));
+}
+
+html.dark .rsw-btn {
+  color: #cbd5e1;
+}
+
+html.dark .rsw-btn:hover,
+html.dark .rsw-btn[data-active="true"] {
+  background-color: rgb(var(--f-slate-200));
+}
+
+html.dark .rsw-separator {
+  border-color: rgb(var(--l-slate-200));
+}
+
+/* ===================================================================
+   Toasts (sonner)
+
+   The library's own look is already close to the panels. These only pull
+   it the rest of the way: the same card radius and shadow, the close
+   button on the trailing corner where the eye expects it, and tighter
+   type.
+
+   The library styles a toast through [data-sonner-toast][data-styled],
+   so every rule here repeats that pair. A shorter selector loses to it
+   and is silently ignored. Toast width is set on <Toaster> in App.jsx,
+   because the library writes that one inline.
+   =================================================================== */
+
+html [data-sonner-toaster] {
+  --border-radius: 14px;
+}
+
+/* Close button on the trailing corner (the library defaults to leading) */
+html [data-sonner-toaster][dir="ltr"] {
+  --toast-close-button-start: unset;
+  --toast-close-button-end: 0;
+  --toast-close-button-transform: translate(35%, -35%);
+}
+
+[data-sonner-toast][data-styled="true"] {
+  padding: 14px 16px;
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 14px 34px -14px rgba(15, 23, 42, 0.3);
-  color: #0f172a;
-  font-family: inherit;
-  overflow: hidden;
 }
 
-/* Status accent down the leading edge */
-.Toastify__toast::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--toast-accent, #2a78d6);
-}
-
-.Toastify__toast--success {
-  --toast-accent: #0ca30c;
-}
-.Toastify__toast--error {
-  --toast-accent: #d03b3b;
-}
-.Toastify__toast--warning {
-  --toast-accent: #fab219;
-}
-.Toastify__toast--info,
-.Toastify__toast--default {
-  --toast-accent: #2a78d6;
-}
-
-.Toastify__toast-body {
-  margin: 0;
-  padding: 0;
-  align-items: flex-start;
-  gap: 10px;
+[data-sonner-toast][data-styled="true"] [data-title] {
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+[data-sonner-toast][data-styled="true"] [data-description] {
+  margin-top: 2px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
-.Toastify__toast-body > div:last-child {
-  padding-top: 1px;
-}
-
-.Toastify__toast-icon {
-  width: auto;
-  margin-inline-end: 0;
-  align-self: flex-start;
-}
-
-.Toastify__progress-bar {
-  height: 2px;
-  background: var(--toast-accent);
-  opacity: 0.8;
-}
-
-.Toastify__close-button {
-  align-self: center;
-  color: #94a3b8;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.Toastify__toast:hover .Toastify__close-button {
-  opacity: 1;
-}
-
-.Toastify__close-button:hover {
-  color: #475569;
+[data-sonner-toast][data-styled="true"] [data-button] {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 /* ===================================================================
@@ -221,18 +273,19 @@ h3 {
    finished state.
    =================================================================== */
 
+/* Visible by default. The hidden starting state applies only after
+   useReveal has run and tagged <html>, so a pre-rendered page shows its
+   content before any script loads. */
 .reveal {
-  opacity: 0;
-  transform: translateY(22px);
   transition:
     opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity, transform;
 }
 
-.reveal.is-visible {
-  opacity: 1;
-  transform: none;
+html.reveal-ready .reveal:not(.is-visible) {
+  opacity: 0;
+  transform: translateY(22px);
 }
 
 /* Staggers children of a revealed group */
@@ -243,7 +296,7 @@ h3 {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal,
-  .reveal.is-visible {
+  html.reveal-ready .reveal:not(.is-visible) {
     opacity: 1;
     transform: none;
     transition: none;

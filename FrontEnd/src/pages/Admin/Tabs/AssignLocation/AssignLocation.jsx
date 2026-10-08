@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Autocomplete, TextField } from "@mui/material";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
+  IndianRupee,
   Loader2,
   MapPin,
   Map,
@@ -16,13 +18,25 @@ import {
 } from "lucide-react";
 import StatusPill from "../../../../components/common/StatusPill";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import {
   assignLocation,
   agentList,
+  fetchProducts,
   getSalesLocations,
 } from "../../../../api/services";
 
 const PINCODE_RE = /^\d{6}$/;
+
+/* The three store types a product is priced for, in the order shown */
+const TIERS = [
+  ["retailerPrice", "Retailer"],
+  ["wholesalerPrice", "Wholesaler"],
+  ["distributorPrice", "Distributor"],
+];
+
+const EMPTY_ROW = { retailerPrice: "", wholesalerPrice: "", distributorPrice: "" };
 
 const Card = ({ className = "", children }) => (
   <div
@@ -35,8 +49,8 @@ const Stat = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -57,15 +71,19 @@ const Label = ({ children, hint }) => (
 );
 
 /* MUI inputs styled to match the plain Tailwind fields used elsewhere */
-const fieldSx = {
-  "& .MuiOutlinedInput-root": {
-    borderRadius: "0.6rem",
-    backgroundColor: "#fff",
-    fontSize: "13.5px",
-    "& fieldset": { borderColor: "#e2e8f0" },
-    "&:hover fieldset": { borderColor: "#cbd5e1" },
-    "&.Mui-focused fieldset": { borderColor: "#60a5fa", borderWidth: "2px" },
-  },
+const fieldSx = (theme) => {
+  const dark = theme.palette.mode === "dark";
+
+  return {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "0.6rem",
+      backgroundColor: dark ? theme.palette.background.paper : "#fff",
+      fontSize: "13.5px",
+      "& fieldset": { borderColor: dark ? "#2a3649" : "#e2e8f0" },
+      "&:hover fieldset": { borderColor: dark ? "#3b4a61" : "#cbd5e1" },
+      "&.Mui-focused fieldset": { borderColor: "#60a5fa", borderWidth: "2px" },
+    },
+  };
 };
 
 export default function AssignLocation() {
@@ -87,6 +105,12 @@ export default function AssignLocation() {
   const [pincodes, setPincodes] = useState([]);
   const [draft, setDraft] = useState("");
 
+  /* Location prices for this territory: productId → tier values as typed.
+     Blank means the product's default price applies. */
+  const [catalog, setCatalog] = useState([]);
+  const [prices, setPrices] = useState({});
+  const [pricingOpen, setPricingOpen] = useState(false);
+
   /* Guards against a slow reply for an earlier state/city overwriting a
      newer one — the old code fired these with no ordering at all. */
   const cityReq = useRef(0);
@@ -95,12 +119,14 @@ export default function AssignLocation() {
   const loadBase = useCallback(async () => {
     setLoadingBase(true);
     try {
-      const [agentRes, coverRes] = await Promise.all([
+      const [agentRes, coverRes, productRes] = await Promise.all([
         agentList(),
         getSalesLocations(),
+        fetchProducts(),
       ]);
       setAgents(agentRes?.agents || []);
       setCoverage(coverRes?.locations || []);
+      setCatalog(productRes?.products || []);
     } catch (error) {
       console.error("Failed to load agents or coverage", error);
       toast.error("Could not load agents and existing coverage");
@@ -206,6 +232,11 @@ export default function AssignLocation() {
     [coverage, agent],
   );
 
+  // The list on the right: one agent's territories, or everyone's
+  const [coveragePager, coveragePagerTop] = usePagination(agent ? agentCoverage : coverage, {
+    resetKey: agent?.agentId || "",
+  });
+
   const stats = useMemo(
     () => ({
       agents: new Set(coverage.map((c) => c.agentId)).size,
@@ -246,7 +277,56 @@ export default function AssignLocation() {
   /* Whenever the target changes, start from what is already assigned */
   useEffect(() => {
     setPincodes(existing?.pincodes ? [...existing.pincodes] : []);
+
+    const seeded = {};
+    (existing?.priceOverrides || []).forEach((row) => {
+      seeded[String(row.productId)] = {
+        retailerPrice: row.retailerPrice ?? "",
+        wholesalerPrice: row.wholesalerPrice ?? "",
+        distributorPrice: row.distributorPrice ?? "",
+      };
+    });
+    setPrices(seeded);
+    setPricingOpen(Object.keys(seeded).length > 0);
   }, [existing]);
+
+  const setPrice = (productId, field, value) => {
+    setPrices((prev) => ({
+      ...prev,
+      [productId]: { ...EMPTY_ROW, ...prev[productId], [field]: value },
+    }));
+  };
+
+  /* What will be sent: only products with at least one price filled in */
+  const priceOverrides = useMemo(
+    () =>
+      Object.entries(prices)
+        .map(([productId, row]) => {
+          const entry = { productId };
+          let any = false;
+          TIERS.forEach(([field]) => {
+            const text = String(row[field] ?? "").trim();
+            if (text !== "" && Number(text) > 0) {
+              entry[field] = Number(text);
+              any = true;
+            }
+          });
+          return any ? entry : null;
+        })
+        .filter(Boolean),
+    [prices],
+  );
+
+  const invalidPrice = useMemo(
+    () =>
+      Object.values(prices).some((row) =>
+        TIERS.some(([field]) => {
+          const text = String(row[field] ?? "").trim();
+          return text !== "" && !(Number(text) > 0);
+        }),
+      ),
+    [prices],
+  );
 
   const addPincode = (raw) => {
     const value = String(raw || "").trim();
@@ -274,7 +354,8 @@ export default function AssignLocation() {
     }
   };
 
-  const canSubmit = Boolean(agent && state && pincodes.length) && !saving;
+  const canSubmit =
+    Boolean(agent && state && pincodes.length) && !invalidPrice && !saving;
 
   const save = async () => {
     try {
@@ -285,10 +366,14 @@ export default function AssignLocation() {
         pincodes,
         state,
         city,
+        priceOverrides,
       });
 
       toast.success(
-        `${pincodes.length} pincode${pincodes.length === 1 ? "" : "s"} assigned to ${agent.name}`,
+        `${pincodes.length} pincode${pincodes.length === 1 ? "" : "s"} assigned to ${agent.name}` +
+          (priceOverrides.length
+            ? ` with location prices for ${priceOverrides.length} product${priceOverrides.length === 1 ? "" : "s"}`
+            : ""),
       );
 
       setConfirmOpen(false);
@@ -539,6 +624,144 @@ export default function AssignLocation() {
               </div>
             </div>
 
+            {/* LOCATION PRICES — optional, per product and store type */}
+            <div className="rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setPricingOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <IndianRupee size={15} />
+                  </span>
+                  <div>
+                    <p className="text-[13.5px] font-semibold text-slate-800">
+                      Location prices{" "}
+                      <span className="font-normal text-slate-400">(optional)</span>
+                    </p>
+                    <p className="text-[12.5px] text-slate-500">
+                      {priceOverrides.length
+                        ? `${priceOverrides.length} product${priceOverrides.length === 1 ? "" : "s"} priced for this territory`
+                        : "Default prices apply unless you set one here"}
+                    </p>
+                  </div>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`shrink-0 text-slate-400 transition-transform ${pricingOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {pricingOpen && (
+                <div className="border-t border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
+                    <p className="text-[12.5px] text-slate-500">
+                      Leave a box blank to keep the default. These prices apply
+                      only to {agent ? `${agent.name}'s` : "this agent's"} stores
+                      in {state || "this state"}.
+                    </p>
+                    {Object.keys(prices).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setPrices({})}
+                        className="text-[12.5px] font-semibold text-slate-500 transition hover:text-red-600">
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+
+                  {invalidPrice && (
+                    <p className="mt-2 flex items-center gap-1.5 px-4 text-[13px] text-red-600">
+                      <AlertTriangle size={12} />
+                      A price must be a number above 0, or left blank.
+                    </p>
+                  )}
+
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full text-[13px]">
+                      <thead>
+                        <tr className="border-y border-slate-100 bg-slate-50/60 text-left text-[11.5px] font-bold uppercase tracking-wide text-slate-400">
+                          <th className="px-4 py-2 font-bold">Product</th>
+                          {TIERS.map(([field, label]) => (
+                            <th key={field} className="px-3 py-2 font-bold">
+                              {label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {catalog.map((product) => {
+                          const row = prices[product._id] || EMPTY_ROW;
+
+                          return (
+                            <tr
+                              key={product._id}
+                              className="border-b border-slate-100 last:border-0">
+                              <td className="px-4 py-2 align-middle">
+                                <p className="font-medium text-slate-800">
+                                  {product.name}
+                                </p>
+                                <p className="text-[12px] text-slate-400">
+                                  per {product.uom}
+                                </p>
+                              </td>
+                              {TIERS.map(([field]) => {
+                                const text = String(row[field] ?? "");
+                                const bad = text.trim() !== "" && !(Number(text) > 0);
+                                const set = text.trim() !== "" && !bad;
+                                const fallback = product[field];
+
+                                return (
+                                  <td key={field} className="px-3 py-2 align-middle">
+                                    <div className="relative">
+                                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-slate-400">
+                                        ₹
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        inputMode="decimal"
+                                        value={text}
+                                        onChange={(e) =>
+                                          setPrice(product._id, field, e.target.value)
+                                        }
+                                        placeholder={
+                                          fallback != null ? String(fallback) : "—"
+                                        }
+                                        className={`w-28 rounded-lg border py-1.5 pl-6 pr-2 text-[13px] tabular-nums outline-none transition placeholder:text-slate-300 ${
+                                          bad
+                                            ? "border-red-300 bg-red-50 text-red-700"
+                                            : set
+                                              ? "border-emerald-300 bg-emerald-50/50 text-emerald-800"
+                                              : "border-slate-200 bg-white text-slate-800 focus:border-blue-400"
+                                        }`}
+                                      />
+                                    </div>
+                                    <p className="mt-0.5 text-[11px] text-slate-400">
+                                      {fallback != null
+                                        ? `Default ₹${fallback}`
+                                        : "No default set"}
+                                    </p>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {!catalog.length && (
+                    <p className="px-4 py-4 text-[13px] text-slate-400">
+                      No active products to price.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
               {!canSubmit && !saving && (
                 <p className="text-[13px] text-slate-400">
@@ -546,7 +769,9 @@ export default function AssignLocation() {
                     ? "Choose an agent"
                     : !state
                       ? "Choose a state"
-                      : "Add at least one pincode"}
+                      : !pincodes.length
+                        ? "Add at least one pincode"
+                        : "Fix the highlighted price"}
                 </p>
               )}
               <button
@@ -583,7 +808,9 @@ export default function AssignLocation() {
 
             {/* Tracks the viewport so tall screens show more of the list
                 instead of capping it at a fixed height. */}
-            <div className="max-h-[28rem] overflow-y-auto p-4 lg:max-h-[calc(100vh-19rem)]">
+            <div
+              ref={coveragePagerTop}
+              className="scroll-mt-24 max-h-[28rem] overflow-y-auto p-4 lg:max-h-[calc(100vh-19rem)]">
               {(() => {
                 const rows = agent ? agentCoverage : coverage;
 
@@ -615,7 +842,7 @@ export default function AssignLocation() {
 
                 return (
                   <div className="space-y-3">
-                    {rows.map((row) => {
+                    {coveragePager.pageItems.map((row) => {
                       const isTarget =
                         existing && row._id === existing._id;
 
@@ -661,6 +888,14 @@ export default function AssignLocation() {
                               </span>
                             ))}
                           </div>
+
+                          {row.priceOverrides?.length > 0 && (
+                            <p className="mt-2 flex items-center gap-1 text-[12px] font-medium text-emerald-700">
+                              <IndianRupee size={11} />
+                              Location prices on {row.priceOverrides.length}{" "}
+                              product{row.priceOverrides.length === 1 ? "" : "s"}
+                            </p>
+                          )}
                         </div>
                       );
                     })}
@@ -668,6 +903,15 @@ export default function AssignLocation() {
                 );
               })()}
             </div>
+
+            {!loadingBase && (
+              <Pagination
+                {...coveragePager.controls}
+                compact
+                label="assignments"
+                className="border-t border-slate-100 px-4 py-3"
+              />
+            )}
           </Card>
         </div>
       </div>
@@ -700,6 +944,14 @@ export default function AssignLocation() {
                 <span className="text-slate-500">Territory</span>
                 <span className="font-medium text-slate-700">
                   {[city, state].filter(Boolean).join(", ")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-slate-500">Location prices</span>
+                <span className="font-medium text-slate-700">
+                  {priceOverrides.length
+                    ? `${priceOverrides.length} product${priceOverrides.length === 1 ? "" : "s"}`
+                    : "Defaults"}
                 </span>
               </div>
               <div className="border-t border-slate-200 pt-2">

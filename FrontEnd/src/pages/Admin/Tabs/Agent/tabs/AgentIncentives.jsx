@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   BadgeCheck,
@@ -12,6 +12,8 @@ import {
   Wallet,
 } from "lucide-react";
 import ConfirmDialog from "../../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 import { getIncentiveList, payoutIncentive } from "../../../../../api/services";
 
 const n = (v) => Number(v || 0);
@@ -29,8 +31,8 @@ const Stat = ({ label, value, hint, icon, tint, ink }) => (
     <div className="flex items-start justify-between gap-3">
       <p className="text-[14px] font-medium text-slate-500">{label}</p>
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
     </div>
@@ -92,6 +94,8 @@ export default function AgentIncentives() {
     }),
     [data],
   );
+
+  const [pager, pagerTop] = usePagination(data, { pageSize: 12 });
 
   /* Runs only after the confirmation step. This used to fire straight from
      the card button, so one stray click paid an agent out. */
@@ -205,8 +209,10 @@ export default function AgentIncentives() {
       </div>
 
       {/* ===== AGENT CARDS ===== */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {data.map((agent) => {
+      <div
+        ref={pagerTop}
+        className="grid scroll-mt-24 grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {pager.pageItems.map((agent) => {
           const earned = n(agent.totalEarned);
           const paid = n(agent.totalPaid);
           const pending = n(agent.pending);
@@ -310,6 +316,8 @@ export default function AgentIncentives() {
           );
         })}
       </div>
+
+      <Pagination {...pager.controls} label="agents" pageSizeOptions={[12, 24, 48]} />
 
       {/* ===== CONFIRMATION ===== */}
       <ConfirmDialog

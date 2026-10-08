@@ -42,6 +42,23 @@ const agentSalesLocationSchema = new mongoose.Schema(
       enum: ["Admin", "Employee"],
       required: true,
     },
+
+    /* Prices that apply only to this agent's stores in this territory. A
+       null tier means "use the product's default price". Products with no
+       entry here are sold at their default prices. */
+    priceOverrides: [
+      {
+        _id: false,
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        retailerPrice: { type: Number, min: 0, default: null },
+        wholesalerPrice: { type: Number, min: 0, default: null },
+        distributorPrice: { type: Number, min: 0, default: null },
+      },
+    ],
   },
   { timestamps: true },
 );

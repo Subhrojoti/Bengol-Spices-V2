@@ -56,7 +56,7 @@ const MyStoresBase = () => {
         flex={1}
         overflow="auto"
         sx={{
-          borderRight: "1px solid #e5e7eb",
+          borderRight: "1px solid var(--panel-line, #e5e7eb)",
         }}>
         {leftView === "LIST" && (
           <StoresList

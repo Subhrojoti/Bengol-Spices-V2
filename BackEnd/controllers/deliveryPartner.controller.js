@@ -125,7 +125,12 @@ export const registerDeliveryPartner = async (req, res) => {
     });
   } catch (error) {
     if (uploadedPublicId) {
-      await cloudinary.uploader.destroy(uploadedPublicId);
+      // A failed clean-up must not replace the real reason with a 500
+      await cloudinary.uploader
+        .destroy(uploadedPublicId)
+        .catch((cleanupError) =>
+          console.error("DELIVERY DOCUMENT CLEANUP FAILED:", cleanupError),
+        );
     }
 
     // 🔥 FIX: gracefully handle duplicate-key errors instead of leaking a
@@ -571,8 +576,10 @@ export const getDeliveryPartnerHistory = async (req, res) => {
   try {
     const { partnerId } = req.params;
 
-    const partner =
-      await DeliveryPartner.findById(partnerId).select("name phone status");
+    // A malformed id used to reach the database and answer 500
+    const partner = mongoose.isValidObjectId(partnerId)
+      ? await DeliveryPartner.findById(partnerId).select("name phone status")
+      : null;
     if (!partner) {
       return res
         .status(404)

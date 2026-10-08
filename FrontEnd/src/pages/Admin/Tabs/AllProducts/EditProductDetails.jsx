@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@mui/material";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   BadgeCheck,
   Box,
@@ -28,10 +28,11 @@ import {
 } from "react-simple-wysiwyg";
 import EntityAvatar from "../../../../components/common/EntityAvatar";
 import { updateProduct } from "../../../../api/services";
+import { UOM_OPTIONS } from "../../../../utils/uom";
+import { sanitizeHtml } from "../../../../utils/sanitizeHtml";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png"];
-const UOM_OPTIONS = ["kg", "gm", "ltr"];
 
 /* Matches what the Product schema marks required. */
 const REQUIRED = [
@@ -171,7 +172,9 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
     () => ({
       name: product?.name || "",
       title: product?.title || "",
-      description: product?.description || "",
+      /* The editor puts this straight onto the page as HTML, so it is
+         cleaned first (utils/sanitizeHtml.js) */
+      description: sanitizeHtml(product?.description || ""),
       category: product?.category || "",
       sku: product?.sku || "",
       uom: product?.uom || "",
@@ -339,7 +342,13 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
       fullWidth
       slotProps={{
         paper: {
-          sx: { borderRadius: 3, overflow: "hidden", bgcolor: "#f8fafc" },
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            // the page colour of whichever theme is showing
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? theme.palette.background.default : "#f8fafc",
+          },
         },
       }}>
       <form onSubmit={handleSubmit} noValidate className="flex max-h-[88vh] flex-col">
@@ -456,17 +465,26 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
                 />
               </Field>
 
-              <Field label="Unit of Measure" required error={show("uom")}>
+              <Field
+                label="Unit of Measure"
+                required
+                error={show("uom")}
+                hint={form.uom === "packet" ? "prices are per packet" : undefined}>
                 <select
                   value={form.uom}
                   onChange={set("uom")}
                   className={inputClass(show("uom"))}>
                   <option value="">Select</option>
                   {UOM_OPTIONS.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
+                    <option key={u.value} value={u.value}>
+                      {u.label}
                     </option>
                   ))}
+                  {/* A product saved long ago with a unit no longer offered
+                      keeps it until another one is chosen */}
+                  {form.uom && !UOM_OPTIONS.some((u) => u.value === form.uom) && (
+                    <option value={form.uom}>{form.uom}</option>
+                  )}
                 </select>
               </Field>
             </div>

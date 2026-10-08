@@ -1,38 +1,48 @@
-import { Navigate } from "react-router-dom";
+import { lazy } from "react";
 import { MarketingHub, marketingRoutes } from "../config/marketingRoutes";
-import AgentLogin from "../pages/Auth/Login/AgentLogin";
-import AdminLogin from "../pages/Auth/Login/AdminLogin";
 import ProtectedRoute from "../routes/ProtectedRoute";
-import Onboarding from "../pages/Auth/Agent/AgentOnboarding";
-import { adminRoutes } from "../config/adminRoutes";
-import ProfileSettings from "../pages/marketingHub/ProfileSettings/ProfileSettings.jsx";
-import SetPassword from "../pages/Auth/Agent/AgentSetPassword";
-import ForgotPassword from "../pages/Auth/ForgotPassword";
-import ResetPassword from "../pages/Auth/ResetPassword";
-import DeliveryPartnerRegister from "../pages/Auth/DeliveryPartner/DeliveryPartnerRegister";
-import AdminBase from "../pages/Admin/AdminBase";
-import ProductDetails from "../pages/Admin/Tabs/AllProducts/ProductDetails";
-import DeliveryLogin from "../pages/Auth/Login/DeliveryLogin";
-import DeliveryHub from "../pages/Delivery/DeliveryHub";
-import AllOrders from "../pages/Delivery/Tabs/AllOrders/AllOrders.jsx";
-import EmployeeLogin from "../pages/Auth/Login/EmployeeLogin";
-import { employeeRoutes } from "../config/employeeRoutes.js";
-import { deliveryRoutes } from "../config/deliveryRoutes.js";
-import EmployeeBase from "../pages/Employee/EmployeeBase";
-import PermissionGuard from "../components/common/PermissionGuard.jsx";
 import PublicRoute from "../routes/PublicRoute";
 import { footerRoutes } from "../config/footerRoutes.js";
 import { mapRoutes } from "../config/mapRoutes.jsx";
 import HomeBase from "../pages/common/HomeBase.jsx";
-
-import DeliveryProfile from "../components/profile/DeliveryProfile.jsx";
+import Home from "../pages/common/Home/Home";
 import ErrorPage from "../components/common/ErrorPage.jsx";
+
+/* Only the public website is bundled with the first download. Each panel
+   and each sign-in or sign-up screen is fetched when someone opens it.
+
+   They used to be imported here directly, so a visitor who only wanted to
+   read the home page downloaded the admin, employee, agent and delivery
+   panels as well: about 1.5 MB of script before the page could respond. */
+const AdminArea = lazy(() => import("./areas/AdminArea"));
+const EmployeeArea = lazy(() => import("./areas/EmployeeArea"));
+const DeliveryArea = lazy(() => import("./areas/DeliveryArea"));
+
+const AgentLogin = lazy(() => import("../pages/Auth/Login/AgentLogin"));
+const AdminLogin = lazy(() => import("../pages/Auth/Login/AdminLogin"));
+const EmployeeLogin = lazy(() => import("../pages/Auth/Login/EmployeeLogin"));
+const DeliveryLogin = lazy(() => import("../pages/Auth/Login/DeliveryLogin"));
+const Onboarding = lazy(() => import("../pages/Auth/Agent/AgentOnboarding"));
+const SetPassword = lazy(() => import("../pages/Auth/Agent/AgentSetPassword"));
+const ForgotPassword = lazy(() => import("../pages/Auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("../pages/Auth/ResetPassword"));
+const DeliveryPartnerRegister = lazy(
+  () => import("../pages/Auth/DeliveryPartner/DeliveryPartnerRegister"),
+);
+const ProfileSettings = lazy(
+  () => import("../pages/marketingHub/ProfileSettings/ProfileSettings.jsx"),
+);
+
 export const routes = [
   /* ===================== PUBLIC ROUTES ===================== */
   {
     path: "/",
     element: <HomeBase />,
     children: [
+      /* Without an index child, "/" matched HomeBase and then had nothing
+         to put in its Outlet, so the bare domain rendered a header and a
+         footer with an empty page between them. Only /home worked. */
+      { index: true, element: <Home /> },
       // footer routes (about, careers, etc.)
       ...mapRoutes(footerRoutes),
     ],
@@ -104,88 +114,19 @@ export const routes = [
     element: <DeliveryPartnerRegister />,
   },
 
-  /* ===================== ADMIN PROTECTED ===================== */
+  /* ===================== ADMIN PROTECTED =====================
+     The sign-in check stays here, outside the lazy bundle, so someone who
+     is not signed in is sent to the login page without the panel being
+     downloaded at all. The panel's own routes are in areas/AdminArea. */
   {
     element: <ProtectedRoute redirectTo="/admin/login" />,
-    children: [
-      {
-        path: "/admin",
-        element: <AdminBase />,
-        children: [
-          ...adminRoutes.map((route) => {
-            const Component = route.component;
-            return {
-              path: route.path,
-              element: <Component />,
-            };
-          }),
-          {
-            path: "allproducts/:productId",
-            element: <ProductDetails />,
-          },
-          {
-            /* adminRoutes entries expose `component`, not `element`.
-               Reading `.element` here rendered undefined, so a bare
-               /admin visit (e.g. the logged-in redirect from
-               /admin/login) showed an empty page. */
-            index: true,
-            element: (() => {
-              const DefaultComponent = adminRoutes[0].component;
-              return <DefaultComponent />;
-            })(),
-          },
-        ],
-      },
-    ],
+    children: [{ path: "/admin/*", element: <AdminArea /> }],
   },
+
   /* ===================== EMPLOYEE PROTECTED ===================== */
   {
     element: <ProtectedRoute redirectTo="/employee/login" />,
-    children: [
-      {
-        path: "/employee",
-        element: <EmployeeBase />,
-        children: [
-          ...employeeRoutes.map((route) => {
-            const Component = route.component;
-
-            return {
-              path: route.path,
-              element: route.permission ? (
-                <PermissionGuard permission={route.permission}>
-                  <Component />
-                </PermissionGuard>
-              ) : (
-                <Component />
-              ),
-            };
-          }),
-
-          {
-            /* The products grid links to its own panel's detail page. This
-               route never existed under /employee, so an employee clicking a
-               product fell through to the admin panel's copy — which reads a
-               different token entirely. Guarded by the same permission as
-               the All Products tab it is reached from. */
-            path: "allproducts/:productId",
-            element: (
-              <PermissionGuard permission="canManageProducts">
-                <ProductDetails />
-              </PermissionGuard>
-            ),
-          },
-
-          /* Default */
-          {
-            index: true,
-            element: (() => {
-              const DefaultComponent = employeeRoutes[0].component;
-              return <DefaultComponent />;
-            })(),
-          },
-        ],
-      },
-    ],
+    children: [{ path: "/employee/*", element: <EmployeeArea /> }],
   },
 
   /* ===================== AGENT / APP PROTECTED ===================== */
@@ -226,32 +167,14 @@ export const routes = [
   /* ===================== DELIVERY PROTECTED ===================== */
   {
     element: <ProtectedRoute redirectTo="/delivery/login" />,
-    children: [
-      {
-        path: "/delivery",
-        element: <DeliveryHub />,
-        children: [
-          {
-            path: "/delivery/profile-settings",
-            element: <DeliveryProfile />,
-          },
+    children: [{ path: "/delivery/*", element: <DeliveryArea /> }],
+  },
 
-          ...deliveryRoutes.map((route) => {
-            const Component = route.component;
-            return {
-              path: route.path,
-              element: <Component />,
-            };
-          }),
-
-          /* Default route → My Deliveries. Redirected rather than rendered
-             in place, so the menu and the page title know where you are. */
-          {
-            index: true,
-            element: <Navigate to="/delivery/all-orders" replace />,
-          },
-        ],
-      },
-    ],
+  /* nginx serves index.html for any address, so a mistyped or dead link
+     reached the router and matched nothing at all, leaving a blank white
+     page. Anything unmatched now lands on the error page instead. */
+  {
+    path: "*",
+    element: <ErrorPage notFound />,
   },
 ];

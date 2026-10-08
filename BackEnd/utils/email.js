@@ -1,7 +1,34 @@
 import { Resend } from "resend";
 import { frontendBaseUrl } from "./frontendUrl.js";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/* The Resend client is made the first time an email is sent, not when this
+   file loads. Built without a key it throws, and built at load time that
+   stopped the whole API from starting: a missing email key took orders,
+   payments and logins down with it. Now only the email fails, with the
+   same { error } result the functions below already handle. */
+let client = null;
+
+const resend = {
+  emails: {
+    send: (message) => {
+      const key = process.env.RESEND_API_KEY?.trim();
+
+      if (!key) {
+        return Promise.resolve({
+          data: null,
+          error: {
+            name: "missing_api_key",
+            message:
+              "Email is not configured on the server (RESEND_API_KEY is missing).",
+          },
+        });
+      }
+
+      client ??= new Resend(key);
+      return client.emails.send(message);
+    },
+  },
+};
 
 const FROM = "Bengol Spices <noreply@bengolspices.com>";
 

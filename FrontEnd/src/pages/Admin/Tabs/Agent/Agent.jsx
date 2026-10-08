@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Users, TrendingUp, Wallet } from "lucide-react";
 
 import AgentManagement from "./tabs/AgentManagement";
@@ -12,7 +13,13 @@ const TABS = [
 ];
 
 export default function Agent() {
-  const [active, setActive] = useState("management");
+  /* A link can open a particular section: /admin/agent?tab=incentives.
+     The dashboard's "needs attention" rows use this. Anything unrecognised
+     falls back to the first section, as before. */
+  const [params] = useSearchParams();
+  const [active, setActive] = useState(() =>
+    TABS.some((t) => t.key === params.get("tab")) ? params.get("tab") : "management",
+  );
 
   const Current = TABS.find((t) => t.key === active)?.Component || AgentManagement;
 

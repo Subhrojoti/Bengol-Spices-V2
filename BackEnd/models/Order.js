@@ -334,4 +334,19 @@ orderSchema.index({
   "orderLocation.longitude": 1,
 });
 
+/* The lists every panel opens all day. Without these each one reads the
+   whole orders collection and sorts it in memory; that is unnoticeable with
+   a few hundred orders and slow with tens of thousands.
+
+     newest first                      admin order list, dashboards by year
+     by status, newest first           active orders, "awaiting" counts
+     one agent's, newest first         the agent app's order list
+     one delivery partner's by status  the delivery app's job list
+     unpaid, by due date               dues and overdue reports */
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ agentId: 1, createdAt: -1 });
+orderSchema.index({ "delivery.partnerId": 1, status: 1 });
+orderSchema.index({ paymentStatus: 1, dueDate: 1 });
+
 export default mongoose.model("Order", orderSchema);

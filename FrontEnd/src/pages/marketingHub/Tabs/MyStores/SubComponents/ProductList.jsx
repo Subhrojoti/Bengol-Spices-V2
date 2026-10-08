@@ -15,19 +15,65 @@ import { ShoppingCartOutlined } from "@mui/icons-material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import { fetchProducts } from "../../../../../api/services";
+import { fetchStoreProducts } from "../../../../../api/services";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../../../../../redux/slices/addToCart/addToCart";
 import { setLeftView } from "../../../../../redux/slices/myStoresUi/myStoresUi";
+import Pagination from "../../../../../components/common/Pagination";
+import usePagination from "../../../../../hooks/usePagination";
 
 const ProductList = ({ onBack }) => {
   const [products, setProducts] = useState([]);
   const [quantities, setQuantities] = useState({});
   const [imageIndex, setImageIndex] = useState({});
 
+  // Quantities typed on one page are kept while another page is looked at
+  const [pager, pagerTop] = usePagination(products, { pageSize: 12 });
+
   const selectedStore = useSelector((state) => state.myStoresUi.selectedStore);
 
   const dispatch = useDispatch();
+
+  /* Every hook sits above the "no store selected" return below. Two of them
+     used to come after it. React needs the same hooks, in the same order,
+     on every render, so the moment the selected store was cleared or set
+     while this screen was open it threw "Rendered fewer hooks than
+     expected" and the whole panel fell over to the error page. */
+  const consumerId = selectedStore?.consumerId;
+
+  const cartCount = useSelector((state) => {
+    if (!consumerId) return 0;
+
+    const items = state.addToCart.carts[consumerId]?.items || [];
+
+    return items.length;
+  });
+
+  /* ---------------- API ---------------- */
+  useEffect(() => {
+    if (!consumerId) return undefined; // no store selected: nothing to load
+
+    let cancelled = false;
+
+    const loadProducts = async () => {
+      try {
+        // Priced for this store, so any location price the admin set shows here
+        const res = await fetchStoreProducts(consumerId);
+        if (!cancelled) setProducts(res?.products || []);
+      } catch (error) {
+        // Left as an empty list, as before; just not an unhandled rejection
+        console.error("Could not load products for this store:", error);
+        if (!cancelled) setProducts([]);
+      }
+    };
+
+    loadProducts();
+
+    // A slow answer for the previous store must not overwrite this one's list
+    return () => {
+      cancelled = true;
+    };
+  }, [consumerId]);
 
   if (!selectedStore) {
     return (
@@ -52,17 +98,8 @@ const ProductList = ({ onBack }) => {
     );
   }
 
-  const consumerId = selectedStore.consumerId;
   const storeName = selectedStore.storeName;
   const storeType = selectedStore.storeType?.toUpperCase(); // 👈 extracted once
-
-  const cartCount = useSelector((state) => {
-    if (!consumerId) return 0;
-
-    const items = state.addToCart.carts[consumerId]?.items || [];
-
-    return items.length;
-  });
 
   const FallBackImage =
     "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2";
@@ -85,16 +122,6 @@ const ProductList = ({ onBack }) => {
       return { ...prev, [id]: next };
     });
   };
-
-  /* ---------------- API ---------------- */
-  useEffect(() => {
-    const loadProducts = async () => {
-      const res = await fetchProducts();
-      setProducts(res?.products || []);
-    };
-
-    loadProducts();
-  }, []);
 
   /* ---------------- HANDLERS ---------------- */
   const handleQuantityChange = (id, value) => {
@@ -167,8 +194,12 @@ const ProductList = ({ onBack }) => {
       </Box>
 
       {/* PRODUCTS GRID */}
-      <Grid container spacing={3} sx={{ paddingLeft: 3.5 }}>
-        {products.map((product) => {
+      <Grid
+        container
+        spacing={3}
+        ref={pagerTop}
+        sx={{ paddingLeft: 3.5, scrollMarginTop: 96 }}>
+        {pager.pageItems.map((product) => {
           const qty = Number(quantities[product._id]) || 0;
 
           const unitPrice = getUnitPrice(product); // 👈 role-aware
@@ -256,6 +287,24 @@ const ProductList = ({ onBack }) => {
 
                   <Typography variant="body2" color="text.secondary" mb={1}>
                     ₹{unitPrice} / {product.uom}
+                    {/* Set by the admin for this territory, not the default */}
+                    {product.priceSource === "location" && (
+                      <Box
+                        component="span"
+                        sx={{
+                          ml: 1,
+                          px: 0.75,
+                          py: 0.15,
+                          borderRadius: 1,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "var(--panel-green-ink, #047857)",
+                          bgcolor: "var(--panel-green-tint, #ecfdf5)",
+                          verticalAlign: "middle",
+                        }}>
+                        Location price
+                      </Box>
+                    )}
                   </Typography>
 
                   <Box
@@ -285,8 +334,8 @@ const ProductList = ({ onBack }) => {
                     borderRadius: "0 0 12px 12px",
                     fontWeight: 700,
                     textTransform: "none",
-                    backgroundColor: qty > 0 ? "#f59e0b" : "#e5e7eb",
-                    color: qty > 0 ? "#fff" : "#6b7280",
+                    backgroundColor: qty > 0 ? "#f59e0b" : "var(--panel-muted, #e5e7eb)",
+                    color: qty > 0 ? "#fff" : "var(--panel-ink-muted, #6b7280)",
                   }}>
                   Add to cart
                 </Button>
@@ -295,6 +344,13 @@ const ProductList = ({ onBack }) => {
           );
         })}
       </Grid>
+
+      <Pagination
+        {...pager.controls}
+        label="products"
+        pageSizeOptions={[12, 24, 48]}
+        className="mt-6 px-1"
+      />
     </Box>
   );
 };

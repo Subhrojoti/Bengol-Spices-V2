@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BadgeCheck,
@@ -13,20 +13,50 @@ import {
   Truck,
 } from "lucide-react";
 
-import coriander from "../../../assets/products/BS_Coriander_Powder.jpeg";
-import cumin from "../../../assets/products/BS_Cumin_Powder.jpeg";
-import garamMasala from "../../../assets/products/BS_Garam_Masala.jpeg";
-import redChilli from "../../../assets/products/BS_Red_Chilli_Powder.jpeg";
-import turmeric from "../../../assets/products/BS_Turmeric_Powder.jpeg";
-import HeroBG from "../../../assets/logo/BS_Home.png";
-import fssaiLogo from "../../../assets/logo/FSSAI_Logo.png";
+import coriander from "../../../assets/products/BS_Coriander_Powder.webp";
+import cumin from "../../../assets/products/BS_Cumin_Powder.webp";
+import garamMasala from "../../../assets/products/BS_Garam_Masala.webp";
+import redChilli from "../../../assets/products/BS_Red_Chilli_Powder.webp";
+import turmeric from "../../../assets/products/BS_Turmeric_Powder.webp";
+import HeroBG from "../../../assets/logo/BS_Home.webp";
+import HeroBGSmall from "../../../assets/logo/BS_Home-960.webp";
+import fssaiLogo from "../../../assets/logo/FSSAI_Logo.webp";
+import useReveal from "../../../hooks/useReveal";
 
+/* `use` is a line of plain description under each pack. It says what the
+   spice is and what it goes into, which is what someone searching for it
+   is looking for, and what a search engine reads the page for. */
 const PRODUCTS = [
-  { name: "Coriander Powder", local: "Dhaniya", image: coriander },
-  { name: "Cumin Powder", local: "Jeera", image: cumin },
-  { name: "Garam Masala", local: "Masala", image: garamMasala },
-  { name: "Red Chilli Powder", local: "Lal Mirch", image: redChilli },
-  { name: "Turmeric Powder", local: "Haldi", image: turmeric },
+  {
+    name: "Coriander Powder",
+    local: "Dhaniya",
+    image: coriander,
+    use: "Ground coriander seed for curries, dals and spice blends.",
+  },
+  {
+    name: "Cumin Powder",
+    local: "Jeera",
+    image: cumin,
+    use: "Ground cumin seed for tempering, raitas and masalas.",
+  },
+  {
+    name: "Garam Masala",
+    local: "Masala",
+    image: garamMasala,
+    use: "A blend of ground spices for gravies, curries and biryanis.",
+  },
+  {
+    name: "Red Chilli Powder",
+    local: "Lal Mirch",
+    image: redChilli,
+    use: "Ground red chilli for colour and heat in everyday cooking.",
+  },
+  {
+    name: "Turmeric Powder",
+    local: "Haldi",
+    image: turmeric,
+    use: "Ground turmeric for colour and flavour in curries and dals.",
+  },
 ];
 
 const PILLARS = [
@@ -111,7 +141,6 @@ const ECOSYSTEM = [
 ];
 
 const Home = () => {
-  const navigate = useNavigate();
   const videoRefs = useRef([]);
 
   /* Videos load and play only near the viewport, and pause once they leave.
@@ -152,24 +181,7 @@ const Home = () => {
 
   /* Sections lift into place as they arrive. Same technique, so scrolling
      stays free of listeners. */
-  useEffect(() => {
-    const nodes = document.querySelectorAll("[data-reveal]");
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0.12 },
-    );
-
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, []);
+  useReveal();
 
   return (
     <div className="bg-[#faf7f2]">
@@ -180,9 +192,19 @@ const Home = () => {
       <div className="min-h-viewport flex flex-col">
         {/* ================= HERO ================= */}
         <section className="relative flex flex-1 items-center overflow-hidden bg-[#14100c]">
+          {/* The largest thing on the first screen, so it is what page-speed
+              scores are measured on. Phones get the 960px file (51 KB)
+              instead of the full 1920px one, and the browser is told to
+              fetch it ahead of everything else. */}
           <img
             src={HeroBG}
-            alt=""
+            srcSet={`${HeroBGSmall} 960w, ${HeroBG} 1920w`}
+            sizes="100vw"
+            width={1920}
+            height={874}
+            alt="Bengol Spices ground turmeric, red chilli, cumin and coriander with whole spices in bowls and sacks"
+            fetchPriority="high"
+            decoding="async"
             className="hero-drift absolute inset-0 h-full w-full object-cover object-center"
           />
 
@@ -215,22 +237,24 @@ const Home = () => {
                 accounted for.
               </p>
 
+              {/* Real links, not buttons with a click handler: a search
+                  engine follows an <a href>, and so does "open in new tab". */}
               <div data-reveal className="reveal reveal-3 mt-9 flex flex-wrap gap-3">
-                <button
-                  onClick={() => navigate("/about")}
+                <Link
+                  to="/about"
                   className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-6 py-3.5 text-[14.5px] font-semibold text-[#14100c] transition hover:bg-amber-300">
                   Our journey
                   <ArrowRight
                     size={16}
                     className="transition-transform group-hover:translate-x-0.5"
                   />
-                </button>
+                </Link>
 
-                <button
-                  onClick={() => navigate("/agent-onboarding")}
+                <Link
+                  to="/agent-onboarding"
                   className="inline-flex items-center gap-2 rounded-full border border-white/25 px-6 py-3.5 text-[14.5px] font-semibold text-white backdrop-blur-sm transition hover:border-white/50 hover:bg-white/5">
                   Become an agent
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -342,10 +366,21 @@ const Home = () => {
               <h2 className="mt-3 text-[32px] font-semibold leading-tight tracking-tight text-[#1c1611] sm:text-[40px]">
                 Ground fresh, packed clean.
               </h2>
+              <p className="mt-4 text-[15.5px] leading-relaxed text-[#5b5147]">
+                Five everyday Indian spice powders, supplied to retailers,
+                wholesalers and distributors with trade pricing for each.
+              </p>
             </div>
 
             <div className="flex items-center gap-3 rounded-2xl border border-[#ece2d4] bg-[#faf7f2] px-4 py-3">
-              <img src={fssaiLogo} alt="" className="h-9 w-auto object-contain" />
+              <img
+                src={fssaiLogo}
+                alt="FSSAI"
+                width={240}
+                height={180}
+                loading="lazy"
+                className="h-9 w-auto object-contain"
+              />
               <p className="text-[12.5px] leading-snug text-[#6b6156]">
                 FSSAI certified
                 <br />
@@ -364,8 +399,11 @@ const Home = () => {
                 <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-[#f4ece0]">
                   <img
                     src={item.image}
-                    alt={item.name}
+                    alt={`Bengol Spices ${item.name} (${item.local}) pack`}
+                    width={650}
+                    height={813}
                     loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.07]"
                   />
 
@@ -376,11 +414,15 @@ const Home = () => {
                   </span>
 
                   <div className="absolute inset-x-4 bottom-4">
-                    <p className="text-[16.5px] font-semibold leading-tight text-white">
+                    <h3 className="text-[16.5px] font-semibold leading-tight text-white">
                       {item.name}
-                    </p>
+                    </h3>
                   </div>
                 </div>
+
+                <p className="mt-3 px-1 text-[13.5px] leading-relaxed text-[#6b6156]">
+                  {item.use}
+                </p>
               </article>
             ))}
           </div>
@@ -523,23 +565,23 @@ const Home = () => {
           </p>
 
           <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => navigate("/careers")}
+            <Link
+              to="/careers"
               className="group inline-flex items-center gap-2 rounded-full bg-[#1c1611] px-7 py-3.5 text-[14.5px] font-semibold text-white transition hover:bg-[#2a2119]">
               Get started
               <ArrowRight
                 size={16}
                 className="transition-transform group-hover:translate-x-0.5"
               />
-            </button>
+            </Link>
 
             {/* There is no /contact route; help and support is where the
                 enquiry actually lands. */}
-            <button
-              onClick={() => navigate("/help")}
+            <Link
+              to="/help"
               className="inline-flex items-center gap-2 rounded-full border border-[#ded0bb] bg-white px-7 py-3.5 text-[14.5px] font-semibold text-[#1c1611] transition hover:border-[#c9b699]">
               Talk to us
-            </button>
+            </Link>
           </div>
 
           <p className="mt-8 flex items-center justify-center gap-2 text-[12.5px] text-[#98897a]">

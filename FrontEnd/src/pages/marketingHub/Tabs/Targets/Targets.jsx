@@ -5,7 +5,7 @@ import TrackChangesIcon from "@mui/icons-material/TrackChanges";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import StoreIcon from "@mui/icons-material/Store";
 import PaymentsIcon from "@mui/icons-material/Payments";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { getDailyTarget } from "../../../../api/services";
 import {
   RadialBarChart,

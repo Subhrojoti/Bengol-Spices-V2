@@ -3,16 +3,19 @@ import { Box, Typography } from "@mui/material";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   getIncentiveSummary,
   getIncentiveHistory,
 } from "../../../../api/services";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 
 const Wallet = () => {
   const [summary, setSummary] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pager, pagerTop] = usePagination(history);
 
   const fetchWallet = async () => {
     try {
@@ -93,8 +96,8 @@ const Wallet = () => {
             No transactions found
           </p>
         ) : (
-          <div className="space-y-4">
-            {history.map((item) => {
+          <div ref={pagerTop} className="scroll-mt-24 space-y-4">
+            {pager.pageItems.map((item) => {
               const isCredit = item.type === "EARNING";
 
               return (
@@ -141,6 +144,8 @@ const Wallet = () => {
                 </div>
               );
             })}
+
+            <Pagination {...pager.controls} label="transactions" />
           </div>
         )}
       </div>

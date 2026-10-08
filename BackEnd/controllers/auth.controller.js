@@ -33,13 +33,14 @@ export const setPassword = async (req, res) => {
       });
     }
 
-    // Approval links now store only a hash of the token. The plain match
-    // keeps links sent before this change working until they expire.
+    /* Only the hash of the token is stored. Matching the raw token as well
+       used to be here so that links mailed out before hashing was
+       introduced kept working; every link lives fifteen minutes, so none of
+       those can still be valid. Leaving it in undid the hashing: the value
+       sitting in the database would itself be accepted as a token, which is
+       precisely what storing a hash is meant to prevent. */
     const agent = await Agent.findOne({
-      $or: [
-        { passwordResetToken: hashResetToken(token) },
-        { passwordResetToken: token },
-      ],
+      passwordResetToken: hashResetToken(token),
       passwordResetExpires: { $gt: Date.now() },
     });
 
@@ -141,13 +142,25 @@ export const agentLogin = async (req, res) => {
   }
 };
 
-// CHANGE PASSWORD (AGENT)
+/* CHANGE PASSWORD (AGENT)
+   Other devices signed in with the old password are signed out, and this
+   one gets a fresh login token to carry on with. Before, a changed password
+   left every existing session working for up to 30 days, so changing it
+   after a phone was lost protected nothing. */
 export const changePassword = async (req, res) => {
   try {
-    const { oldPassword, newPassword, confirmPassword } = req.body;
+    const { oldPassword, newPassword, confirmPassword } = req.body || {};
 
-    // 1️⃣ Required fields check
-    if (!oldPassword || !newPassword || !confirmPassword) {
+    // 1️⃣ Required fields check (text only: anything else used to reach
+    // bcrypt, throw, and answer 500)
+    if (
+      typeof oldPassword !== "string" ||
+      typeof newPassword !== "string" ||
+      typeof confirmPassword !== "string" ||
+      !oldPassword ||
+      !newPassword ||
+      !confirmPassword
+    ) {
       return res.status(400).json({
         success: false,
         message: "Old password, new password and confirm password are required",
@@ -184,11 +197,23 @@ export const changePassword = async (req, res) => {
       });
     }
 
+    // Approved but the set-password link was never used: nothing to compare
+    if (!agent.password) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No password has been set on this account yet. Use Forgot password to choose one.",
+      });
+    }
+
     // 4️⃣ Old password check
     const isMatch = await bcrypt.compare(oldPassword, agent.password);
 
+    /* 400, not 401. The agent app and the web panel both treat any 401 as
+       "your session has ended" and sign the user out, so a mistyped current
+       password used to throw the agent out of the app. */
     if (!isMatch) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: "Old password is incorrect",
       });
@@ -204,13 +229,31 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    // 6️⃣ Hash and save new password
-    agent.password = await bcrypt.hash(newPassword, 10);
-    await agent.save();
+    /* 6️⃣ Hash and save the new password. Only these two fields are
+       written, so an older record missing some other required detail cannot
+       block a password change. Tokens issued before passwordChangedAt stop
+       working; it is set a moment early so the token issued just below
+       (whose "issued at" is in whole seconds) is not caught by it. */
+    await Agent.updateOne(
+      { _id: agent._id },
+      {
+        $set: {
+          password: await bcrypt.hash(newPassword, 10),
+          passwordChangedAt: new Date(Date.now() - 2000),
+        },
+      },
+    );
+
+    const token = jwt.sign(
+      { id: agent._id, agentId: agent.agentId, role: agent.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "30d" },
+    );
 
     return res.json({
       success: true,
       message: "Password changed successfully",
+      token,
     });
   } catch (error) {
     console.error(error);

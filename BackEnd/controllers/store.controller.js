@@ -1,18 +1,113 @@
+import crypto from "crypto";
 import Store from "../models/store.js";
 import cloudinary from "../config/cloudinary.js";
 import AgentTargetProgress from "../models/AgentTargetProgress.js";
 import AgentSalesLocation from "../models/AgentSalesLocation.js";
 import Counter from "../models/Counter.js";
+import Product from "../models/Product.js";
 import { updateTargetProgress } from "../services/target.service.js";
+import {
+  applyLocationPrices,
+  effectivePrice,
+  getLocationOverrides,
+} from "../utils/pricing.js";
+
+// The same fields the public catalogue exposes
+const CATALOGUE_FIELDS =
+  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice images gstPercentage minOrderQty";
+
+/**
+ * THE CATALOGUE AS ONE STORE SEES IT (Agent, own store only)
+ *
+ * The public catalogue carries the default prices. This returns the same
+ * products with the territory's location prices applied, so the apps show
+ * exactly what the server will charge when the order is placed. Field names
+ * match the public catalogue; `effectivePrice` is the single price for this
+ * store's type and `priceSource` says where it came from.
+ */
+export const getStoreCatalog = async (req, res) => {
+  try {
+    const { consumerId } = req.params;
+
+    const store = await Store.findOne({
+      consumerId,
+      registeredBy: req.user.agentId,
+    })
+      .select("consumerId storeName storeType address.state")
+      .lean();
+
+    if (!store) {
+      return res.status(404).json({
+        success: false,
+        message: "Store not found",
+      });
+    }
+
+    const [products, overrides] = await Promise.all([
+      Product.find({ status: "ACTIVE" })
+        .select(CATALOGUE_FIELDS)
+        .sort({ createdAt: -1 })
+        .lean(),
+      getLocationOverrides(req.user.agentId, store.address?.state),
+    ]);
+
+    const priced = products.map((product) => {
+      const override = overrides.get(String(product._id));
+      const { fromLocation, ...tierPrices } = applyLocationPrices(
+        product,
+        override,
+      );
+      const { price, source } = effectivePrice(
+        product,
+        store.storeType,
+        override,
+      );
+
+      return {
+        ...product,
+        ...tierPrices,
+        effectivePrice: price,
+        priceSource: source,
+        locationPricing: fromLocation,
+      };
+    });
+
+    return res.json({
+      success: true,
+      count: priced.length,
+      store: {
+        consumerId: store.consumerId,
+        storeName: store.storeName,
+        storeType: store.storeType,
+        state: store.address?.state,
+      },
+      products: priced,
+    });
+  } catch (error) {
+    console.error("GET STORE CATALOG ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch products for this store",
+    });
+  }
+};
 
 //Store Creation - POST /api/stores
 export const createStore = async (req, res) => {
+  /* The delivery code is a credential, not just an identifier: the store
+     owner reads it out at handover and the delivery partner types it in to
+     confirm the order really arrived. Math.random is a predictable
+     generator - its internal state can be recovered from a handful of
+     outputs - so a partner who legitimately sees a few codes could work
+     out other stores codes and confirm deliveries that never happened.
+     crypto.randomInt draws on the same source as the other credentials
+     here. The format is unchanged: six digits, 100000 to 999999. */
   const generateDeliveryCode = async () => {
     let code;
     let exists = true;
 
     while (exists) {
-      code = Math.floor(100000 + Math.random() * 900000).toString();
+      code = String(crypto.randomInt(100000, 1000000));
       exists = await Store.findOne({ deliveryCode: code });
     }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
-import brandLogo from "../../../assets/logo/Logo_Final.png";
+import brandLogo from "../../../assets/logo/Logo_Final.webp";
 
 /**
  * Split-screen shell shared by the staff sign-in pages.

@@ -235,6 +235,9 @@ export const updateEmployeePermissions = async (req, res) => {
         message = "Your permissions have been updated. Please re-login.";
       }
 
+      /* The permissions are already saved. A notification that could not be
+         written used to answer "Failed to update permissions" for a change
+         that had in fact gone through. */
       await createNotification({
         title: "Permission Update",
         message,
@@ -244,7 +247,9 @@ export const updateEmployeePermissions = async (req, res) => {
           granted,
           revoked,
         },
-      });
+      }).catch((notifyError) =>
+        console.error("PERMISSION NOTIFICATION FAILED:", notifyError),
+      );
     }
 
     return res.json({

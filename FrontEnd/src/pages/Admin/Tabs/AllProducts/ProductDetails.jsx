@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { sanitizeHtml } from "../../../../utils/sanitizeHtml";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowLeft,
@@ -107,6 +108,12 @@ export default function ProductDetails() {
         { label: "Front", url: product?.images?.front?.url },
         { label: "Back", url: product?.images?.back?.url },
       ].filter((i) => i.url),
+    [product],
+  );
+
+  // Only its formatting, nothing that can run (utils/sanitizeHtml.js)
+  const description = useMemo(
+    () => sanitizeHtml(product?.description),
     [product],
   );
 
@@ -260,11 +267,14 @@ export default function ProductDetails() {
             <h3 className="text-[15px] font-semibold text-slate-900">
               Description
             </h3>
-            {product.description ? (
+            {description ? (
               <div
                 className="prose prose-sm mt-2 max-w-none text-[14px] leading-relaxed text-slate-600"
-                /* Admin-authored rich text from the product form */
-                dangerouslySetInnerHTML={{ __html: product.description }}
+                /* Rich text from the product form. Rebuilt with only its
+                   formatting before it goes on the page: shown as stored, a
+                   description saved with a script in it would run here, in
+                   the admin's own session (utils/sanitizeHtml.js). */
+                dangerouslySetInnerHTML={{ __html: description }}
               />
             ) : (
               <p className="mt-2 text-[14px] text-slate-400">

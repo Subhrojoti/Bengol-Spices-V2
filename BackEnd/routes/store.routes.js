@@ -3,6 +3,7 @@ import {
   createStore,
   getMyStores,
   getAllStores,
+  getStoreCatalog,
 } from "../controllers/store.controller.js";
 import { protect } from "../middleware/auth.js";
 import { isAgent } from "../middleware/role.js";
@@ -20,6 +21,9 @@ router.post("/register", protect, isAgent, upload.single("image"), createStore);
 
 // GET MY STORES
 router.get("/my-stores", protect, isAgent, getMyStores);
+
+// Products with the prices that apply to one of the agent's stores
+router.get("/:consumerId/products", protect, isAgent, getStoreCatalog);
 
 // Assign Sales Location to Agent (Admin and Employees with Permission)
 router.post(

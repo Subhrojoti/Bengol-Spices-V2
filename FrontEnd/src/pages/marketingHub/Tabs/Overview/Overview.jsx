@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getAgentDashboard } from "../../../../api/services";
+import { useChartChrome } from "../../../../theme/useChartChrome";
 
 import {
   ResponsiveContainer,
@@ -41,6 +42,9 @@ const months = [
 
 const Overview = () => {
   const [data, setData] = useState(null);
+  // Grid lines, axis labels and tooltip box, for light or dark. Up here
+  // with the other hooks, above the "still loading" return below.
+  const chrome = useChartChrome({ grid: "#e5e7eb" });
 
   useEffect(() => {
     fetchDashboard();
@@ -188,10 +192,10 @@ const Overview = () => {
                   </linearGradient>
                 </defs>
 
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke={chrome.grid} />
+                <XAxis dataKey="month" {...chrome.axisProps} />
+                <YAxis {...chrome.axisProps} />
+                <Tooltip {...chrome.tooltip} />
 
                 <Area dataKey="sales" stroke="#3b82f6" fill="url(#sales)" />
                 <Area
@@ -227,7 +231,7 @@ const Overview = () => {
                     <Cell key={index} fill={COLORS[index]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip {...chrome.tooltip} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -304,6 +308,7 @@ const SparkCard = ({ icon, label, value, color, data, dataKey }) => {
 /* NEW RADIAL KPI */
 
 const RadialMiniCard = ({ icon, label, value, color }) => {
+  const chrome = useChartChrome();
   const chartData = [
     { name: "value", value: value || 0 },
     { name: "rest", value: 10 }, // small background ring
@@ -337,7 +342,7 @@ const RadialMiniCard = ({ icon, label, value, color }) => {
                 dataKey="value"
                 stroke="none">
                 <Cell fill={color} />
-                <Cell fill="#e5e7eb" />
+                <Cell fill={chrome.track} />
               </Pie>
             </PieChart>
           </ResponsiveContainer>

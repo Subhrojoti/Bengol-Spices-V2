@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import PanelLayout from "../../components/layout/PanelLayout";
 import { adminRoutes } from "../../config/adminRoutes";
+import useLiveOrders from "../../hooks/useLiveOrders";
 
 const ADMIN_ACCENT = {
   main: "#2563eb",
@@ -14,6 +15,12 @@ const ADMIN_IDENTITY = { name: "Administrator", role: "Full access" };
 
 const AdminBase = () => {
   const navigate = useNavigate();
+
+  // New orders arrive as a toast with a chime while the panel is open
+  useLiveOrders({
+    tokenKey: "adminToken",
+    ordersPath: "/admin/order-management",
+  });
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");

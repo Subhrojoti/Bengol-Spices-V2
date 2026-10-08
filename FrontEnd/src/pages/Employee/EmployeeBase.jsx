@@ -7,6 +7,7 @@ import { employeeRoutes } from "../../config/employeeRoutes";
 import { getEmployeeProfile } from "../../api/services";
 import { canAccessRoute } from "../../utils/permissionUtils";
 import useAccessSync from "../../hooks/useAccessSync";
+import useLiveOrders from "../../hooks/useLiveOrders";
 
 const EMPLOYEE_ACCENT = {
   main: "#7c3aed",
@@ -16,6 +17,14 @@ const EMPLOYEE_ACCENT = {
 
 const EmployeeBase = () => {
   const navigate = useNavigate();
+
+  // New orders arrive as a toast with a chime; the server only sends them
+  // to employees allowed to see all orders
+  useLiveOrders({
+    tokenKey: "employeeToken",
+    ordersPath: "/employee/order-management",
+  });
+
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
 

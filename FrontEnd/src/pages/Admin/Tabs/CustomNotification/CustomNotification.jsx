@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   AlertCircle,
   Bell,
@@ -13,6 +13,8 @@ import {
   Users,
 } from "lucide-react";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import {
   sendNotification,
   getNotificationAudience,
@@ -95,6 +97,7 @@ export default function CustomNotification() {
   const [audience, setAudience] = useState(null);
   const [sent, setSent] = useState([]);
   const [historyStatus, setHistoryStatus] = useState("loading");
+  const [sentPager, sentPagerTop] = usePagination(sent);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -220,8 +223,8 @@ export default function CustomNotification() {
                             : "border-slate-200 bg-white hover:border-slate-300"
                         }`}>
                         <span
-                          className="mb-2 grid h-8 w-8 place-items-center rounded-lg"
-                          style={{ backgroundColor: r.tint, color: r.ink }}>
+                          className="tint-chip mb-2 grid h-8 w-8 place-items-center rounded-lg"
+                          style={{ "--tint": r.tint, "--ink": r.ink }}>
                           <Icon size={15} />
                         </span>
 
@@ -361,7 +364,9 @@ export default function CustomNotification() {
               </button>
             </div>
 
-            <div className="max-h-[30rem] overflow-y-auto p-4 lg:max-h-[calc(100vh-14rem)]">
+            <div
+              ref={sentPagerTop}
+              className="scroll-mt-24 max-h-[30rem] overflow-y-auto p-4 lg:max-h-[calc(100vh-14rem)]">
               {historyStatus === "loading" ? (
                 <div className="animate-pulse space-y-3">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -393,7 +398,7 @@ export default function CustomNotification() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {sent.map((item, i) => {
+                  {sentPager.pageItems.map((item, i) => {
                     const meta =
                       ROLES.find((r) => r.key === item.audience) || ROLES[0];
                     const Icon = meta.icon;
@@ -408,8 +413,8 @@ export default function CustomNotification() {
                         className="rounded-xl border border-slate-200 bg-white p-3.5">
                         <div className="flex items-start gap-2.5">
                           <span
-                            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
-                            style={{ backgroundColor: meta.tint, color: meta.ink }}>
+                            className="tint-chip grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+                            style={{ "--tint": meta.tint, "--ink": meta.ink }}>
                             <Icon size={14} />
                           </span>
 
@@ -453,6 +458,15 @@ export default function CustomNotification() {
                 </div>
               )}
             </div>
+
+            {historyStatus === "ready" && (
+              <Pagination
+                {...sentPager.controls}
+                compact
+                label="sent"
+                className="border-t border-slate-100 px-4 py-3"
+              />
+            )}
           </Card>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { Eye, EyeOff, KeyRound, Loader2, Mail, ShieldCheck } from "lucide-react";
 import AuthShell, { AuthField } from "./AuthShell";
 import { adminLogin } from "../../../api/services";

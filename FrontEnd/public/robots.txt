@@ -1,0 +1,21 @@
+# Bengol Spices
+# The public pages are open. Everything below is the signed-in application
+# (the admin, employee, agent and delivery panels and their logins), which
+# has nothing a search engine should list.
+
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /employee
+Disallow: /delivery/
+Disallow: /marketing
+Disallow: /agent/
+Disallow: /agent-set-password
+Disallow: /agent-forgot-password
+Disallow: /agent-reset-password
+Disallow: /delivery-forgot-password
+Disallow: /delivery-reset-password
+Disallow: /error
+
+Sitemap: https://www.bengolspices.com/sitemap.xml

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, History, MapPin, Search, Undo2 } from "lucide-react";
 import StatusPill from "../../../../components/common/StatusPill";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import { getMyDeliveryHistory } from "../../../../api/services";
 import { Card, Empty, ListSkeleton, LoadError, Stat } from "../../ui";
 import { day, inr } from "../../format";
@@ -84,6 +86,8 @@ export default function DeliveryHistory() {
 
     return filtered.sort((a, b) => new Date(b.when) - new Date(a.when));
   }, [data, tab, search]);
+
+  const [pager, pagerTop] = usePagination(rows, { resetKey: `${tab}|${search}` });
 
   if (status === "error") {
     return <LoadError title="Could not load your history" onRetry={load} />;
@@ -173,8 +177,9 @@ export default function DeliveryHistory() {
             }
           />
         ) : (
-          <div className="divide-y divide-slate-100">
-            {rows.map((row) => (
+          <>
+          <div ref={pagerTop} className="scroll-mt-24 divide-y divide-slate-100">
+            {pager.pageItems.map((row) => (
               <div
                 key={row.key}
                 className="flex flex-wrap items-center gap-3 px-5 py-3.5">
@@ -213,6 +218,12 @@ export default function DeliveryHistory() {
               </div>
             ))}
           </div>
+          <Pagination
+            {...pager.controls}
+            label={tab === "delivered" ? "deliveries" : "returns"}
+            className="border-t border-slate-100 px-5 py-3"
+          />
+          </>
         )}
       </Card>
     </div>

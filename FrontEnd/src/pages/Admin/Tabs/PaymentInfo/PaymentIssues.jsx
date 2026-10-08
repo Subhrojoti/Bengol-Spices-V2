@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { CheckCircle2, RotateCcw, TriangleAlert } from "lucide-react";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import {
   getPaymentIssues,
   refundPaymentIssue,
@@ -36,6 +38,8 @@ export default function PaymentIssues() {
   const [action, setAction] = useState(null); // { issue, kind: "refund" | "resolve" }
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const [pager, pagerTop] = usePagination(issues, { pageSize: 5 });
 
   const load = useCallback(async () => {
     try {
@@ -102,8 +106,8 @@ export default function PaymentIssues() {
           </div>
         </div>
 
-        <div className="mt-4 space-y-2.5">
-          {issues.map((issue) => (
+        <div ref={pagerTop} className="mt-4 scroll-mt-24 space-y-2.5">
+          {pager.pageItems.map((issue) => (
             <div
               key={issue._id}
               className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200/80 bg-white px-4 py-3">
@@ -148,6 +152,13 @@ export default function PaymentIssues() {
             </div>
           ))}
         </div>
+
+        <Pagination
+          {...pager.controls}
+          label="payments"
+          pageSizeOptions={[5, 10, 25]}
+          className="mt-3"
+        />
       </div>
 
       <ConfirmDialog

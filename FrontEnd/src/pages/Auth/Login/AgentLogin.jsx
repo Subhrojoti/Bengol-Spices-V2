@@ -16,11 +16,10 @@ import { Link as RouterLink } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { agentLogin } from "../../../api/services";
 import { Link } from "@mui/material";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import slide1 from "../../../assets/Slides/Slide1.png";
-import slide2 from "../../../assets/Slides/Slide2.png";
-import slide3 from "../../../assets/Slides/Slide3.png";
+import { toast } from "sonner";
+import slide1 from "../../../assets/Slides/Slide1.webp";
+import slide2 from "../../../assets/Slides/Slide2.webp";
+import slide3 from "../../../assets/Slides/Slide3.webp";
 
 const spiceImages = [
   {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fallback. scripts/prerender.mjs writes a fresh copy, with today's date
+     on every entry, each time the site is built. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.bengolspices.com/</loc></url>
+  <url><loc>https://www.bengolspices.com/about</loc></url>
+  <url><loc>https://www.bengolspices.com/careers</loc></url>
+  <url><loc>https://www.bengolspices.com/help</loc></url>
+  <url><loc>https://www.bengolspices.com/terms</loc></url>
+  <url><loc>https://www.bengolspices.com/privacy</loc></url>
+  <url><loc>https://www.bengolspices.com/agent-onboarding</loc></url>
+  <url><loc>https://www.bengolspices.com/delivery-partner-register</loc></url>
+</urlset>

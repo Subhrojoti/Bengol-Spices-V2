@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import StatusPill from "../../../../components/common/StatusPill";
 import EntityAvatar from "../../../../components/common/EntityAvatar";
+import Pagination from "../../../../components/common/Pagination";
+import usePagination from "../../../../hooks/usePagination";
 import { getAllReturns, getAllStores } from "../../../../api/services";
 
 const IN_PROGRESS = ["PICKUP_ASSIGNED", "PICKED_UP", "RECEIVED_AT_WAREHOUSE"];
@@ -44,8 +46,8 @@ const Stat = ({ label, value, icon, tint, ink }) => (
   <Card className="p-4">
     <div className="flex items-center gap-3">
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-        style={{ backgroundColor: tint, color: ink }}>
+        className="tint-chip grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ "--tint": tint, "--ink": ink }}>
         {icon}
       </span>
       <div className="min-w-0">
@@ -213,6 +215,11 @@ export default function ReturnsManagement() {
     return activeStore.returns.filter((r) => r.status === statusFilter);
   }, [activeStore, statusFilter]);
 
+  const [storePager, storePagerTop] = usePagination(visibleStores, { resetKey: storeSearch });
+  const [returnPager, returnPagerTop] = usePagination(visibleReturns, {
+    resetKey: `${selectedStore}|${statusFilter}`,
+  });
+
   const stats = useMemo(
     () => ({
       total: returns.length,
@@ -330,8 +337,11 @@ export default function ReturnsManagement() {
               }
             />
           ) : (
-            <div className="max-h-[30rem] space-y-2.5 overflow-y-auto p-4 lg:max-h-[calc(100vh-22rem)]">
-              {visibleStores.map((store) => {
+            <>
+            <div
+              ref={storePagerTop}
+              className="scroll-mt-24 max-h-[30rem] space-y-2.5 overflow-y-auto p-4 lg:max-h-[calc(100vh-22rem)]">
+              {storePager.pageItems.map((store) => {
                 const active = store.consumerId === selectedStore;
 
                 return (
@@ -405,6 +415,13 @@ export default function ReturnsManagement() {
                 );
               })}
             </div>
+            <Pagination
+              {...storePager.controls}
+              compact
+              label="stores"
+              className="border-t border-slate-100 px-4 py-3"
+            />
+            </>
           )}
         </Card>
 
@@ -464,8 +481,9 @@ export default function ReturnsManagement() {
               hint="Choose a different status above."
             />
           ) : (
-            <div className="space-y-3 p-4">
-              {visibleReturns.map((ret) => {
+            <>
+            <div ref={returnPagerTop} className="scroll-mt-24 space-y-3 p-4">
+              {returnPager.pageItems.map((ret) => {
                 const isOpen = expanded === ret._id;
                 const historyOpen = expandedHistory === ret._id;
                 const history = ret.statusHistory || [];
@@ -681,6 +699,12 @@ export default function ReturnsManagement() {
                 );
               })}
             </div>
+            <Pagination
+              {...returnPager.controls}
+              label="returns"
+              className="border-t border-slate-100 px-4 py-3"
+            />
+            </>
           )}
         </Card>
       </div>

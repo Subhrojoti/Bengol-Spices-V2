@@ -3,6 +3,7 @@ import {
   approveAgent,
   approveDeliveryPartner,
   getAllAgents,
+  getAttentionSummary,
   getDashboardSummary,
   rejectAgent,
   rejectDeliveryPartner,
@@ -65,6 +66,14 @@ router.get(
   "/dashboard-summary",
   checkPermission("canViewDashboardSummary"),
   getDashboardSummary,
+);
+
+// What is waiting on the office: orders to confirm, overdue dues,
+// applications… Each part is shown only to someone allowed to act on it.
+router.get(
+  "/attention",
+  checkPermission("canViewDashboardSummary"),
+  getAttentionSummary,
 );
 
 export default router;

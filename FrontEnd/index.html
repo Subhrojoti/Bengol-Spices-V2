@@ -1,25 +1,113 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-IN">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- The tags between the two markers are this page's SEO defaults (the
+         home page's). scripts/prerender.mjs replaces the whole block when it
+         writes each page out as static HTML; src/seo/RouteMeta.jsx keeps
+         them current in the browser. Keep the markers. -->
+    <!--seo:start-->
+    <title>Bengol Spices | Spice Supplier for Retailers &amp; Wholesalers</title>
+    <meta
+      name="description"
+      content="Bengol Spices supplies FSSAI-licensed turmeric, red chilli, coriander, cumin and garam masala powders to retailers, wholesalers and distributors across India."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://www.bengolspices.com/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Bengol Spices" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:title" content="Bengol Spices | Spice Supplier for Retailers &amp; Wholesalers" />
+    <meta
+      property="og:description"
+      content="Bengol Spices supplies FSSAI-licensed turmeric, red chilli, coriander, cumin and garam masala powders to retailers, wholesalers and distributors across India."
+    />
+    <meta property="og:url" content="https://www.bengolspices.com/" />
+    <meta property="og:image" content="https://www.bengolspices.com/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Bengol Spices ground and whole spices" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bengol Spices | Spice Supplier for Retailers &amp; Wholesalers" />
+    <meta
+      name="twitter:description"
+      content="Bengol Spices supplies FSSAI-licensed turmeric, red chilli, coriander, cumin and garam masala powders to retailers, wholesalers and distributors across India."
+    />
+    <meta name="twitter:image" content="https://www.bengolspices.com/og-image.jpg" />
+    <!--seo:end-->
+
+    <meta name="theme-color" content="#14100c" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Dark mode, decided before anything is drawn.
+
+         Someone who chose the dark theme in a panel would otherwise see a
+         white screen for the moment between the page arriving and the app
+         starting. This marks the page dark straight away, and the
+         stylesheet colours the background from that.
+
+         Only on the panels' own addresses: the public website and the
+         sign-in screens have one look and are never repainted. The same
+         rule and the same storage key are in src/theme/ThemeMode.jsx. -->
+    <script>
+      (function () {
+        try {
+          var path = location.pathname;
+          var panel =
+            /^\/(admin|employee|delivery|marketing)(\/|$)|^\/agent\/profile-settings(\/|$)/.test(path) &&
+            !/\/login\/?$/.test(path);
+
+          if (panel && localStorage.getItem("bengol:theme") === "dark") {
+            document.documentElement.classList.add("dark");
+            document.documentElement.style.colorScheme = "dark";
+          }
+        } catch (e) {
+          /* storage blocked: the panel opens in the light theme */
+        }
+      })();
+    </script>
+
+    <!-- The icon used to be the 2.9 MB master logo, downloaded on every
+         page. These are the same emblem at the sizes browsers ask for. -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
     <!-- The app asked for Inter in its MUI theme but never loaded it, so every
-         screen fell back to Helvetica/Arial. -->
+         screen fell back to Helvetica/Arial.
+
+         Loaded without blocking the first paint: the stylesheet is fetched
+         as "print", which the browser does at low priority, then switched to
+         apply everywhere once it has arrived. Text shows in the fallback
+         font meanwhile (display=swap) instead of the page waiting on
+         Google's servers. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
-
-    <title>bengol</title>
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
-    <!-- Razorpay Script -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- Razorpay's checkout script used to load here, on every page of the
+         site. It is now fetched only when an agent opens a payment
+         (src/utils/razorpay.js). -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

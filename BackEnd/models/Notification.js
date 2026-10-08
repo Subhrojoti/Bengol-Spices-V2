@@ -54,4 +54,9 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+/* One person's notifications, newest first: what every app asks for each
+   time it opens. There was no index at all, so each of those requests read
+   every notification ever sent to anybody. */
+notificationSchema.index({ recipientId: 1, createdAt: -1 });
+
 export default mongoose.model("Notification", notificationSchema);

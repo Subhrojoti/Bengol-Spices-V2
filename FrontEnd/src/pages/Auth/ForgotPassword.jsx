@@ -10,7 +10,7 @@ import {
   Link,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   agentForgotPassword,
   deliveryForgotPassword,

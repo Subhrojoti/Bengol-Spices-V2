@@ -51,4 +51,10 @@ const paymentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+/* "Has this Razorpay payment / QR code been recorded already?" is asked on
+   every online payment. Sparse: cash payments carry neither value and stay
+   out of the index. */
+paymentSchema.index({ razorpayPaymentId: 1 }, { sparse: true });
+paymentSchema.index({ razorpayOrderId: 1 }, { sparse: true });
+
 export default mongoose.model("Payment", paymentSchema);

@@ -1,5 +1,5 @@
 import React from "react";
-import logoMain from "../../assets/logo/Logo_Final.png";
+import logoMain from "../../assets/logo/Logo_Final.webp";
 import {
   AppBar,
   Toolbar,
@@ -30,6 +30,7 @@ import { Divider } from "@mui/material";
 import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
 import Logout from "@mui/icons-material/Logout";
 import NotificationBell from "../notifications/NotificationBell";
+import ThemeToggle from "../common/ThemeToggle";
 
 const AgentHeader = () => {
   const theme = useTheme();
@@ -85,14 +86,14 @@ const AgentHeader = () => {
               <img
                 src={logoMain}
                 alt="Bengol Spices"
-                className="h-14 object-contain"
+                className="h-14 object-contain dark:my-1 dark:h-12 dark:rounded-lg dark:bg-[#ffffff] dark:px-1"
               />
             </div>
             <Typography
               fontWeight={600}
               fontSize={16}
               whiteSpace="nowrap"
-              color="black">
+              color={theme.palette.mode === "dark" ? "text.primary" : "black"}>
               Marketing Hub
             </Typography>
           </Box>
@@ -138,7 +139,7 @@ const AgentHeader = () => {
                 borderRadius: 2,
                 border: "1px solid",
                 borderColor: "divider",
-                bgcolor: "#f9fafb",
+                bgcolor: "var(--panel-subtle, #f9fafb)",
                 minWidth: 220,
               }}>
               <InputBase
@@ -155,6 +156,9 @@ const AgentHeader = () => {
               <Search />
             </IconButton>
           )} */}
+
+          {/* Light / dark, on every screen size */}
+          <ThemeToggle />
 
           {/* Notifications (desktop/tablet only) */}
           {!isMobile && (

@@ -20,6 +20,7 @@ import {
 import { getDeliveryPartnerDashboard } from "../../../../api/services";
 import { Card, LoadError, Stat } from "../../ui";
 import { n } from "../../format";
+import { useChartChrome } from "../../../../theme/useChartChrome";
 
 const COLORS = {
   delivered: "#0f766e",
@@ -46,6 +47,8 @@ export default function DeliveryPanel() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [status, setStatus] = useState("loading");
+  // This chart's own light colours, and the shared dark ones
+  const chrome = useChartChrome({ grid: "#eef2f6", axis: "#94a3b8" });
 
   const load = useCallback(async () => {
     try {
@@ -149,21 +152,21 @@ export default function DeliveryPanel() {
           {hasMonthlyData ? (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={monthly} barGap={2}>
-                <CartesianGrid vertical={false} stroke="#eef2f6" />
+                <CartesianGrid vertical={false} stroke={chrome.grid} />
                 <XAxis
                   dataKey="month"
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                  tick={{ fontSize: 12, fill: chrome.axis }}
                 />
                 <YAxis
                   allowDecimals={false}
                   tickLine={false}
                   axisLine={false}
                   width={32}
-                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                  tick={{ fontSize: 12, fill: chrome.axis }}
                 />
-                <Tooltip cursor={{ fill: "rgba(15,23,42,0.04)" }} />
+                <Tooltip cursor={{ fill: chrome.cursor }} {...chrome.tooltip} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 13 }} />
                 <Bar
                   dataKey="delivered"
