@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "Bengol Delivery",
+    "slug": "bengol-spices-delivery-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/app-logo.png",
+    "scheme": "bengoldelivery",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-screen.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#025E57"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bengolspices.delivery"
+    },
+    "android": {
+      "package": "com.bengolspices.delivery",
+      "adaptiveIcon": {
+        "backgroundColor": "#026869",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/app-logo.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-screen.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#025E57",
+          "enableFullScreenImage_legacy": true,
+          "android": {
+            "image": "./assets/app-logo.png",
+            "imageWidth": 150,
+            "resizeMode": "contain",
+            "backgroundColor": "#026869"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "953c0c84-f7ba-41e8-9617-e5e3bf0404ee"
+      }
+    }
+  }
+}
