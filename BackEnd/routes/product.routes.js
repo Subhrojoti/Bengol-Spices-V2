@@ -24,10 +24,14 @@ router.post(
   ]),
   createProduct,
 );
+/* Reading the list is also open to whoever sets targets: a target's
+   per-product commissions are chosen from it, and an employee allowed to
+   set targets but not to manage products was refused here, leaving the
+   commission picker empty. Changing a product still needs canManageProducts. */
 router.get(
   "/all",
   protect,
-  checkPermission("canManageProducts"),
+  checkPermission(["canManageProducts", "canSetTargets"]),
   getAllProductsInternal,
 );
 

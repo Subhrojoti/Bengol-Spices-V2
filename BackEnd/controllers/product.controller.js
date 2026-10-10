@@ -6,7 +6,7 @@ import { sanitizeDescription } from "../utils/sanitizeHtml.js";
 
 /* What the catalogue shows.
 
-   The retailer, wholesaler and distributor prices are the company's trade
+   The retailer, wholesaler, distributor and HoReCa prices are the company's trade
    terms. They used to be sent to anyone who asked this address, signed in
    or not, so a competitor could read the whole price list with one request.
    The agent app and the web panel always send their login with the
@@ -14,7 +14,7 @@ import { sanitizeDescription } from "../utils/sanitizeHtml.js";
    login gets the range and the listed prices, without the trade tiers. */
 const PUBLIC_FIELDS =
   "name title description category uom price discountPrice images gstPercentage minOrderQty";
-const TRADE_FIELDS = "retailerPrice wholesalerPrice distributorPrice";
+const TRADE_FIELDS = "retailerPrice wholesalerPrice distributorPrice horecaPrice";
 
 const catalogueFields = (req) =>
   req.user ? `${PUBLIC_FIELDS} ${TRADE_FIELDS}` : PUBLIC_FIELDS;
@@ -67,6 +67,7 @@ const EDITABLE_FIELDS = [
   "retailerPrice",
   "wholesalerPrice",
   "distributorPrice",
+  "horecaPrice",
   "gstPercentage",
   "stock",
   "minOrderQty",
@@ -95,6 +96,7 @@ export const createProduct = async (req, res) => {
       retailerPrice,
       wholesalerPrice,
       distributorPrice,
+      horecaPrice,
     } = req.body;
 
     // Taken first, so an upload of only one image is still cleaned up below
@@ -139,6 +141,7 @@ export const createProduct = async (req, res) => {
       retailerPrice: toOptionalPrice(retailerPrice),
       wholesalerPrice: toOptionalPrice(wholesalerPrice),
       distributorPrice: toOptionalPrice(distributorPrice),
+      horecaPrice: toOptionalPrice(horecaPrice),
 
       images: {
         front: {
@@ -268,6 +271,7 @@ export const updateProduct = async (req, res) => {
       "retailerPrice",
       "wholesalerPrice",
       "distributorPrice",
+      "horecaPrice",
       "gstPercentage",
       "stock",
       "minOrderQty",

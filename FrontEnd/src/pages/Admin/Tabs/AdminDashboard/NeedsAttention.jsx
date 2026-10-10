@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   AlertTriangle,
+  Banknote,
   Boxes,
   CheckCircle2,
   ChevronRight,
@@ -62,6 +63,7 @@ const TAB_ACCESS = {
   "order-management": "canGetAllOrders",
   delivery: ["canGetAllDeliveryPartners", "canManageDeliveryPartners"],
   "payment-summary": "canSeePaymentInfo",
+  "cash-verification": "canVerifyPayments",
   "return-management": "canAssignReturn",
   agent: ["canManageAgents", "canPayoutIncentives"],
   allproducts: "canManageProducts",
@@ -77,6 +79,23 @@ const ROWS = [
       `${plural(s.count, "online payment", "online payments")} taken but not recorded`,
     detail: (s) =>
       `${inr(s.amount)} from customers that is neither on an order nor refunded`,
+  },
+  {
+    /* Cash agents recorded that nobody has verified. Until someone does,
+       the agents are not credited for it; urgent once any has waited too
+       long. */
+    key: "cashToVerify",
+    tone: (s) => (s.late > 0 ? "urgent" : "action"),
+    icon: Banknote,
+    tab: "cash-verification",
+    title: (s) =>
+      `${inr(s.amount)} in cash from ${plural(s.count, "payment", "payments")} waiting to be verified`,
+    detail: (s) =>
+      s.late > 0
+        ? `${plural(s.late, "has", "have")} waited more than ${s.lateAfterDays} days; agents are not credited until it is approved`
+        : age(s.oldest)
+          ? `The oldest was recorded ${age(s.oldest)} ago; agents are not credited until it is approved`
+          : null,
   },
   {
     key: "ordersToConfirm",
@@ -199,7 +218,12 @@ export default function NeedsAttention({ refreshKey = 0 }) {
   useEffect(() => {
     const onLiveOrder = () => setLiveTick((tick) => tick + 1);
     window.addEventListener("live:order-placed", onLiveOrder);
-    return () => window.removeEventListener("live:order-placed", onLiveOrder);
+    // Cash recorded, approved or rejected: the cash row changes too
+    window.addEventListener("live:cash-verification", onLiveOrder);
+    return () => {
+      window.removeEventListener("live:order-placed", onLiveOrder);
+      window.removeEventListener("live:cash-verification", onLiveOrder);
+    };
   }, []);
 
   useEffect(() => {
@@ -242,6 +266,8 @@ export default function NeedsAttention({ refreshKey = 0 }) {
 
       return {
         ...row,
+        // A row can be more or less urgent depending on what is in it
+        tone: typeof row.tone === "function" ? row.tone(section) : row.tone,
         section,
         to: tab ? `/${panel}/${tab}${tab === row.tab ? row.query || "" : ""}` : null,
       };

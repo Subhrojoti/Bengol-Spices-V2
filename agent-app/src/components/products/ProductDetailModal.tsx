@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, Image, Modal, Pressable, ScrollView, Dimensions } from "react-native";
-import { X, Tag, Percent, Minus, Plus } from "lucide-react-native";
+import { X, Tag, Percent, Plus } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/Button";
+import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { formatCurrency } from "@/utils/currency";
 import { resolveProductPrice } from "@/utils/pricing";
 import { unitForCounting } from "@/utils/uom";
@@ -24,6 +25,14 @@ export function ProductDetailModal({ visible, product, storeType, onClose, onAdd
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
 
+  // Opens on the fewest that can be ordered. It used to open on 1 whatever
+  // the product's minimum was, and that 1 is what "Add Product" added.
+  const minQuantity = Math.max(1, Number(product?.minOrderQty) || 1);
+  const productId = product?._id;
+  useEffect(() => {
+    setQuantity(minQuantity);
+  }, [productId, minQuantity]);
+
   if (!product) return null;
 
   const images = [product.images?.front?.url, product.images?.back?.url].filter(Boolean) as string[];
@@ -32,13 +41,14 @@ export function ProductDetailModal({ visible, product, storeType, onClose, onAdd
   const description = htmlToText(product.description);
 
   const handleAdd = () => {
-    onAdd(product, quantity);
-    setQuantity(1);
+    // "Add" can be pressed while a quantity is half typed
+    onAdd(product, Math.max(minQuantity, quantity));
+    setQuantity(minQuantity);
     setActiveImage(0);
   };
 
   const handleClose = () => {
-    setQuantity(1);
+    setQuantity(minQuantity);
     setActiveImage(0);
     onClose();
   };
@@ -46,7 +56,7 @@ export function ProductDetailModal({ visible, product, storeType, onClose, onAdd
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           <View className="relative">
             {images.length > 0 ? (
               <>
@@ -129,15 +139,7 @@ export function ProductDetailModal({ visible, product, storeType, onClose, onAdd
               <Text className="font-sans-semibold text-sm text-ink-700">Quantity ({unitForCounting(product.uom)})</Text>
             </View>
             <View className="mt-2 flex-row items-center gap-3">
-              <View className="flex-row items-center gap-3 rounded-full border border-sand-dark bg-white px-2 py-1">
-                <Pressable onPress={() => setQuantity((q) => Math.max(product.minOrderQty, q - 1))} className="h-9 w-9 items-center justify-center rounded-full bg-cream-100">
-                  <Minus size={16} color={colors.ink.DEFAULT} />
-                </Pressable>
-                <Text className="min-w-[32px] text-center font-sans-bold text-base text-ink">{quantity}</Text>
-                <Pressable onPress={() => setQuantity((q) => q + 1)} className="h-9 w-9 items-center justify-center rounded-full bg-cream-100">
-                  <Plus size={16} color={colors.ink.DEFAULT} />
-                </Pressable>
-              </View>
+              <QuantityStepper value={quantity} min={minQuantity} onChange={setQuantity} size="md" accessibilityLabel={`Quantity of ${product.name}`} />
               <Button label="Add Product" icon={<Plus size={16} color={colors.white} />} onPress={handleAdd} className="flex-1" />
             </View>
           </View>

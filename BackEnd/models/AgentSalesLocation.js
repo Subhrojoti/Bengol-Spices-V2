@@ -57,6 +57,7 @@ const agentSalesLocationSchema = new mongoose.Schema(
         retailerPrice: { type: Number, min: 0, default: null },
         wholesalerPrice: { type: Number, min: 0, default: null },
         distributorPrice: { type: Number, min: 0, default: null },
+        horecaPrice: { type: Number, min: 0, default: null },
       },
     ],
   },

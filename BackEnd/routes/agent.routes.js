@@ -5,6 +5,8 @@ import {
   getAgentProfile,
   leaderboard,
 } from "../controllers/agent.controller.js";
+import { getMyProductSales } from "../controllers/analytics.controller.js";
+import { getMyCashPayments } from "../controllers/cashVerification.controller.js";
 import { upload } from "../middleware/upload.js";
 import { setPassword } from "../controllers/auth.controller.js";
 import { protect } from "../middleware/auth.js";
@@ -55,3 +57,9 @@ router.get("/dashboard", protect, isAgent, agentDashboard);
 
 // Agent Leaderboard Route
 router.get("/leaderboard", protect, isAgent, leaderboard);
+
+// The agent's own sales, product by product
+router.get("/sales/products", protect, isAgent, getMyProductSales);
+
+// The agent's own cash payments and whether the office has verified each
+router.get("/cash-payments", protect, isAgent, getMyCashPayments);

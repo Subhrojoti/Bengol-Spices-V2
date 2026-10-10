@@ -11,6 +11,7 @@ import { useMyStores } from "@/hooks/useStores";
 import { useInvoiceDownload } from "@/hooks/useInvoiceDownload";
 import { formatCurrency } from "@/utils/currency";
 import { formatDate, isOverdue } from "@/utils/date";
+import { paymentStateOf } from "@/utils/paymentState";
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { Order } from "@/types/api";
@@ -198,6 +199,8 @@ function OrderLine({ order, onDownload, downloading, showDue }: { order: Order; 
   const router = useRouter();
   const firstProduct = order.products[0];
   const extraCount = order.products.length - 1;
+  // Cash the office has not verified is not "paid" yet, and is said so
+  const payment = paymentStateOf(order);
 
   return (
     <Pressable onPress={() => router.push(`/orders/${order.orderId}`)} className="flex-row items-center gap-3 border-b border-sand p-4 last:border-b-0 active:opacity-80">
@@ -216,13 +219,18 @@ function OrderLine({ order, onDownload, downloading, showDue }: { order: Order; 
         <Text className="mt-0.5 font-sans text-xs text-ink-500" numberOfLines={1}>
           {firstProduct ? `${firstProduct.name}${extraCount > 0 ? ` +${extraCount} more` : ""}` : formatDate(order.createdAt)}
         </Text>
+        {showDue && payment.notVerified > 0 ? (
+          <Text className="mt-0.5 font-sans-semibold text-[11px] text-chili-700">{formatCurrency(payment.notVerified)} cash not verified</Text>
+        ) : showDue && payment.awaiting > 0 ? (
+          <Text className="mt-0.5 font-sans-semibold text-[11px] text-saffron-700">{formatCurrency(payment.awaiting)} cash awaiting verification</Text>
+        ) : null}
       </View>
 
       <View className="items-end gap-1">
         {showDue ? (
           <Badge label={`Due ${formatCurrency(order.dueAmount)}`} variant={isOverdue(order.dueDate) ? "danger" : "warning"} />
         ) : (
-          <Badge label="Paid" variant="success" />
+          <Badge label={payment.label} variant={payment.variant} />
         )}
         <Text className="font-sans-bold text-sm text-ink">{formatCurrency(order.totalAmount)}</Text>
       </View>

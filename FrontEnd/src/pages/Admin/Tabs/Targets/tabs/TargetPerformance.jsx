@@ -1,43 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
-  Banknote,
   CheckCircle2,
   Clock3,
   Crosshair,
   RefreshCcw,
-  ShoppingCart,
-  Store,
   Trophy,
+  User,
   Users,
 } from "lucide-react";
 import { getTargetPerformance } from "../../../../../api/services";
 import Pagination from "../../../../../components/common/Pagination";
 import usePagination from "../../../../../hooks/usePagination";
-
-const TYPE_META = {
-  STORE_CREATION: {
-    label: "Store Creation",
-    unit: "stores",
-    icon: Store,
-    tint: "#eaf1fc",
-    ink: "#2a78d6",
-  },
-  ORDER: {
-    label: "Order Placement",
-    unit: "units",
-    icon: ShoppingCart,
-    tint: "#f0edfd",
-    ink: "#5b4bc4",
-  },
-  PAYMENT: {
-    label: "Collect Payment",
-    unit: "collections",
-    icon: Banknote,
-    tint: "#e6f7f0",
-    ink: "#12805a",
-  },
-};
+import { TYPE_META, periodLabel, unitOf } from "../targetMeta";
 
 const n = (v) => Number(v || 0);
 const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
@@ -163,6 +138,7 @@ const PagedAgents = ({ agents, children }) => {
 
 export default function TargetPerformance() {
   const [rows, setRows] = useState([]);
+  const [running, setRunning] = useState([]);
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -173,6 +149,7 @@ export default function TargetPerformance() {
     try {
       const res = await getTargetPerformance();
       setRows(Array.isArray(res?.data) ? res.data : []);
+      setRunning(Array.isArray(res?.targets) ? res.targets : []);
       setStatus("ready");
     } catch (error) {
       console.error("Failed to load target performance", error);
@@ -191,6 +168,27 @@ export default function TargetPerformance() {
      compare against, so every agent rendered as 100% complete. */
   const targets = useMemo(() => {
     const map = {};
+
+    /* Every running target has a card, including one nobody has started:
+       for a mandatory target that is exactly what the office needs to see.
+       The agents it applies to who have done nothing yet are listed too,
+       at zero. */
+    running.forEach((target) => {
+      map[target._id] = {
+        ...target,
+        agents: (target.notStarted || []).map((agent) => ({
+          agentId: agent.agentId,
+          agentName: agent.agentName || agent.agentId,
+          achieved: 0,
+          earned: 0,
+          isCompleted: false,
+          notStarted: true,
+          percent: 0,
+        })),
+        completed: 0,
+        totalEarned: 0,
+      };
+    });
 
     rows.forEach((row) => {
       const target = row.target;
@@ -226,9 +224,15 @@ export default function TargetPerformance() {
 
     return Object.values(map).map((t) => ({
       ...t,
-      agents: t.agents.sort((a, b) => b.percent - a.percent),
+      // Furthest along first; those yet to start last, by name
+      agents: t.agents.sort(
+        (a, b) =>
+          b.percent - a.percent ||
+          Number(Boolean(a.notStarted)) - Number(Boolean(b.notStarted)) ||
+          String(a.agentName).localeCompare(String(b.agentName)),
+      ),
     }));
-  }, [rows]);
+  }, [rows, running]);
 
   const summary = useMemo(
     () => ({
@@ -335,6 +339,8 @@ export default function TargetPerformance() {
         const meta = TYPE_META[target.type] || TYPE_META.STORE_CREATION;
         const Icon = meta.icon;
         const goal = n(target.targetValue);
+        const unit = unitOf(target, goal);
+        const audience = target.audienceCount ?? target.agents.length;
 
         return (
           <Card key={target._id} className="overflow-hidden">
@@ -346,26 +352,46 @@ export default function TargetPerformance() {
               </span>
 
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-[16px] font-semibold text-slate-900">
-                  {target.name}
-                </h3>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <h3 className="truncate text-[16px] font-semibold text-slate-900">
+                    {target.name}
+                  </h3>
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11.5px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-500/20">
+                    {periodLabel(target.period)}
+                  </span>
+                  {target.isMandatory && (
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[11.5px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                      Mandatory
+                    </span>
+                  )}
+                  {target.isIndividual && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[11.5px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-600/20">
+                      <User size={10} />
+                      {audience === 1 ? "1 agent" : `${audience} agents`}
+                    </span>
+                  )}
+                </div>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[13px] text-slate-500">
                   <span>{meta.label}</span>
                   <span className="text-slate-300">·</span>
                   <span className="tabular-nums">
-                    {goal} {meta.unit} to finish
+                    {goal} {unit} to finish
                   </span>
                   <span className="text-slate-300">·</span>
-                  <span className="inline-flex items-center gap-1 tabular-nums">
-                    <Trophy size={11} className="text-slate-400" />
-                    {inr(target.rewardAmount)}
-                  </span>
+                  {n(target.rewardAmount) > 0 ? (
+                    <span className="inline-flex items-center gap-1 tabular-nums">
+                      <Trophy size={11} className="text-slate-400" />
+                      {inr(target.rewardAmount)}
+                    </span>
+                  ) : (
+                    <span>No reward</span>
+                  )}
                 </p>
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
                 <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[12.5px] font-semibold tabular-nums text-slate-600">
-                  {target.completed}/{target.agents.length} completed
+                  {target.completed}/{audience} completed
                 </span>
                 <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[12.5px] font-semibold tabular-nums text-emerald-700">
                   {inr(target.totalEarned)} earned
@@ -401,7 +427,9 @@ export default function TargetPerformance() {
                   <div className="hidden min-w-0 flex-1 sm:block">
                     <div className="mb-1 flex items-baseline justify-between gap-2 text-[12.5px]">
                       <span className="tabular-nums text-slate-500">
-                        {agent.achieved} of {goal} {meta.unit}
+                        {agent.notStarted
+                          ? "Not started"
+                          : `${agent.achieved} of ${goal} ${unit}`}
                       </span>
                       {agent.isCompleted && (
                         <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">

@@ -18,6 +18,12 @@ import { colors } from "@/theme/colors";
 
 type PaymentMethod = "CASH" | "ONLINE" | "QR";
 
+/* A month's sales target counts only orders placed in that month (months
+   as in India, whatever zone the phone is set to). Collecting on an older
+   order clears a due and moves no target, and the agent is told so. */
+const indianMonth = (instant: string | number | Date) => new Date(new Date(instant).getTime() + 330 * 60 * 1000).toISOString().slice(0, 7);
+const isFromEarlierMonth = (placedAt: string | Date) => indianMonth(placedAt) < indianMonth(Date.now());
+
 export default function CollectPaymentScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
@@ -46,7 +52,12 @@ export default function CollectPaymentScreen() {
     setSubmitting(true);
     try {
       await orderApi.collectCashPayment(order.orderId, order.dueAmount);
-      toast.success("Payment recorded", formatCurrency(order.dueAmount));
+      toast.success(
+        "Payment recorded",
+        isFromEarlierMonth(order.createdAt)
+          ? `${formatCurrency(order.dueAmount)} cash · the office will verify it. A due from an earlier month does not count toward this month's target.`
+          : `${formatCurrency(order.dueAmount)} cash · counts toward your target once the office verifies it`,
+      );
       refreshAfterOrderActivity();
       setTimeout(close, 400);
     } catch (e) {

@@ -22,7 +22,9 @@ import DeliveryPartner from "../models/DeliveryPartner.js";
 import Product from "../models/Product.js";
 import GatewayPayment from "../models/GatewayPayment.js";
 import AgentIncentiveLedger from "../models/AgentIncentiveLedger.js";
+import Payment from "../models/Payment.js";
 import { paymentsNeedingAttention } from "./payment.service.js";
+import { LATE_AFTER_DAYS } from "./cashVerification.service.js";
 
 // An order that has not moved for this long while out for delivery
 const STALLED_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
@@ -122,6 +124,37 @@ const sections = {
         count: row?.count || 0,
         amount: roundRupees(row?.amount),
         oldest: row?.oldest || null,
+      };
+    },
+  },
+
+  /* Cash agents have recorded that nobody has verified yet. Until it is,
+     the agent gets no credit for it; `late` is how many have waited
+     longer than they should. */
+  cashToVerify: {
+    permissions: ["canVerifyPayments"],
+    load: async () => {
+      const lateBefore = new Date(Date.now() - LATE_AFTER_DAYS * 24 * 60 * 60 * 1000);
+
+      const [row] = await Payment.aggregate([
+        { $match: { "verification.status": "PENDING" } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            amount: { $sum: "$amount" },
+            oldest: { $min: "$createdAt" },
+            late: { $sum: { $cond: [{ $lt: ["$createdAt", lateBefore] }, 1, 0] } },
+          },
+        },
+      ]);
+
+      return {
+        count: row?.count || 0,
+        amount: roundRupees(row?.amount),
+        oldest: row?.oldest || null,
+        late: row?.late || 0,
+        lateAfterDays: LATE_AFTER_DAYS,
       };
     },
   },

@@ -84,6 +84,13 @@ const productSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Hotels, restaurants and caterers (store type HORECA)
+    horecaPrice: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+
     gstPercentage: {
       type: Number,
       default: 5,

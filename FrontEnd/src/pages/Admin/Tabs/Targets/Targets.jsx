@@ -1,9 +1,15 @@
 import { useState } from "react";
-import { Crosshair, TrendingUp } from "lucide-react";
+import { Crosshair, IndianRupee, TrendingUp } from "lucide-react";
 
 import CreateTarget from "./tabs/CreateTarget";
 import TargetPerformance from "./tabs/TargetPerformance";
+import SalesTargets from "./tabs/SalesTargets";
 
+/* Two kinds of target live here. "Targets" and "Performance" are the
+   activity targets (so many stores, orders or collections in a day, week
+   or month). "Sales Targets" is each agent's mandatory monthly sales
+   amount, with its daily and weekly breakdown and the additional
+   incentive that opens once it is met. */
 const TABS = [
   { key: "create", label: "Targets", icon: Crosshair, Component: CreateTarget },
   {
@@ -11,6 +17,12 @@ const TABS = [
     label: "Performance",
     icon: TrendingUp,
     Component: TargetPerformance,
+  },
+  {
+    key: "sales",
+    label: "Sales Targets",
+    icon: IndianRupee,
+    Component: SalesTargets,
   },
 ];
 

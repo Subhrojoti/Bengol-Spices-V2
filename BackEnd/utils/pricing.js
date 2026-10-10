@@ -3,7 +3,8 @@ import AgentSalesLocation from "../models/AgentSalesLocation.js";
 /* =====================================================================
    PRODUCT PRICING
 
-   Every product carries default prices for the three store types, the
+   Every product carries default prices for the four store types (retailer,
+   wholesaler, distributor and HoReCa: hotels, restaurants, caterers), the
    same across India. A territory assignment (agent + state) may carry
    location prices for some products. The rule, used both when the agent
    sees the catalogue and when the server prices an order:
@@ -15,7 +16,10 @@ export const TIER_FIELDS = {
   RETAILER: "retailerPrice",
   WHOLESALER: "wholesalerPrice",
   DISTRIBUTOR: "distributorPrice",
+  HORECA: "horecaPrice",
 };
+
+export const STORE_TYPES = Object.keys(TIER_FIELDS);
 
 const isPrice = (value) => typeof value === "number" && value > 0;
 

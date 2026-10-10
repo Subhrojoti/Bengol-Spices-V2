@@ -31,6 +31,12 @@ const ledgerSchema = new mongoose.Schema(
 
     note: String,
 
+    // For an additional sales incentive: the month's record that earned it
+    salesPeriodId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AgentSalesPeriod",
+    },
+
     status: {
       type: String,
       enum: ["PENDING", "COMPLETED"],

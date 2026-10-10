@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { View, Text, Image, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Plus, Search, Phone, MapPin, Store as StoreIcon, FileText, PackagePlus, Warehouse, Truck, Navigation } from "lucide-react-native";
+import { Plus, Search, Phone, MapPin, Store as StoreIcon, FileText, PackagePlus, Warehouse, Truck, Navigation, UtensilsCrossed } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -19,12 +19,14 @@ const STORE_TYPE_LABEL: Record<Store["storeType"], string> = {
   RETAILER: "Retailer",
   WHOLESALER: "Wholesaler",
   DISTRIBUTOR: "Distributor",
+  HORECA: "HoReCa",
 };
 
 const STORE_TYPE_ICON: Record<Store["storeType"], typeof StoreIcon> = {
   RETAILER: StoreIcon,
   WHOLESALER: Warehouse,
   DISTRIBUTOR: Truck,
+  HORECA: UtensilsCrossed,
 };
 
 type TypeFilter = "ALL" | StoreType;
@@ -36,9 +38,10 @@ export default function MyStoresScreen() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
 
   const counts = useMemo(() => {
-    const c: Record<TypeFilter, number> = { ALL: stores?.length ?? 0, RETAILER: 0, WHOLESALER: 0, DISTRIBUTOR: 0 };
+    const c: Record<TypeFilter, number> = { ALL: stores?.length ?? 0, RETAILER: 0, WHOLESALER: 0, DISTRIBUTOR: 0, HORECA: 0 };
     stores?.forEach((s) => {
-      c[s.storeType]++;
+      // a type this version of the app has not heard of is still in "All"
+      if (s.storeType in c) c[s.storeType]++;
     });
     return c;
   }, [stores]);
@@ -97,6 +100,7 @@ export default function MyStoresScreen() {
                     { value: "RETAILER", label: "Retailer", count: counts.RETAILER },
                     { value: "WHOLESALER", label: "Wholesaler", count: counts.WHOLESALER },
                     { value: "DISTRIBUTOR", label: "Distributor", count: counts.DISTRIBUTOR },
+                    { value: "HORECA", label: "HoReCa", count: counts.HORECA },
                   ]}
                   value={typeFilter}
                   onChange={setTypeFilter}
@@ -125,7 +129,8 @@ export default function MyStoresScreen() {
 
 function StoreCard({ store }: { store: Store }) {
   const router = useRouter();
-  const TypeIcon = STORE_TYPE_ICON[store.storeType];
+  // Falls back, so a store type added later cannot blank this screen
+  const TypeIcon = STORE_TYPE_ICON[store.storeType] ?? StoreIcon;
 
   return (
     <Card className="relative overflow-hidden">
@@ -169,7 +174,7 @@ function StoreCard({ store }: { store: Store }) {
 
       <View className="mt-3 flex-row items-center justify-between gap-2">
         <View className="flex-row items-center gap-2">
-          <Badge label={STORE_TYPE_LABEL[store.storeType]} variant="info" />
+          <Badge label={STORE_TYPE_LABEL[store.storeType] ?? store.storeType} variant="info" />
           <Badge label={store.status} variant={store.status === "ACTIVE" ? "success" : "neutral"} />
         </View>
         <Pressable

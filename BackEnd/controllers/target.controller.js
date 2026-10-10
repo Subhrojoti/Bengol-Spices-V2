@@ -1,13 +1,92 @@
 import Target from "../models/Target.js";
 import AgentTargetProgress from "../models/AgentTargetProgress.js";
 import { sendBulkNotification } from "../services/notification.service.js";
+import { settleTarget } from "../services/target.service.js";
 import Agent from "../models/Agent.js";
 import Product from "../models/Product.js";
 import mongoose from "mongoose";
+import {
+  TARGET_TYPES,
+  appliesToAgent,
+  isForEveryone,
+  normalizeOrderMetric,
+  normalizePeriod,
+  windowEnd,
+} from "../utils/targets.js";
+
+const refuse = (res, message, status = 400) =>
+  res.status(status).json({ success: false, message });
+
+/* A reward is optional. Blank, missing and 0 all mean "nothing is paid";
+   anything else has to be a real amount. Returns null for a value that is
+   neither. */
+const readReward = (value) => {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return 0;
+  }
+
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+};
+
+const readFlag = (value) => value === true || value === "true";
+
+/* The agents a target is for. Nothing (or an empty list) means every agent.
+   Names are checked against real, approved agents: a target for an ID that
+   does not exist would be one nobody could ever see or complete.
+   Returns { agentIds } or { error }. */
+const readAudience = async (raw) => {
+  if (raw === undefined || raw === null || raw === "") return { agentIds: [] };
+
+  const list = Array.isArray(raw) ? raw : [raw];
+
+  if (list.some((entry) => typeof entry !== "string")) {
+    return { error: "Agents must be given as a list of agent IDs" };
+  }
+
+  const agentIds = [
+    ...new Set(list.map((entry) => entry.trim()).filter(Boolean)),
+  ];
+
+  if (agentIds.length === 0) return { agentIds: [] };
+
+  const known = await Agent.find({
+    agentId: { $in: agentIds },
+    status: "APPROVED",
+  })
+    .select("agentId")
+    .lean();
+
+  const found = new Set(known.map((agent) => agent.agentId));
+  const missing = agentIds.filter((agentId) => !found.has(agentId));
+
+  if (missing.length > 0) {
+    return {
+      error: `Not an approved agent: ${missing.join(", ")}`,
+    };
+  }
+
+  return { agentIds };
+};
+
+/* Where a target stands right now. "Live" means its window is open, not
+   merely that isActive is set (that flag is only cleared lazily). */
+const stateOf = (target, now) => {
+  const stopped = Boolean(target.endedEarlyAt);
+  const start = new Date(target.startDate);
+  const end = new Date(target.endDate);
+
+  return {
+    isLive: Boolean(target.isActive) && !stopped && start <= now && end >= now,
+    isUpcoming: !stopped && start > now,
+    isExpired: stopped || end < now,
+    endedEarly: stopped,
+  };
+};
 
 /* =====================================================
    ✅ CREATE TARGET (ADMIN)
-   🔥 FORCED 24 HOUR EXPIRY
+   Runs for a day, a week or a month from its start
 ===================================================== */
 export const createTarget = async (req, res) => {
   try {
@@ -23,14 +102,24 @@ export const createTarget = async (req, res) => {
     } = req.body;
 
     // 🔴 BASIC VALIDATION
-    if (!name || !type || !targetValue || !rewardAmount || !startDate) {
+    /* The reward is no longer part of this check. It used to be, as
+       "!rewardAmount", which made a target with nothing to pay impossible:
+       0 was refused as if it had been left out. */
+    if (typeof name !== "string" || !name.trim() || !type || !startDate) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
-    if (!["STORE_CREATION", "ORDER", "PAYMENT"].includes(type)) {
+    if (!targetValue) {
+      return res.status(400).json({
+        success: false,
+        message: "Target value must be a number greater than zero",
+      });
+    }
+
+    if (!TARGET_TYPES.includes(type)) {
       return res.status(400).json({
         success: false,
         message: "Invalid target type",
@@ -40,7 +129,6 @@ export const createTarget = async (req, res) => {
     // 🔥 FIX: "!targetValue" rejects 0 but happily accepts -5, which would
     // create a target already complete before any agent touched it.
     const numericTargetValue = Number(targetValue);
-    const numericReward = Number(rewardAmount);
 
     if (!Number.isFinite(numericTargetValue) || numericTargetValue <= 0) {
       return res.status(400).json({
@@ -49,15 +137,32 @@ export const createTarget = async (req, res) => {
       });
     }
 
-    if (!Number.isFinite(numericReward) || numericReward <= 0) {
+    const numericReward = readReward(rewardAmount);
+
+    if (numericReward === null) {
       return res.status(400).json({
         success: false,
-        message: "Reward amount must be a number greater than zero",
+        message: "Reward amount must be 0 or more",
       });
     }
 
+    // ⏱ DAILY (as every target was), WEEKLY or MONTHLY
+    const period = normalizePeriod(req.body.period);
+
+    if (!period) {
+      return refuse(res, "Duration must be DAILY, WEEKLY or MONTHLY");
+    }
+
+    // 🛒 What an order target counts. Only order targets carry the choice.
+    const orderMetric =
+      type === "ORDER" ? normalizeOrderMetric(req.body.orderMetric) : "UNITS";
+
+    if (!orderMetric) {
+      return refuse(res, "An order target counts either UNITS or ORDERS");
+    }
+
     // 🔥 FIX: an unparseable startDate produced an Invalid Date, whose
-    // getTime() is NaN. That flowed into the 24h calculation and surfaced
+    // getTime() is NaN. That flowed into the window calculation and surfaced
     // as an opaque 500 instead of telling the caller what was wrong.
     const start = new Date(startDate);
 
@@ -98,28 +203,42 @@ export const createTarget = async (req, res) => {
       }
     }
 
-    // ✅ FORCE 24-HOUR WINDOW
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    // 👤 EVERYONE (the default) OR NAMED AGENTS
+    const audience = await readAudience(req.body.assignedAgentIds);
+
+    if (audience.error) return refuse(res, audience.error);
+
+    // ✅ THE WINDOW: a day, a week or a month from the start
+    const end = windowEnd(start, period);
 
     // ✅ CREATE TARGET
     const target = await Target.create({
-      name,
+      name: name.trim(),
       type,
       targetValue: numericTargetValue,
       rewardAmount: numericReward,
+      period,
+      isMandatory: readFlag(req.body.isMandatory),
+      orderMetric,
+      assignedAgentIds: audience.agentIds,
       productCommissions: commissionRules,
       paymentConfig: type === "PAYMENT" ? paymentConfig : undefined,
       startDate: start,
-      endDate: end, // 🔥 always 24h
+      endDate: end,
     });
 
-    /* ✅ NOTIFY ALL AGENTS. The target is already saved: a failed
+    /* ✅ NOTIFY THE AGENTS IT IS FOR. The target is already saved: a failed
        notification used to answer "Failed to create target", and creating it
        again made a duplicate that agents could complete for a second reward. */
     let agentsNotified = true;
 
     try {
-      const agents = await Agent.find({ status: "APPROVED" });
+      const agents = await Agent.find({
+        status: "APPROVED",
+        ...(audience.agentIds.length
+          ? { agentId: { $in: audience.agentIds } }
+          : {}),
+      }).select("_id");
 
       await sendBulkNotification({
         users: agents.map((agent) => ({
@@ -127,7 +246,9 @@ export const createTarget = async (req, res) => {
           role: "Agent",
         })),
         title: "🎯 New Target Assigned",
-        message: `A new target "${name}" has been assigned`,
+        message: audience.agentIds.length
+          ? `A target "${target.name}" has been set for you`
+          : `A new target "${target.name}" has been assigned`,
         senderId: req.user._id,
       });
     } catch (notifyError) {
@@ -153,6 +274,186 @@ export const createTarget = async (req, res) => {
 };
 
 /* =====================================================
+   ✅ CHANGE A TARGET (ADMIN / EMPLOYEE WITH PERMISSION)
+
+   A target used to be fixed the moment it was created, which was bearable
+   while every target was gone in 24 hours. One that runs for a month needs
+   a way to correct a slip. Its name, value, reward and whether it is
+   mandatory can be changed while it has not ended. Its type, duration,
+   start and agents cannot: those decide whose progress counts, so the
+   honest change is to end it and create another.
+===================================================== */
+export const updateTarget = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return refuse(res, "Target not found", 404);
+    }
+
+    const target = await Target.findById(id);
+
+    if (!target) return refuse(res, "Target not found", 404);
+
+    const now = new Date();
+
+    if (stateOf(target, now).isExpired) {
+      return refuse(res, "This target has ended and can no longer be changed");
+    }
+
+    const change = {};
+
+    if (req.body.name !== undefined) {
+      if (typeof req.body.name !== "string" || !req.body.name.trim()) {
+        return refuse(res, "Give the target a name");
+      }
+      change.name = req.body.name.trim();
+    }
+
+    if (req.body.targetValue !== undefined) {
+      const value = Number(req.body.targetValue);
+
+      if (!Number.isFinite(value) || value <= 0) {
+        return refuse(res, "Target value must be a number greater than zero");
+      }
+      change.targetValue = value;
+    }
+
+    if (req.body.rewardAmount !== undefined) {
+      const reward = readReward(req.body.rewardAmount);
+
+      if (reward === null) {
+        return refuse(res, "Reward amount must be 0 or more");
+      }
+      change.rewardAmount = reward;
+    }
+
+    if (req.body.isMandatory !== undefined) {
+      change.isMandatory = readFlag(req.body.isMandatory);
+    }
+
+    if (Object.keys(change).length === 0) {
+      return refuse(res, "Nothing to change");
+    }
+
+    const updated = await Target.findByIdAndUpdate(
+      id,
+      { $set: change },
+      { new: true, runValidators: true },
+    );
+
+    /* A lower value can already have been reached. Those agents are
+       complete now, with the reward as it stands after this change, rather
+       than at whatever they happen to do next. Agents who had completed
+       before the change keep what they were paid. */
+    let completedNow = 0;
+
+    if (change.targetValue !== undefined && stateOf(updated, now).isLive) {
+      completedNow = await settleTarget(updated);
+    }
+
+    return res.json({
+      success: true,
+      message: completedNow
+        ? `Target updated. ${completedNow} agent${completedNow === 1 ? " has" : "s have"} already reached the new value.`
+        : "Target updated",
+      completedNow,
+      data: updated,
+    });
+  } catch (error) {
+    console.error("UPDATE TARGET ERROR:", error);
+    return refuse(res, "Failed to update target", 500);
+  }
+};
+
+/* =====================================================
+   ✅ END A TARGET NOW (ADMIN / EMPLOYEE WITH PERMISSION)
+
+   Closes a running target, or withdraws one that has not started. Progress
+   made and rewards already earned stay as they are; nothing further counts.
+===================================================== */
+export const endTarget = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return refuse(res, "Target not found", 404);
+    }
+
+    const now = new Date();
+
+    const target = await Target.findById(id).select(
+      "startDate endDate endedEarlyAt isActive",
+    );
+
+    if (!target) return refuse(res, "Target not found", 404);
+
+    if (stateOf(target, now).isExpired) {
+      return refuse(res, "This target has already ended");
+    }
+
+    const started = target.startDate <= now;
+
+    // Matched on "not ended yet", so two clicks cannot both end it
+    const ended = await Target.findOneAndUpdate(
+      { _id: id, endedEarlyAt: null, endDate: { $gte: now } },
+      {
+        $set: {
+          isActive: false,
+          endedEarlyAt: now,
+          // A running target's window closes here. One that never started
+          // keeps its dates, as a record of what was planned.
+          ...(started ? { endDate: now } : {}),
+        },
+      },
+      { new: true },
+    );
+
+    if (!ended) return refuse(res, "This target has already ended");
+
+    return res.json({
+      success: true,
+      message: started ? "Target ended" : "Target withdrawn",
+      data: ended,
+    });
+  } catch (error) {
+    console.error("END TARGET ERROR:", error);
+    return refuse(res, "Failed to end target", 500);
+  }
+};
+
+/* =====================================================
+   ✅ AGENTS A TARGET CAN BE GIVEN TO (ADMIN / EMPLOYEE WITH PERMISSION)
+
+   The full agent list belongs to "Manage Agents". Someone who only sets
+   targets still has to be able to pick who a target is for, so this gives
+   just the names and IDs of approved agents.
+===================================================== */
+export const getTargetAgents = async (req, res) => {
+  try {
+    const agents = await Agent.find({ status: "APPROVED" })
+      .select("agentId name phone")
+      .sort({ name: 1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      count: agents.length,
+      data: agents
+        .filter((agent) => agent.agentId)
+        .map((agent) => ({
+          agentId: agent.agentId,
+          name: agent.name,
+          phone: agent.phone,
+        })),
+    });
+  } catch (error) {
+    console.error("TARGET AGENTS ERROR:", error);
+    return refuse(res, "Failed to fetch agents", 500);
+  }
+};
+
+/* =====================================================
    ✅ GET TARGET PERFORMANCE (ADMIN)
 ===================================================== */
 export const getTargetPerformance = async (req, res) => {
@@ -169,7 +470,7 @@ export const getTargetPerformance = async (req, res) => {
 
     if (targetId) {
       if (!mongoose.isValidObjectId(targetId)) {
-        return res.json({ success: true, count: 0, data: [] });
+        return res.json({ success: true, count: 0, data: [], targets: [] });
       }
       targetFilter = { _id: targetId };
     } else {
@@ -181,7 +482,12 @@ export const getTargetPerformance = async (req, res) => {
       };
     }
 
-    const targets = await Target.find(targetFilter).select("_id");
+    const targets = await Target.find(targetFilter)
+      .select(
+        "name type targetValue rewardAmount startDate endDate period isMandatory orderMetric assignedAgentIds",
+      )
+      .sort({ endDate: 1 })
+      .lean();
     const targetIds = targets.map((t) => t._id);
 
     if (targetIds.length === 0) {
@@ -189,65 +495,111 @@ export const getTargetPerformance = async (req, res) => {
         success: true,
         count: 0,
         data: [],
+        targets: [],
       });
     }
+
+    const describe = (t) => ({
+      _id: t._id,
+      name: t.name,
+      type: t.type,
+      targetValue: t.targetValue,
+      rewardAmount: t.rewardAmount,
+      startDate: t.startDate,
+      endDate: t.endDate,
+      period: t.period || "DAILY",
+      isMandatory: Boolean(t.isMandatory),
+      orderMetric: t.orderMetric || "UNITS",
+      isIndividual: !isForEveryone(t),
+    });
+
+    const targetMap = {};
+    targets.forEach((t) => {
+      targetMap[String(t._id)] = t;
+    });
 
     // 🔥 FIX: this returned bare progress documents. They carry
     // achievedValue but nothing to measure it against, so the admin screen
     // had no targetValue to divide by and every agent rendered as 100%
-    // complete. The target is now populated, and the agent's name resolved,
+    // complete. The target is now attached, and the agent's name resolved,
     // so real progress can be shown.
     const progress = await AgentTargetProgress.find({
       targetId: { $in: targetIds },
-    })
-      .populate(
-        "targetId",
-        "name type targetValue rewardAmount startDate endDate",
-      )
+    }).lean();
+
+    /* Every approved agent, not only those with progress: a target says
+       nothing about the agents who have not started on it, and for a
+       mandatory one those are exactly the names the office needs. */
+    const approved = await Agent.find({ status: "APPROVED" })
+      .select("agentId name phone")
+      .sort({ name: 1 })
       .lean();
 
-    const agentIds = [...new Set(progress.map((p) => p.agentId))];
-
-    const agents = await Agent.find({ agentId: { $in: agentIds } })
+    const progressAgentIds = [...new Set(progress.map((p) => p.agentId))];
+    const others = await Agent.find({
+      agentId: { $in: progressAgentIds },
+      status: { $ne: "APPROVED" },
+    })
       .select("agentId name phone")
       .lean();
 
     const agentMap = {};
-    agents.forEach((a) => {
-      agentMap[a.agentId] = a;
+    [...approved, ...others].forEach((a) => {
+      if (a.agentId) agentMap[a.agentId] = a;
     });
 
-    const data = progress.map((p) => ({
-      _id: p._id,
-      agentId: p.agentId,
-      agentName: agentMap[p.agentId]?.name || null,
-      agentPhone: agentMap[p.agentId]?.phone || null,
+    const data = progress.map((p) => {
+      const t = targetMap[String(p.targetId)];
 
-      type: p.type,
-      achievedValue: p.achievedValue,
-      earnedAmount: p.earnedAmount,
-      isCompleted: p.isCompleted,
-      updatedAt: p.updatedAt,
+      return {
+        _id: p._id,
+        agentId: p.agentId,
+        agentName: agentMap[p.agentId]?.name || null,
+        agentPhone: agentMap[p.agentId]?.phone || null,
 
-      target: p.targetId
-        ? {
-            _id: p.targetId._id,
-            name: p.targetId.name,
-            type: p.targetId.type,
-            targetValue: p.targetId.targetValue,
-            rewardAmount: p.targetId.rewardAmount,
-            startDate: p.targetId.startDate,
-            endDate: p.targetId.endDate,
-          }
-        : null,
-    }));
+        type: p.type,
+        achievedValue: p.achievedValue,
+        earnedAmount: p.earnedAmount,
+        isCompleted: p.isCompleted,
+        completedAt: p.completedAt || null,
+        updatedAt: p.updatedAt,
+
+        target: t ? describe(t) : null,
+      };
+    });
+
+    // One entry per target: who it is for, and who has not started
+    const started = {};
+    progress.forEach((p) => {
+      const key = String(p.targetId);
+      (started[key] ||= new Set()).add(p.agentId);
+    });
+
+    const targetSummaries = targets.map((t) => {
+      const key = String(t._id);
+      const audience = isForEveryone(t)
+        ? approved.filter((a) => a.agentId)
+        : approved.filter((a) => t.assignedAgentIds.includes(a.agentId));
+
+      const notStarted = audience
+        .filter((a) => !started[key]?.has(a.agentId))
+        .map((a) => ({ agentId: a.agentId, agentName: a.name || null }));
+
+      return {
+        ...describe(t),
+        audienceCount: audience.length,
+        notStarted,
+      };
+    });
 
     return res.json({
       success: true,
       count: data.length,
       data,
+      targets: targetSummaries,
     });
   } catch (error) {
+    console.error("TARGET PERFORMANCE ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch performance",
@@ -269,19 +621,31 @@ export const getTodayTarget = async (req, res) => {
       { $set: { isActive: false } },
     );
 
-    // ✅ ONLY FETCH CURRENTLY ACTIVE TARGETS (REAL-TIME)
-    const targets = await Target.find({
+    // ✅ ONLY FETCH CURRENTLY ACTIVE TARGETS (REAL-TIME) THAT APPLY TO THIS
+    // AGENT: the ones set for everyone, and the ones that name them
+    const found = await Target.find({
       isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
-    });
+      ...appliesToAgent(req.user.agentId),
+    }).lean();
 
-    if (!targets.length) {
+    if (!found.length) {
       return res.json({
         success: true,
         message: "No active targets",
       });
     }
+
+    /* The list of agents a target names stays in the office: an agent is
+       told only that a target was set for them. */
+    const targets = found.map(({ assignedAgentIds, ...target }) => ({
+      ...target,
+      period: target.period || "DAILY",
+      isMandatory: Boolean(target.isMandatory),
+      orderMetric: target.orderMetric || "UNITS",
+      isIndividual: !isForEveryone({ assignedAgentIds }),
+    }));
 
     // ✅ GET PROGRESS
     // 🔥 FIX: match on the currently-active target IDs instead of a
@@ -297,6 +661,8 @@ export const getTodayTarget = async (req, res) => {
       success: true,
       targets,
       progress,
+      // So an app can count down to a target's close by the server's clock
+      serverTime: now,
     });
   } catch (error) {
     console.error("GET TARGET ERROR:", error);
@@ -342,20 +708,39 @@ export const getAllTargets = async (req, res) => {
       statMap[String(s._id)] = s;
     });
 
+    // Names for the targets set for particular agents
+    const namedIds = [
+      ...new Set(targets.flatMap((t) => t.assignedAgentIds || [])),
+    ];
+    const named = namedIds.length
+      ? await Agent.find({ agentId: { $in: namedIds } })
+          .select("agentId name")
+          .lean()
+      : [];
+
+    const nameMap = {};
+    named.forEach((a) => {
+      nameMap[a.agentId] = a.name;
+    });
+
     const now = new Date();
 
     const data = targets.map((t) => {
       const s = statMap[String(t._id)] || {};
+      const assigned = t.assignedAgentIds || [];
 
       return {
         ...t,
-        // Live means the window is open right now, not merely isActive
-        isLive:
-          t.isActive &&
-          new Date(t.startDate) <= now &&
-          new Date(t.endDate) >= now,
-        isUpcoming: new Date(t.startDate) > now,
-        isExpired: new Date(t.endDate) < now,
+        period: t.period || "DAILY",
+        isMandatory: Boolean(t.isMandatory),
+        orderMetric: t.orderMetric || "UNITS",
+        assignedAgentIds: assigned,
+        assignedAgents: assigned.map((agentId) => ({
+          agentId,
+          name: nameMap[agentId] || null,
+        })),
+
+        ...stateOf(t, now),
 
         stats: {
           participants: s.participants || 0,

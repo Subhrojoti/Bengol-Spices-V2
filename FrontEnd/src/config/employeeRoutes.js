@@ -13,10 +13,14 @@ import PersonIcon from "@mui/icons-material/Person";
 import AddLocationIcon from "@mui/icons-material/AddLocation";
 import PaymentIcon from "@mui/icons-material/Payment";
 import AdsClickIcon from "@mui/icons-material/AdsClick";
+import QueryStatsIcon from "@mui/icons-material/QueryStats";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import EmpProfile from "../components/profile/EmpProfile";
 import Agent from "../pages/Admin/Tabs/Agent/Agent";
 import PaymentInfo from "../pages/Admin/Tabs/PaymentInfo/PaymentInfo";
 import Targets from "../pages/Admin/Tabs/Targets/Targets";
+import ProductSales from "../pages/Admin/Tabs/ProductSales/ProductSales";
+import CashVerification from "../pages/Admin/Tabs/CashVerification/CashVerification";
 import { AllInbox, LocalShipping, OutboxOutlined } from "@mui/icons-material";
 import CustomNotification from "../pages/Admin/Tabs/CustomNotification/CustomNotification";
 import NotificationsActive from "@mui/icons-material/NotificationsActive";
@@ -111,12 +115,28 @@ export const employeeRoutes = [
     component: PaymentInfo,
   },
   {
+    label: "Cash Verification",
+    path: "cash-verification",
+    group: "Performance",
+    icon: FactCheckIcon,
+    permission: "canVerifyPayments",
+    component: CashVerification,
+  },
+  {
     label: "Targets",
     path: "target-management",
     group: "Performance",
     permission: "canSetTargets",
     icon: AdsClickIcon,
     component: Targets,
+  },
+  {
+    label: "Product Sales",
+    path: "product-sales",
+    group: "Performance",
+    icon: QueryStatsIcon,
+    permission: ["canViewDashboardSummary", "canManageAgents"],
+    component: ProductSales,
   },
   {
     label: "Custom Notification",

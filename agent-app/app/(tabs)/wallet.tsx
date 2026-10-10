@@ -137,7 +137,9 @@ function LedgerRow({ entry }: { entry: IncentiveLedgerEntry }) {
       </View>
       <View className="flex-1">
         <Text className="font-sans-bold text-sm text-ink">{isPayout ? "Payout" : "Incentive Earned"}</Text>
-        <Text className="font-sans text-xs text-ink-500">{SOURCE_LABEL[entry.source ?? ""] ?? entry.type} · {formatDateTime(entry.createdAt)}</Text>
+        <Text className="font-sans text-xs text-ink-500" numberOfLines={2}>
+          {(!isPayout && entry.note) || SOURCE_LABEL[entry.source ?? ""] || entry.type} · {formatDateTime(entry.createdAt)}
+        </Text>
       </View>
       <Text className={`font-sans-bold text-sm ${isPayout ? "text-chili-600" : "text-cardamom-700"}`}>
         {isPayout ? "-" : "+"}{formatCurrency(Math.abs(entry.amount))}

@@ -181,6 +181,7 @@ export default function ProductDetails() {
     ["Retailer", product.retailerPrice],
     ["Wholesaler", product.wholesalerPrice],
     ["Distributor", product.distributorPrice],
+    ["HoReCa", product.horecaPrice],
   ];
   const hasTiers = tiers.some(([, v]) => v !== null && v !== undefined);
 

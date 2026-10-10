@@ -105,6 +105,7 @@ export default function CreateStoreScreen() {
                   { value: "RETAILER", label: "Retailer" },
                   { value: "WHOLESALER", label: "Wholesaler" },
                   { value: "DISTRIBUTOR", label: "Distributor" },
+                  { value: "HORECA", label: "HoReCa" },
                 ]}
               />
             )}

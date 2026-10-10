@@ -41,6 +41,12 @@ const progressSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // When the agent reached the target's value
+    completedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

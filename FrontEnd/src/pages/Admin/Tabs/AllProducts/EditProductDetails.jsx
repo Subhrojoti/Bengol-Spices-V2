@@ -186,6 +186,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
       retailerPrice: product?.retailerPrice ?? "",
       wholesalerPrice: product?.wholesalerPrice ?? "",
       distributorPrice: product?.distributorPrice ?? "",
+      horecaPrice: product?.horecaPrice ?? "",
     }),
     [product],
   );
@@ -604,11 +605,12 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
                 ["retailerPrice", "Retailer Price"],
                 ["wholesalerPrice", "Wholesaler Price"],
                 ["distributorPrice", "Distributor Price"],
+                ["horecaPrice", "HoReCa Price"],
               ].map(([key, label]) => (
                 <Field key={key} label={label} hint="optional">
                   <input

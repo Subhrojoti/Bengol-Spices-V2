@@ -1,6 +1,7 @@
 import Target from "../models/Target.js";
 import AgentTargetProgress from "../models/AgentTargetProgress.js";
 import AgentIncentiveLedger from "../models/AgentIncentiveLedger.js";
+import { appliesToAgent } from "../utils/targets.js";
 
 /* Adds to an agent's progress on one target, creating the record the first
    time. Two first events at once both try the insert; the loser hits the
@@ -31,12 +32,79 @@ const addProgress = async ({
   }
 };
 
+/* Marks one agent's progress complete, and adds the target's reward, the
+   first time it has reached the target's value. Only the update that flips
+   isCompleted can match the filter, so this happens once however many
+   requests arrive together. Returns null when this call completed nothing
+   (already complete, or not there yet), otherwise the reward it added,
+   which is 0 for a target that carries none. */
+export const settleCompletion = async (progressId, target) => {
+  const reward = Number(target.rewardAmount) || 0;
+
+  const completed = await AgentTargetProgress.findOneAndUpdate(
+    {
+      _id: progressId,
+      isCompleted: false,
+      achievedValue: { $gte: target.targetValue },
+    },
+    {
+      $set: { isCompleted: true, completedAt: new Date() },
+      $inc: { earnedAmount: reward },
+    },
+    { new: true },
+  );
+
+  return completed ? { reward } : null;
+};
+
+/* After a target's value is lowered, agents who have already done that much
+   are complete now, not at their next order or store. Each is completed and
+   paid through the same once-only step as everywhere else. Returns how many
+   agents this completed. */
+export const settleTarget = async (target) => {
+  const reached = await AgentTargetProgress.find({
+    targetId: target._id,
+    isCompleted: false,
+    achievedValue: { $gte: target.targetValue },
+  }).select("_id agentId");
+
+  let completedNow = 0;
+
+  for (const progress of reached) {
+    const settled = await settleCompletion(progress._id, target);
+    if (!settled) continue; // an order placed this instant got there first
+
+    completedNow += 1;
+
+    if (settled.reward > 0) {
+      await AgentIncentiveLedger.create({
+        agentId: progress.agentId,
+        amount: settled.reward,
+        type: "EARNING",
+        source: "TARGET",
+        referenceId: progress._id,
+      });
+    }
+  }
+
+  return completedNow;
+};
+
+/* `at` is for something that happened earlier and is only being credited
+   now: cash collected then, verified by the office today. It is credited to
+   the targets that existed and were running when it was collected: exactly
+   the ones it would have counted for had it been credited on the spot.
+   That includes targets that have ended since, so an agent does not lose a
+   collection because the office took a day to confirm it; and never one
+   that was set up or started afterwards. Without `at`, the event is
+   happening now. */
 export const updateTargetProgress = async ({
   agentId,
   type,
   value = 0,
   amount = 0,
   order = null,
+  at = null,
 }) => {
   try {
     const now = new Date();
@@ -55,12 +123,38 @@ export const updateTargetProgress = async ({
       { $set: { isActive: false } },
     );
 
-    const targets = await Target.find({
-      type,
-      isActive: true,
-      startDate: { $lte: now },
-      endDate: { $gte: now },
-    });
+    // Targets set for everyone, and those that name this agent. A target
+    // made for someone else is neither shown to this agent nor credited.
+    const targets = await Target.find(
+      at
+        ? {
+            type,
+            startDate: { $lte: at },
+            endDate: { $gte: at },
+            /* Not one withdrawn before it ever started: that keeps its
+               planned dates, but it never ran. (A target ended early has
+               its end date moved to when it was ended.) */
+            $and: [
+              appliesToAgent(agentId),
+              {
+                $or: [
+                  { endedEarlyAt: null },
+                  { $expr: { $gte: ["$endedEarlyAt", "$startDate"] } },
+                ],
+              },
+              // A target given a start time in the past counts from when
+              // it was set up, as it always has
+              { $or: [{ createdAt: { $exists: false } }, { createdAt: { $lte: at } }] },
+            ],
+          }
+        : {
+            type,
+            isActive: true,
+            startDate: { $lte: now },
+            endDate: { $gte: now },
+            ...appliesToAgent(agentId),
+          },
+    );
 
     for (const target of targets) {
       // 🔥 FIX: track only what is genuinely earned during THIS call.
@@ -82,6 +176,16 @@ export const updateTargetProgress = async ({
         const rules = target.productCommissions || [];
         const hasRules = rules.length > 0;
 
+        /* "Place 20 orders" and "sell 20 packets" are different targets.
+           Until now only the second existed: every order target counted
+           units, so one order of 20 packets finished a target the admin
+           meant as twenty orders. A target now says which it counts. One
+           saved without the choice counts units, as it always did. Product
+           commissions are per unit either way. */
+        const countsOrders = target.orderMetric === "ORDERS";
+
+        if (countsOrders) achievedDelta += 1;
+
         for (const item of order.products || []) {
           // 🔥 FIX: skip items with no productId instead of crashing the
           // whole loop (a single bad item used to abort progress updates
@@ -99,7 +203,7 @@ export const updateTargetProgress = async ({
           // still scope what counts, so targets already configured that way
           // behave exactly as before.
           if (!hasRules) {
-            achievedDelta += quantity;
+            if (!countsOrders) achievedDelta += quantity;
             continue;
           }
 
@@ -111,7 +215,7 @@ export const updateTargetProgress = async ({
 
           if (rule) {
             const commission = quantity * (Number(rule.commissionPerUnit) || 0);
-            achievedDelta += quantity;
+            if (!countsOrders) achievedDelta += quantity;
             commissionDelta += commission;
             newlyEarned += commission; // ✅ log real commission, not the flat reward
           }
@@ -137,24 +241,11 @@ export const updateTargetProgress = async ({
           commissionDelta,
         });
 
-        // ✅ COMPLETE CHECK — the reward is added, and logged, exactly ONCE:
-        // only the update that flips isCompleted can match this filter.
-        const completed = await AgentTargetProgress.findOneAndUpdate(
-          {
-            _id: progress._id,
-            isCompleted: false,
-            achievedValue: { $gte: target.targetValue },
-          },
-          {
-            $set: { isCompleted: true },
-            $inc: { earnedAmount: target.rewardAmount },
-          },
-          { new: true },
-        );
-
-        if (completed) {
-          newlyEarned += target.rewardAmount;
-        }
+        // ✅ COMPLETE CHECK — the reward is added, and logged, exactly ONCE
+        // (see settleCompletion). A target with no reward completes the
+        // same way and simply adds nothing.
+        const settled = await settleCompletion(progress._id, target);
+        if (settled) newlyEarned += settled.reward;
 
         // 🔥 FIX: only write a ledger entry when something was actually
         // earned this call (previously this ran unconditionally every time,

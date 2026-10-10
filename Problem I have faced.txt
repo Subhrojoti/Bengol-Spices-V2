@@ -5,3 +5,7 @@ Challanges I have faced
 - Integration of Notification
 - Set Daily target
 - How to Assign Location to the Agent
+
+Previous pending due amount also taking to sale achieve that i dont want , i want the oderder to be considered after releasing the target or only for that month , new month fresh start dont consider pending or previous month due order to achieve sale target
+
+after successfull order place first showing error page then showing successfully placed order on agent app fixed it , and also once placing the order on a certain store when i am doing back after placing the order it shows the Product cart screen.

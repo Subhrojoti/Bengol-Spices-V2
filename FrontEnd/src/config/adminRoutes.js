@@ -14,12 +14,16 @@ import NotificationsActive from "@mui/icons-material/NotificationsActive";
 import AddLocationIcon from "@mui/icons-material/AddLocation";
 import PaymentIcon from "@mui/icons-material/Payment";
 import AdsClickIcon from "@mui/icons-material/AdsClick";
+import QueryStatsIcon from "@mui/icons-material/QueryStats";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import { AllInbox, LocalShipping, OutboxOutlined } from "@mui/icons-material";
 import Delivery from "../pages/Admin/Tabs/Delivery/Delivery";
 import OrderManagement from "../pages/Admin/Tabs/Orders/OrderManagement";
 import ReturnManagement from "../pages/Admin/Tabs/Returns/ReturnManagement";
 import PaymentInfo from "../pages/Admin/Tabs/PaymentInfo/PaymentInfo";
 import Targets from "../pages/Admin/Tabs/Targets/Targets";
+import ProductSales from "../pages/Admin/Tabs/ProductSales/ProductSales";
+import CashVerification from "../pages/Admin/Tabs/CashVerification/CashVerification";
 import CustomNotification from "../pages/Admin/Tabs/CustomNotification/CustomNotification";
 import AssignLocation from "../pages/Admin/Tabs/AssignLocation/AssignLocation";
 
@@ -89,11 +93,25 @@ export const adminRoutes = [
     component: PaymentInfo,
   },
   {
+    label: "Cash Verification",
+    path: "cash-verification",
+    group: "Performance",
+    icon: FactCheckIcon,
+    component: CashVerification,
+  },
+  {
     label: "Targets",
     path: "target-management",
     group: "Performance",
     icon: AdsClickIcon,
     component: Targets,
+  },
+  {
+    label: "Product Sales",
+    path: "product-sales",
+    group: "Performance",
+    icon: QueryStatsIcon,
+    component: ProductSales,
   },
   {
     label: "Custom Notification",

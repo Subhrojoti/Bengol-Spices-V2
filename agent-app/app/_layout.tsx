@@ -17,6 +17,7 @@ import {
 import { queryClient } from "@/api/queryClient";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { toastConfig } from "@/theme/toastConfig";
+import { Confetti } from "@/components/ui/Confetti";
 import { useReactQueryAppStateFocus } from "@/hooks/useReactQueryAppStateFocus";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -46,6 +47,8 @@ export default function RootLayout() {
         <AuthProvider>
           <StatusBar style="dark" />
           <RootNavigator fontsReady={fontsReady} />
+          {/* Drawn over whichever screen is open (a target is usually reached on an order or a collection); never takes a touch */}
+          <Confetti />
           <Toast config={toastConfig} />
         </AuthProvider>
       </QueryClientProvider>
@@ -81,6 +84,9 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Screen name="profile/index" />
         <Stack.Screen name="profile/change-password" />
         <Stack.Screen name="leaderboard" />
+        <Stack.Screen name="sales" />
+        <Stack.Screen name="target-history" />
+        <Stack.Screen name="cash-payments" />
         <Stack.Screen name="help" />
         <Stack.Screen name="returns/index" />
         <Stack.Screen name="orders/[orderId]/index" />

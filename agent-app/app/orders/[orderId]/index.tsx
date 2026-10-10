@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, Image, ScrollView, RefreshControl, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, MapPin, FileDown, Wallet2, Navigation, Package, Undo2, X } from "lucide-react-native";
+import { ChevronLeft, CircleCheck, MapPin, FileDown, Wallet2, Navigation, Package, Undo2, X } from "lucide-react-native";
 import { IconButton, Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -13,6 +13,7 @@ import { useInvoiceDownload } from "@/hooks/useInvoiceDownload";
 import { formatCurrency } from "@/utils/currency";
 import { formatQuantity } from "@/utils/uom";
 import { formatDateTime } from "@/utils/date";
+import { paymentStateOf } from "@/utils/paymentState";
 import { getErrorMessage } from "@/api/client";
 import { openInMaps } from "@/utils/maps";
 import { toast } from "@/utils/toast";
@@ -41,9 +42,10 @@ const RETURN_STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "
 const MIN_REASON_LENGTH = 5;
 
 export default function OrderDetailScreen() {
-  const { orderId } = useLocalSearchParams<{ orderId: string }>();
+  // `placed` is "1" when this screen is opened straight after placing the order
+  const { orderId, placed } = useLocalSearchParams<{ orderId: string; placed?: string }>();
   const router = useRouter();
-  const { data: orders, isLoading, isError, isFetching, refetch, error } = useMyOrders();
+  const { data: orders, isLoading, isError, isFetching, refetch, error, dataUpdatedAt } = useMyOrders();
   const { data: returns } = useMyReturns();
   const { downloadInvoice, downloading } = useInvoiceDownload();
   const initiateReturn = useInitiateReturn();
@@ -53,6 +55,27 @@ export default function OrderDetailScreen() {
   const [reasonError, setReasonError] = useState<string | null>(null);
 
   const order = orders?.find((o) => o.orderId === orderId);
+  // What is paid and verified, what is cash still waiting on the office, and what is owed
+  const payment = order ? paymentStateOf(order) : null;
+
+  /* This screen reads the order out of the agent's list of orders. An order
+     placed a moment ago is not yet in the copy of that list the app holds,
+     and "Couldn't find this order" used to be shown, about an order that
+     had just been placed successfully, until the list had been read again.
+     So when the order is not in the list, the list is read again, and until
+     a reading taken after this screen opened has come back the order is
+     loading, not missing. Only if it is still absent then is it not found. */
+  const [openedAt] = useState(() => Date.now());
+  const listIsOlder = !dataUpdatedAt || dataUpdatedAt < openedAt;
+  const stillLooking = !order && listIsOlder && !isError;
+
+  useEffect(() => {
+    // Joins a reading already under way instead of starting it again
+    if (stillLooking) refetch({ cancelRefetch: false });
+    // Once, as the screen opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // The backend allows one open return per order. The list is newest first,
   // so this is the latest one; once that is cancelled, a new return can be
   // requested.
@@ -93,15 +116,26 @@ export default function OrderDetailScreen() {
         <Text className="font-display-bold text-xl text-ink">{orderId}</Text>
       </View>
 
-      {isLoading ? (
-        <LoadingState message="Loading order…" />
-      ) : isError || !order ? (
+      {isLoading || stillLooking ? (
+        <LoadingState message={placed === "1" ? "Order placed. Loading its details…" : "Loading order…"} />
+      ) : !order ? (
+        // An order already on screen stays on screen if a later refresh fails
         <ErrorState message={isError ? getErrorMessage(error, "Couldn't load this order.") : "Couldn't find this order."} onRetry={refetch} />
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 14 }}
           refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.saffron[600]} />}
         >
+          {placed === "1" ? (
+            <View className="flex-row items-start gap-2.5 rounded-2xl bg-cardamom-100 p-3.5" accessibilityRole="alert">
+              <CircleCheck size={18} color={colors.cardamom[700]} />
+              <View className="flex-1">
+                <Text className="font-sans-bold text-sm text-cardamom-700">Order placed successfully</Text>
+                <Text className="mt-0.5 font-sans text-xs text-cardamom-700">It has been sent to the office for confirmation.</Text>
+              </View>
+            </View>
+          ) : null}
+
           <Card>
             <View className="flex-row items-start justify-between">
               <View>
@@ -158,12 +192,33 @@ export default function OrderDetailScreen() {
           </Card>
 
           <Card>
-            <Text className="mb-3 font-display-bold text-base text-ink">Payment</Text>
+            <View className="mb-3 flex-row items-center justify-between gap-2">
+              <Text className="font-display-bold text-base text-ink">Payment</Text>
+              {/* A cancelled order has no payment to chase */}
+              {payment && order.status !== "CANCELLED" ? <Badge label={payment.label} variant={payment.variant} /> : null}
+            </View>
             <SummaryRow label="Total Amount" value={formatCurrency(order.totalAmount)} bold />
-            <SummaryRow label="Paid" value={formatCurrency(order.paidAmount)} tone="success" />
+            {/* Cash counts as paid once the office has verified it; until then it is shown on its own line */}
+            <SummaryRow label={payment && (payment.awaiting > 0 || payment.notVerified > 0) ? "Paid and verified" : "Paid"} value={formatCurrency(payment ? payment.paid : order.paidAmount)} tone="success" />
+            {payment && payment.awaiting > 0 ? <SummaryRow label="Cash awaiting verification" value={formatCurrency(payment.awaiting)} tone="warning" /> : null}
+            {payment && payment.notVerified > 0 ? <SummaryRow label="Cash not verified" value={formatCurrency(payment.notVerified)} tone="danger" /> : null}
             <SummaryRow label="Due" value={formatCurrency(order.dueAmount)} tone={order.dueAmount > 0 ? "danger" : undefined} />
             <SummaryRow label="Due Date" value={formatDateTime(order.dueDate)} />
             <SummaryRow label="Payment Mode" value={order.paymentMode} />
+
+            {payment && payment.notVerified > 0 ? (
+              <View className="mt-2 rounded-xl bg-chili-100 p-3">
+                <Text className="font-sans-bold text-xs text-chili-700">The office could not verify {formatCurrency(payment.notVerified)} of the cash on this order.</Text>
+                {payment.rejectionReason ? <Text className="mt-0.5 font-sans text-xs leading-4 text-chili-700">{payment.rejectionReason}</Text> : null}
+                <Text className="mt-0.5 font-sans text-[11px] leading-4 text-ink-500">Settle it with the office and it can still be verified.</Text>
+              </View>
+            ) : payment && payment.awaiting > 0 ? (
+              <View className="mt-2 rounded-xl bg-saffron-50 p-3">
+                <Text className="font-sans text-xs leading-4 text-ink-700">
+                  {formatCurrency(payment.awaiting)} in cash is recorded and waiting for the office to confirm the deposit. It shows as paid once verified.
+                </Text>
+              </View>
+            ) : null}
 
             <Button label="Invoice" variant="outline" icon={<FileDown size={15} color={colors.ink.DEFAULT} />} onPress={() => downloadInvoice(order.orderId)} loading={downloading} fullWidth className="mt-3" />
 
@@ -294,11 +349,11 @@ export default function OrderDetailScreen() {
   );
 }
 
-function SummaryRow({ label, value, bold, tone }: { label: string; value: string; bold?: boolean; tone?: "success" | "danger" }) {
+function SummaryRow({ label, value, bold, tone }: { label: string; value: string; bold?: boolean; tone?: "success" | "danger" | "warning" }) {
   return (
     <View className="flex-row items-center justify-between py-1.5">
       <Text className="font-sans text-sm text-ink-500">{label}</Text>
-      <Text className={`${bold ? "font-sans-bold" : "font-sans-semibold"} text-sm ${tone === "success" ? "text-cardamom-700" : tone === "danger" ? "text-chili-600" : "text-ink"}`}>
+      <Text className={`${bold ? "font-sans-bold" : "font-sans-semibold"} text-sm ${tone === "success" ? "text-cardamom-700" : tone === "danger" ? "text-chili-600" : tone === "warning" ? "text-saffron-700" : "text-ink"}`}>
         {value}
       </Text>
     </View>

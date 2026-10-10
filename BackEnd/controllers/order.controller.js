@@ -14,12 +14,19 @@ import { createNotification } from "../services/notification.service.js";
 import { razorpayInstance } from "../config/razorpay.js";
 import Agent from "../models/Agent.js";
 import { updateTargetProgress } from "../services/target.service.js";
+import { syncAfterSale } from "../services/salesTarget.service.js";
+import { withCashVerification } from "../services/cashVerification.service.js";
 import { TIER_FIELDS, getLocationOverrides } from "../utils/pricing.js";
+import {
+  needsVerification,
+  pendingVerification,
+} from "../utils/paymentVerification.js";
 import { quantityWithUnit } from "../utils/uom.js";
 import { publish } from "../services/liveEvents.js";
 import mongoose from "mongoose";
 import GatewayPayment from "../models/GatewayPayment.js";
 import {
+  announceCashToVerify,
   applyDuePayment,
   beginGatewayPayment,
   markGatewayPayment,
@@ -195,8 +202,12 @@ export const placeOrder = async (req, res) => {
        BASIC VALIDATION
        ============================= */
 
+    /* consumerId has to be the store's ID as text. A list or an object in
+       its place reached the database lookup and came back as a server
+       error carrying the database's own message. */
     if (
       !consumerId ||
+      typeof consumerId !== "string" ||
       !Array.isArray(products) ||
       products.length === 0 ||
       paidAmount === undefined ||
@@ -259,7 +270,7 @@ export const placeOrder = async (req, res) => {
     }
 
     // ✅ Capture storeType for price resolution below
-    const storeType = store.storeType; // "RETAILER" | "WHOLESALER" | "DISTRIBUTOR"
+    const storeType = store.storeType; // "RETAILER" | "WHOLESALER" | "DISTRIBUTOR" | "HORECA"
 
     // Location prices the admin set for this agent's territory, if any
     const locationPrices = await getLocationOverrides(
@@ -544,9 +555,18 @@ export const placeOrder = async (req, res) => {
        500 invited the agent to place the same order again. */
     reservedLines = [];
 
+    /* Cash is recorded as waiting for the office to verify it; a payment
+       Razorpay confirmed needs no verifying. Until cash is approved the
+       agent is not credited for it (utils/paymentVerification.js). */
+    const paymentMethod =
+      paymentMode === "ONLINE" || razorpay_payment_id || razorpay_order_id
+        ? "RAZORPAY"
+        : "CASH";
+    const awaitingVerification = needsVerification(paymentMethod);
+
     // ✅ Create payment entry for CASH / initial payment
     try {
-      await Payment.create({
+      const payment = await Payment.create({
         orderId: order.orderId,
         consumerId: order.consumerId,
         agentId: order.agentId,
@@ -554,10 +574,10 @@ export const placeOrder = async (req, res) => {
         // 🔥 FIX: a partly-online ("MIXED") or QR payment carries a verified
         // Razorpay reference but was being recorded as CASH, so cash
         // reconciliation expected money the agent never held.
-        method:
-          paymentMode === "ONLINE" || razorpay_payment_id || razorpay_order_id
-            ? "RAZORPAY"
-            : "CASH",
+        method: paymentMethod,
+        ...(awaitingVerification && {
+          verification: pendingVerification(agentId),
+        }),
         // 🔥 FIX: attach the verified Razorpay reference here (when this
         // is an online initial payment) so verifyPaymentAndPlaceOrder no
         // longer needs to create a second, duplicate Payment record for
@@ -570,6 +590,8 @@ export const placeOrder = async (req, res) => {
           role: "AGENT",
         },
       });
+
+      if (awaitingVerification) announceCashToVerify(payment);
     } catch (paymentError) {
       // The order already records the amount paid; only the payment log
       // entry is missing, and it needs adding by hand.
@@ -619,8 +641,9 @@ export const placeOrder = async (req, res) => {
     /* The payment taken with the order counts toward PAYMENT targets however
        it was collected. Only the online (Razorpay) flow used to count it, so
        cash and QR collected at order time were never credited. Every place
-       that places an order comes through here, so it is counted once. */
-    if (paid > 0) {
+       that places an order comes through here, so it is counted once.
+       Cash is counted when the office verifies it, not here. */
+    if (paid > 0 && !awaitingVerification) {
       await updateTargetProgress({
         agentId,
         type: "PAYMENT",
@@ -629,10 +652,18 @@ export const placeOrder = async (req, res) => {
       });
     }
 
+    /* The monthly sales target is measured on money collected: the amount
+       paid with this order may be what reaches it, or earns the additional
+       incentive. Logs and carries on if it cannot be updated; the order is
+       already placed. */
+    await syncAfterSale(agentId);
+
     return res.status(201).json({
       success: true,
       message: "Order placed successfully",
       orderId: order.orderId,
+      // "PENDING" when the amount paid was cash the office has yet to verify
+      paymentVerification: awaitingVerification ? "PENDING" : null,
     });
   } catch (error) {
     console.error("PLACE ORDER ERROR:", error);
@@ -674,7 +705,8 @@ export const getOrdersByStoreConsumerId = async (req, res) => {
       return res.json({
         success: true,
         totalOrders: orders.length,
-        orders,
+        // Each with how much of its payment is cash not yet verified
+        orders: await withCashVerification(orders),
       });
     }
 
@@ -721,7 +753,8 @@ export const getMyOrders = async (req, res) => {
     return res.json({
       success: true,
       count: orders.length,
-      orders,
+      // Each with how much of its payment is cash not yet verified
+      orders: await withCashVerification(orders),
     });
   } catch (error) {
     console.error("GET MY ORDERS ERROR:", error);
@@ -1365,7 +1398,14 @@ const OFFLINE_METHODS = ["CASH", "UPI", "CARD", "BANK_TRANSFER"];
 export const collectPayment = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { note } = req.body;
+    /* The note is shown to the office beside the payment. Only text is
+       kept, and no more of it than a note needs: it used to be stored at
+       whatever length was sent, and anything that was not text failed the
+       whole collection with a server error. */
+    const note =
+      typeof req.body.note === "string"
+        ? req.body.note.trim().slice(0, 500) || undefined
+        : undefined;
     const method = req.body.method || "CASH";
 
     /* 🔥 FIX: amount was used as sent. A negative amount passed every check
@@ -1411,6 +1451,8 @@ export const collectPayment = async (req, res) => {
       message: "Payment recorded successfully",
       paidAmount: result.order.paidAmount,
       dueAmount: result.order.dueAmount,
+      // "PENDING": it counts toward the agent's sales once the office verifies it
+      paymentVerification: result.payment?.verification?.status || null,
     });
   } catch (error) {
     console.error("COLLECT PAYMENT ERROR:", error);
@@ -1457,7 +1499,8 @@ export const getAgentDueOrders = async (req, res) => {
     res.json({
       success: true,
       count: orders.length,
-      data: orders,
+      // Each with how much of its payment is cash not yet verified
+      data: await withCashVerification(orders),
     });
   } catch (error) {
     res.status(500).json({
@@ -1597,6 +1640,8 @@ export const getCompletePaymentSummary = async (req, res) => {
           method: p.method,
           collectedAt: p.createdAt,
           collectedBy: p.collectedBy?.id,
+          // PENDING / APPROVED / REJECTED for cash; null where none is needed
+          verification: p.verification?.status || null,
         })),
       };
     });

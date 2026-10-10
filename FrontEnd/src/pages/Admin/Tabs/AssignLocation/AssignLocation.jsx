@@ -29,14 +29,20 @@ import {
 
 const PINCODE_RE = /^\d{6}$/;
 
-/* The three store types a product is priced for, in the order shown */
+/* The four store types a product is priced for, in the order shown */
 const TIERS = [
   ["retailerPrice", "Retailer"],
   ["wholesalerPrice", "Wholesaler"],
   ["distributorPrice", "Distributor"],
+  ["horecaPrice", "HoReCa"],
 ];
 
-const EMPTY_ROW = { retailerPrice: "", wholesalerPrice: "", distributorPrice: "" };
+const EMPTY_ROW = {
+  retailerPrice: "",
+  wholesalerPrice: "",
+  distributorPrice: "",
+  horecaPrice: "",
+};
 
 const Card = ({ className = "", children }) => (
   <div
@@ -284,6 +290,7 @@ export default function AssignLocation() {
         retailerPrice: row.retailerPrice ?? "",
         wholesalerPrice: row.wholesalerPrice ?? "",
         distributorPrice: row.distributorPrice ?? "",
+        horecaPrice: row.horecaPrice ?? "",
       };
     });
     setPrices(seeded);

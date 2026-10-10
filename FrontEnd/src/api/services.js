@@ -837,6 +837,27 @@ export const getAllTargets = async () => {
   return response.data;
 };
 
+/** The approved agents a target can be set for (names and IDs only). */
+export const getTargetAgents = async () => {
+  const response = await axiosInstance.get("/targets/admin/agents");
+  return response.data;
+};
+
+/** Change a target that has not ended: name, value, reward, mandatory. */
+export const updateTarget = async (targetId, payload) => {
+  const response = await axiosInstance.patch(
+    `/targets/admin/${targetId}`,
+    payload,
+  );
+  return response.data;
+};
+
+/** Close a running target now, or withdraw one that has not started. */
+export const endTarget = async (targetId) => {
+  const response = await axiosInstance.post(`/targets/admin/${targetId}/end`);
+  return response.data;
+};
+
 /** How many people each role would receive a broadcast. */
 export const getNotificationAudience = async () => {
   const response = await axiosInstance.get("/api/notifications/audience");
@@ -846,5 +867,95 @@ export const getNotificationAudience = async () => {
 /** Previously sent broadcasts, with recipient and read counts. */
 export const getSentNotifications = async () => {
   const response = await axiosInstance.get("/api/notifications/sent");
+  return response.data;
+};
+
+/* =====================================================================
+   MONTHLY SALES TARGET (admin)
+   ===================================================================== */
+
+/** Every agent's month side by side. `month` ("2026-10") for an earlier one. */
+export const getSalesTargets = async (month) => {
+  const response = await axiosInstance.get("/targets/admin/sales-target", {
+    params: month ? { month } : undefined,
+  });
+  return response.data;
+};
+
+/** One agent in full: own settings, this month, history, change log. */
+export const getAgentSalesTarget = async (agentId) => {
+  const response = await axiosInstance.get(
+    `/targets/admin/sales-target/agents/${encodeURIComponent(agentId)}`,
+  );
+  return response.data;
+};
+
+/** Change the settings every agent follows. */
+export const saveDefaultSalesTarget = async (payload) => {
+  const response = await axiosInstance.put(
+    "/targets/admin/sales-target/default",
+    payload,
+  );
+  return response.data;
+};
+
+/** Change one agent's own settings. A field sent as null goes back to the default. */
+export const saveAgentSalesTarget = async (agentId, payload) => {
+  const response = await axiosInstance.put(
+    `/targets/admin/sales-target/agents/${encodeURIComponent(agentId)}`,
+    payload,
+  );
+  return response.data;
+};
+
+/** Who changed which target, from what to what, and from when. */
+export const getSalesTargetChanges = async (agentId) => {
+  const response = await axiosInstance.get("/targets/admin/sales-target/changes", {
+    params: agentId ? { agentId } : undefined,
+  });
+  return response.data;
+};
+
+/* =====================================================================
+   PRODUCT-WISE SALES (admin)
+   ===================================================================== */
+
+/** { from, to, agentId, productId, groupBy } — dates as YYYY-MM-DD. */
+export const getProductSales = async (params) => {
+  const response = await axiosInstance.get("/admin/analytics/product-sales", {
+    params,
+  });
+  return response.data;
+};
+
+/* Cash verification: the cash agents record, approved or rejected by the
+   office before it counts toward their sales.
+   params: { status: PENDING|APPROVED|REJECTED|ALL, from, to, agentId } */
+export const getCashPayments = async (params) => {
+  const response = await axiosInstance.get("/admin/cash-payments", { params });
+  return response.data;
+};
+
+export const approveCashPayment = async (paymentId, note) => {
+  const response = await axiosInstance.post(
+    `/admin/cash-payments/${paymentId}/approve`,
+    { note },
+  );
+  return response.data;
+};
+
+export const approveCashPayments = async (paymentIds, note) => {
+  const response = await axiosInstance.post("/admin/cash-payments/approve", {
+    paymentIds,
+    note,
+  });
+  return response.data;
+};
+
+export const rejectCashPayment = async (paymentId, reason) => {
+  const response = await axiosInstance.post(
+    `/admin/cash-payments/${paymentId}/reject`,
+    { reason },
+  );
   return response.data;
 };

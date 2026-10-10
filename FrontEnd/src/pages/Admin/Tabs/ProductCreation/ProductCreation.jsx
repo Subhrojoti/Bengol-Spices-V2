@@ -60,6 +60,7 @@ const EMPTY = {
   retailerPrice: "",
   wholesalerPrice: "",
   distributorPrice: "",
+  horecaPrice: "",
 };
 
 const n = (v) => Number(v || 0);
@@ -570,11 +571,12 @@ export default function ProductCreation() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
                 ["retailerPrice", "Retailer Price"],
                 ["wholesalerPrice", "Wholesaler Price"],
                 ["distributorPrice", "Distributor Price"],
+                ["horecaPrice", "HoReCa Price"],
               ].map(([key, label]) => (
                 <Field key={key} label={label} hint="optional">
                   <input
@@ -709,7 +711,10 @@ export default function ProductCreation() {
               </div>
 
               {/* TIER SUMMARY */}
-              {(form.retailerPrice || form.wholesalerPrice || form.distributorPrice) && (
+              {(form.retailerPrice ||
+                form.wholesalerPrice ||
+                form.distributorPrice ||
+                form.horecaPrice) && (
                 <div className="mt-4 space-y-1.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
                   <p className="text-[11.5px] font-bold uppercase tracking-wide text-slate-400">
                     Tier pricing
@@ -718,6 +723,7 @@ export default function ProductCreation() {
                     ["Retailer", form.retailerPrice],
                     ["Wholesaler", form.wholesalerPrice],
                     ["Distributor", form.distributorPrice],
+                    ["HoReCa", form.horecaPrice],
                   ].map(([label, value]) => (
                     <div
                       key={label}

@@ -6,8 +6,30 @@ import Payment from "../models/Payment.js";
 import { razorpayInstance } from "../config/razorpay.js";
 import { updateInvoiceAfterPayment } from "./invoice.service.js";
 import { updateTargetProgress } from "./target.service.js";
+import { syncAfterSale } from "./salesTarget.service.js";
+import { publish } from "./liveEvents.js";
+import {
+  needsVerification,
+  pendingVerification,
+} from "../utils/paymentVerification.js";
 
 export const roundRupees = (value) => Math.round(Number(value) * 100) / 100;
+
+/** Tells open office panels that cash has been recorded and needs verifying. */
+export const announceCashToVerify = (payment) =>
+  publish(
+    "CASH_VERIFICATION",
+    {
+      payment: {
+        id: String(payment._id),
+        orderId: payment.orderId,
+        agentId: payment.agentId,
+        amount: payment.amount,
+        status: payment.verification?.status,
+      },
+    },
+    "canVerifyPayments",
+  );
 
 /* =============================
    LOCKS
@@ -72,7 +94,11 @@ const refuse = (code, message) => ({ ok: false, code, message });
  * requests arriving together (a double tap, a retried request) both passed
  * the due check and both were recorded.
  *
- * @returns {Promise<{ok: true, order: object} | {ok: false, code: number, message: string}>}
+ * Cash is recorded as PENDING verification: the order's paid and due
+ * amounts move at once (the store has paid), but the agent is credited for
+ * it only when the office approves it (cashVerification.service.js).
+ *
+ * @returns {Promise<{ok: true, order: object, payment: object} | {ok: false, code: number, message: string}>}
  */
 export const applyDuePayment = async ({
   orderId,
@@ -111,6 +137,8 @@ export const applyDuePayment = async ({
       return refuse(400, "Enter a valid amount of at least ₹1");
     }
 
+    const unverified = needsVerification(method);
+
     const payment = await Payment.create({
       orderId: order.orderId,
       consumerId: order.consumerId,
@@ -125,6 +153,7 @@ export const applyDuePayment = async ({
         id: agentId,
         role: "AGENT",
       },
+      ...(unverified && { verification: pendingVerification(agentId) }),
     });
 
     // Rounded to paise, so 141 − 14 − 127 lands on exactly 0 and completes
@@ -157,14 +186,26 @@ export const applyDuePayment = async ({
       method,
     });
 
-    await updateTargetProgress({
-      agentId: order.agentId,
-      type: "PAYMENT",
-      value: 1,
-      amount,
-    });
+    /* Cash waiting to be verified earns the agent nothing yet: the
+       collection target and the sales target are credited when the office
+       approves it. A gateway payment is confirmed already and counts now. */
+    if (!unverified) {
+      await updateTargetProgress({
+        agentId: order.agentId,
+        type: "PAYMENT",
+        value: 1,
+        amount,
+      });
 
-    return { ok: true, order };
+      /* The monthly sales target is measured on money collected, so this
+         payment may be the one that reaches it or earns the incentive. Logs
+         and carries on if it cannot be updated; the payment is recorded. */
+      await syncAfterSale(order.agentId);
+    } else {
+      announceCashToVerify(payment);
+    }
+
+    return { ok: true, order, payment };
   });
 
   if (locked.busy) {

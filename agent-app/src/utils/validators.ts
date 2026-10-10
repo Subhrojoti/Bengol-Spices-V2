@@ -87,7 +87,7 @@ export const createStoreSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9]{10}$/, "Enter a valid 10-digit phone number"),
-  storeType: z.enum(["RETAILER", "WHOLESALER", "DISTRIBUTOR"], { message: "Select a store type" }),
+  storeType: z.enum(["RETAILER", "WHOLESALER", "DISTRIBUTOR", "HORECA"], { message: "Select a store type" }),
   state: z.string().trim().min(2, "Enter the state"),
   city: z.string().trim().min(2, "Enter the city"),
   street: z.string().trim().min(2, "Enter the street"),

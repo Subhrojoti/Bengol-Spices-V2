@@ -144,6 +144,15 @@ export default function useLiveOrders({ tokenKey, ordersPath }) {
       try {
         const payload = JSON.parse(data.join("\n"));
         if (type === "ORDER_PLACED" && payload.order) announce(payload.order);
+
+        /* Cash recorded by an agent, or approved or rejected by someone at
+           the office. No toast or chime: the screens that show it (cash
+           verification, the dashboard) just refresh themselves. */
+        if (type === "CASH_VERIFICATION") {
+          window.dispatchEvent(
+            new CustomEvent("live:cash-verification", { detail: payload.payment }),
+          );
+        }
       } catch {
         /* a malformed event is dropped, the stream carries on */
       }

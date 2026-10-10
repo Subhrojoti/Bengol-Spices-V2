@@ -30,7 +30,8 @@ export function useDueOrders() {
 export function useRefreshAfterOrderActivity() {
   const queryClient = useQueryClient();
   return () => {
-    for (const key of ["orders", "dashboard", "targets", "wallet"]) {
+    // "sales" is the agent's product-wise sales, which an order changes too
+    for (const key of ["orders", "dashboard", "targets", "wallet", "sales"]) {
       queryClient.invalidateQueries({ queryKey: [key] });
     }
   };

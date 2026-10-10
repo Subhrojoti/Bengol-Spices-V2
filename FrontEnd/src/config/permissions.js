@@ -36,6 +36,7 @@ export const PERMISSION_GROUPS = [
     items: [
       { key: "canViewDashboardSummary", label: "View Dashboard Summary" },
       { key: "canSeePaymentInfo", label: "View Payment Info" },
+      { key: "canVerifyPayments", label: "Verify Cash Payments" },
       { key: "canSetTargets", label: "Manage Daily Targets" },
       { key: "canManageNotifications", label: "Manage Notifications" },
     ],

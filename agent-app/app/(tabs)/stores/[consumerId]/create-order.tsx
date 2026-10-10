@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { View, Text, Image, FlatList, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Plus, Minus, Trash2, Search, X, PackageSearch, Wallet2, Landmark, QrCode as QrCodeIcon } from "lucide-react-native";
+import { ChevronLeft, Plus, Trash2, Search, X, PackageSearch, Wallet2, Landmark, QrCode as QrCodeIcon } from "lucide-react-native";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { LoadingState, EmptyState, ErrorState } from "@/components/ui/States";
 import { RazorpayCheckout, type RazorpaySuccessPayload } from "@/components/payments/RazorpayCheckout";
@@ -15,6 +16,7 @@ import { useCatalog } from "@/hooks/useCatalog";
 import { usePlaceOrder, useRefreshAfterOrderActivity } from "@/hooks/useOrders";
 import { orderApi, type PlaceOrderInput } from "@/api/order.api";
 import { formatCurrency } from "@/utils/currency";
+import { unitForCounting } from "@/utils/uom";
 import { isLocationPrice, resolveProductPrice } from "@/utils/pricing";
 import { getErrorMessage, isSettledPaymentFailure } from "@/api/client";
 import { toast } from "@/utils/toast";
@@ -97,30 +99,59 @@ export default function CreateOrderScreen() {
     setPickerOpen(false);
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart((prev) =>
-      prev.map((item) => (item.productId === productId ? { ...item, quantity: Math.max(item.minOrderQty, item.quantity + delta) } : item)),
-    );
+  // The quantity as typed or stepped. It can be below the minimum (or 0, for
+  // a cleared box) while it is being typed; cartProblem() refuses to place
+  // an order in that state, so what is on screen is always what is sent.
+  const setQuantity = (productId: string, quantity: number) => {
+    setCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, quantity } : item)));
+  };
+
+  /** Why the cart cannot be ordered as it stands, shown as a toast. False when it can. */
+  const cartProblem = (): boolean => {
+    if (cart.length === 0) {
+      toast.error("Cart is empty", "Add at least one product first.");
+      return true;
+    }
+    const short = cart.find((item) => !Number.isInteger(item.quantity) || item.quantity < item.minOrderQty);
+    if (short) {
+      toast.error(
+        "Check the quantity",
+        short.quantity > 0 ? `${short.name}: the minimum order is ${short.minOrderQty}.` : `Enter a quantity for ${short.name}.`,
+      );
+      return true;
+    }
+    if (payNowAmount <= 0) {
+      toast.error("Enter an amount", "Enter how much is being paid now.");
+      return true;
+    }
+    return false;
   };
 
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((i) => i.productId !== productId));
   };
 
+  /* The order is placed, so this cart is finished with. It is emptied, and
+     this screen is taken off the stack before the order is shown. Back from
+     the order then goes to where the agent came from (the store list, or
+     that store's orders) and never to a cart that still held the order and
+     could be placed a second time. */
+  const finishOrder = (orderId: string) => {
+    setCart([]);
+    setRazorpaySession(null);
+    setQrSession(null);
+    if (router.canGoBack()) router.back();
+    router.push(`/orders/${orderId}?placed=1`);
+  };
+
   const handleCashSubmit = async () => {
-    if (cart.length === 0) {
-      toast.error("Cart is empty", "Add at least one product first.");
-      return;
-    }
-    if (payNowAmount <= 0) {
-      toast.error("Enter an amount", "Enter how much is being paid now.");
-      return;
-    }
+    if (cartProblem()) return;
     setSubmitting(true);
     try {
       const result = await placeOrder.mutateAsync(buildOrderPayload());
-      toast.success("Order placed", result.orderId);
-      router.push(`/orders/${result.orderId}`);
+      // Cash counts toward the agent's sales only once the office has verified it
+      toast.success("Order placed", `${result.orderId} · ${formatCurrency(payNowAmount)} cash will count toward your target once the office verifies it`);
+      finishOrder(result.orderId);
     } catch (e) {
       toast.error("Couldn't place order", getErrorMessage(e));
     } finally {
@@ -129,14 +160,7 @@ export default function CreateOrderScreen() {
   };
 
   const handleOnlineSubmit = async () => {
-    if (cart.length === 0) {
-      toast.error("Cart is empty", "Add at least one product first.");
-      return;
-    }
-    if (payNowAmount <= 0) {
-      toast.error("Enter an amount", "Enter how much is being paid now.");
-      return;
-    }
+    if (cartProblem()) return;
     setSubmitting(true);
     try {
       const session = await orderApi.createInitialPayment(payNowAmount);
@@ -167,7 +191,7 @@ export default function CreateOrderScreen() {
       // than trusting whatever unit the backend's session response echoes.
       toast.success("Payment received", `${formatCurrency(amountPaidNow)} · Order ${result.orderId} placed`);
       refreshAfterOrderActivity();
-      router.push(`/orders/${result.orderId}`);
+      finishOrder(result.orderId);
     } catch (e) {
       toast.error("Couldn't place order", getErrorMessage(e));
     } finally {
@@ -180,14 +204,7 @@ export default function CreateOrderScreen() {
   // payment), store owner scans and pays via their own UPI app. Verified
   // server-side against Razorpay before the order is placed.
   const handleGenerateQr = async () => {
-    if (cart.length === 0) {
-      toast.error("Cart is empty", "Add at least one product first.");
-      return;
-    }
-    if (payNowAmount <= 0) {
-      toast.error("Enter an amount", "Enter how much is being paid now.");
-      return;
-    }
+    if (cartProblem()) return;
     setSubmitting(true);
     try {
       const session = await orderApi.createInitialPaymentQr(payNowAmount);
@@ -211,7 +228,7 @@ export default function CreateOrderScreen() {
       setQrVisible(false);
       toast.success("Payment received", `${formatCurrency(amountPaidNow)} · Order ${result.orderId} placed`);
       refreshAfterOrderActivity();
-      router.push(`/orders/${result.orderId}`);
+      finishOrder(result.orderId);
       return true;
     } catch (e) {
       toast.error("Couldn't place order", getErrorMessage(e));
@@ -241,6 +258,9 @@ export default function CreateOrderScreen() {
         data={cart}
         keyExtractor={(item) => item.productId}
         contentContainerStyle={{ padding: 20, paddingTop: 8, paddingBottom: 24, gap: 10 }}
+        // With the keyboard up for a quantity, + / − and the buttons below
+        // still answer the first tap instead of only closing the keyboard
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <Button label="Add Products" variant="outline" icon={<Plus size={16} color={colors.ink.DEFAULT} />} onPress={() => setPickerOpen(true)} fullWidth className="mb-2" />
         }
@@ -255,16 +275,15 @@ export default function CreateOrderScreen() {
               <Text className="font-sans text-xs text-ink-500">
                 {formatCurrency(item.unitPrice)} / {item.uom}
               </Text>
+              {/* What this line comes to, so a typed quantity can be checked at a glance */}
+              <Text className="mt-0.5 font-sans-semibold text-xs text-ink-700">{formatCurrency(Math.round(item.unitPrice * item.quantity * 100) / 100)}</Text>
             </View>
-            <View className="flex-row items-center gap-2 rounded-full border border-sand-dark bg-white px-1.5 py-1">
-              <Pressable onPress={() => updateQuantity(item.productId, -1)} className="h-7 w-7 items-center justify-center rounded-full bg-cream-100">
-                <Minus size={14} color={colors.ink.DEFAULT} />
-              </Pressable>
-              <Text className="min-w-[24px] text-center font-sans-bold text-sm text-ink">{item.quantity}</Text>
-              <Pressable onPress={() => updateQuantity(item.productId, 1)} className="h-7 w-7 items-center justify-center rounded-full bg-cream-100">
-                <Plus size={14} color={colors.ink.DEFAULT} />
-              </Pressable>
-            </View>
+            <QuantityStepper
+              value={item.quantity}
+              min={item.minOrderQty}
+              onChange={(quantity) => setQuantity(item.productId, quantity)}
+              accessibilityLabel={`Quantity of ${item.name}${item.uom ? `, in ${unitForCounting(item.uom)}` : ""}`}
+            />
             <Pressable onPress={() => removeFromCart(item.productId)} hitSlop={8}>
               <Trash2 size={16} color={colors.chili[600]} />
             </Pressable>

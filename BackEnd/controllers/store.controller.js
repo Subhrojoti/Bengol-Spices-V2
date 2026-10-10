@@ -7,6 +7,7 @@ import Counter from "../models/Counter.js";
 import Product from "../models/Product.js";
 import { updateTargetProgress } from "../services/target.service.js";
 import {
+  STORE_TYPES,
   applyLocationPrices,
   effectivePrice,
   getLocationOverrides,
@@ -14,7 +15,7 @@ import {
 
 // The same fields the public catalogue exposes
 const CATALOGUE_FIELDS =
-  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice images gstPercentage minOrderQty";
+  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage minOrderQty";
 
 /**
  * THE CATALOGUE AS ONE STORE SEES IT (Agent, own store only)
@@ -145,6 +146,17 @@ export const createStore = async (req, res) => {
       throw new Error("All fields including complete address are required");
     }
 
+    /* Checked here, with words an agent can act on. An unknown type used to
+       get as far as saving the store, which used up a consumer ID and
+       answered with the database's own validation text. */
+    const cleanStoreType = String(storeType).trim().toUpperCase();
+
+    if (!STORE_TYPES.includes(cleanStoreType)) {
+      throw new Error(
+        "Store type must be Retailer, Wholesaler, Distributor or HoReCa",
+      );
+    }
+
     if (!req.file) {
       throw new Error("Store image is required");
     }
@@ -258,7 +270,7 @@ export const createStore = async (req, res) => {
         latitude: lat,
         longitude: lng,
       },
-      storeType,
+      storeType: cleanStoreType,
       registeredBy: req.user.agentId,
       image: {
         url: req.file.path,
