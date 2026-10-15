@@ -35,6 +35,8 @@ import { formatCurrency } from "@/utils/currency";
 import { colors, gradients } from "@/theme/colors";
 import { getErrorMessage } from "@/api/client";
 import type { LeaderboardEntry } from "@/types/api";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 
 const styles = StyleSheet.create({
   tileShadow: { shadowColor: colors.maroon[900], shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
@@ -57,7 +59,10 @@ function parseGrowth(value: unknown): number | null {
 
 export default function OverviewScreen() {
   const router = useRouter();
-  const { data, isLoading, isError, isFetching, refetch, error } = useDashboard();
+  const { data, isLoading, isError, refetch, error } = useDashboard();
+  const { pulling, onPull } = usePullToRefresh(refetch);
+  // What the office does (confirming an order, approving cash) moves these too
+  useRefetchOnFocus(["dashboard"], ["notifications"], ["leaderboard"]);
   const { data: agent } = useProfile();
   const { data: notifications } = useNotifications();
   const { data: board } = useLeaderboard();
@@ -75,7 +80,7 @@ export default function OverviewScreen() {
   const myEntry = board && myRank > 0 ? board[myRank - 1] : undefined;
 
   return (
-    <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
+    <Screen onRefresh={onPull} refreshing={pulling}>
       <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
         <View className="flex-1 pr-2">
           <Eyebrow color={colors.saffron[700]}>{greetingForNow()}</Eyebrow>

@@ -9,6 +9,6 @@ export const returnApi = {
 
   updateReturnStatus: (returnId: string, status: ReturnStatus) =>
     api
-      .put<{ success: true; message: string }>(`/returns/delivery/${returnId}/status`, { status })
+      .put<{ success: true; message: string }>(`/returns/delivery/${encodeURIComponent(returnId)}/status`, { status })
       .then((r) => r.data),
 };

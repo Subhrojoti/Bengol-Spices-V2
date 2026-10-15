@@ -12,9 +12,12 @@ import { useInvoiceDownload } from "@/hooks/useInvoiceDownload";
 import { formatCurrency } from "@/utils/currency";
 import { formatDate, isOverdue } from "@/utils/date";
 import { paymentStateOf } from "@/utils/paymentState";
+import { sizedImage } from "@/utils/image";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { Order } from "@/types/api";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 type Tab = "DUE" | "OVERDUE" | "COMPLETED";
 
@@ -66,6 +69,9 @@ export default function PaymentsScreen() {
   const myOrdersQuery = useMyOrders();
   const { data: stores } = useMyStores();
   const { downloadInvoice, downloading } = useInvoiceDownload();
+  // Dues and payments change while the agent is elsewhere in the app
+  useRefetchOnFocus(["orders"]);
+  const { pulling, onPull } = usePullToRefresh(dueQuery.refetch, myOrdersQuery.refetch);
 
   const imagesByConsumerId = useMemo(() => {
     const map = new Map<string, string>();
@@ -123,6 +129,10 @@ export default function PaymentsScreen() {
           data={groups}
           keyExtractor={(item) => item.consumerId}
           contentContainerStyle={{ padding: 20, paddingTop: 4, gap: 10 }}
+          refreshing={pulling}
+          onRefresh={onPull}
+          initialNumToRender={8}
+          windowSize={7}
           ListEmptyComponent={
             <EmptyState icon={<ReceiptText size={22} color={colors.ink[500]} />} title={EMPTY_COPY[tab].title} subtitle={EMPTY_COPY[tab].subtitle} />
           }
@@ -161,7 +171,7 @@ function StoreGroupCard({
     <View className="overflow-hidden rounded-2xl border border-sand bg-white">
       <Pressable onPress={onToggle} className="flex-row items-center gap-3 p-4 active:opacity-80">
         {group.imageUrl ? (
-          <Image source={{ uri: group.imageUrl }} className="h-11 w-11 rounded-full border border-sand-dark" />
+          <Image source={{ uri: sizedImage(group.imageUrl, 44) }} className="h-11 w-11 rounded-full border border-sand-dark" />
         ) : (
           <View className="h-11 w-11 items-center justify-center rounded-full bg-saffron-50">
             <StoreIcon size={18} color={colors.saffron[600]} />
@@ -205,7 +215,7 @@ function OrderLine({ order, onDownload, downloading, showDue }: { order: Order; 
   return (
     <Pressable onPress={() => router.push(`/orders/${order.orderId}`)} className="flex-row items-center gap-3 border-b border-sand p-4 last:border-b-0 active:opacity-80">
       {firstProduct?.image ? (
-        <Image source={{ uri: firstProduct.image }} className="h-11 w-11 rounded-lg" />
+        <Image source={{ uri: sizedImage(firstProduct.image, 44) }} className="h-11 w-11 rounded-lg" />
       ) : (
         <View className="h-11 w-11 items-center justify-center rounded-lg bg-cream-100">
           <Package size={16} color={colors.ink[500]} />

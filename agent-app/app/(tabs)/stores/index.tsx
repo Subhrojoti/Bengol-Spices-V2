@@ -14,6 +14,9 @@ import type { Store, StoreType } from "@/types/api";
 import { colors } from "@/theme/colors";
 import { getErrorMessage } from "@/api/client";
 import { openInMaps } from "@/utils/maps";
+import { sizedImage } from "@/utils/image";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 
 const STORE_TYPE_LABEL: Record<Store["storeType"], string> = {
   RETAILER: "Retailer",
@@ -33,7 +36,9 @@ type TypeFilter = "ALL" | StoreType;
 
 export default function MyStoresScreen() {
   const router = useRouter();
-  const { data: stores, isLoading, isError, isFetching, refetch, error } = useMyStores();
+  const { data: stores, isLoading, isError, refetch, error } = useMyStores();
+  const { pulling, onPull } = usePullToRefresh(refetch);
+  useRefetchOnFocus(["stores"]);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
 
@@ -83,8 +88,8 @@ export default function MyStoresScreen() {
           data={filtered}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 14 }}
-          refreshing={isFetching}
-          onRefresh={refetch}
+          refreshing={pulling}
+          onRefresh={onPull}
           ListHeaderComponent={
             stores && stores.length > 0 ? (
               <View className="mb-1 gap-3">
@@ -140,7 +145,7 @@ function StoreCard({ store }: { store: Store }) {
 
       <View className="flex-row items-start gap-3">
         <View className="relative">
-          <Image source={{ uri: store.image.url }} className="h-16 w-16 rounded-full border-2 border-sand-dark" />
+          <Image source={{ uri: sizedImage(store.image.url, 64) }} className="h-16 w-16 rounded-full border-2 border-sand-dark" />
           <View className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-saffron-600">
             <TypeIcon size={11} color={colors.white} />
           </View>

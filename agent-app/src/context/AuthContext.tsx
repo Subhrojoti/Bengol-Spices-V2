@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/auth.api";
 import { setUnauthorizedHandler } from "@/api/client";
@@ -54,8 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
+  // One object while nothing in it changes, so the screens that read it are
+  // not re-drawn every time this provider is
+  const value = useMemo(() => ({ isAuthenticated, isBootstrapping, login, logout }), [isAuthenticated, isBootstrapping, login, logout]);
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isBootstrapping, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

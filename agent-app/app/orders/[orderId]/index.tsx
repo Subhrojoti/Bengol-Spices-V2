@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { View, Text, Image, ScrollView, RefreshControl, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, CircleCheck, MapPin, FileDown, Wallet2, Navigation, Package, Undo2, X } from "lucide-react-native";
 import { IconButton, Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState } from "@/components/ui/States";
-import { useMyOrders } from "@/hooks/useOrders";
+import { useOrder } from "@/hooks/useOrders";
 import { useInitiateReturn, useMyReturns } from "@/hooks/useReturns";
 import { useInvoiceDownload } from "@/hooks/useInvoiceDownload";
 import { formatCurrency } from "@/utils/currency";
@@ -16,8 +16,10 @@ import { formatDateTime } from "@/utils/date";
 import { paymentStateOf } from "@/utils/paymentState";
 import { getErrorMessage } from "@/api/client";
 import { openInMaps } from "@/utils/maps";
+import { sizedImage } from "@/utils/image";
 import { toast } from "@/utils/toast";
 import { colors } from "@/theme/colors";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 const STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "info"> = {
   DELIVERED: "success",
@@ -45,7 +47,13 @@ export default function OrderDetailScreen() {
   // `placed` is "1" when this screen is opened straight after placing the order
   const { orderId, placed } = useLocalSearchParams<{ orderId: string; placed?: string }>();
   const router = useRouter();
-  const { data: orders, isLoading, isError, isFetching, refetch, error, dataUpdatedAt } = useMyOrders();
+  /* The order is read on its own, not picked out of the agent's whole list
+     of orders: it opens at once from whatever list already holds it, an
+     order placed a moment ago is simply fetched, and nothing has to wait
+     for (or download) every other order. While this screen is the one being
+     looked at and the order is still on its way, it is kept up to date. */
+  const focused = useIsFocused();
+  const { data: order, isLoading, isError, refetch, error } = useOrder(orderId, { live: focused });
   const { data: returns } = useMyReturns();
   const { downloadInvoice, downloading } = useInvoiceDownload();
   const initiateReturn = useInitiateReturn();
@@ -54,27 +62,10 @@ export default function OrderDetailScreen() {
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
 
-  const order = orders?.find((o) => o.orderId === orderId);
   // What is paid and verified, what is cash still waiting on the office, and what is owed
   const payment = order ? paymentStateOf(order) : null;
 
-  /* This screen reads the order out of the agent's list of orders. An order
-     placed a moment ago is not yet in the copy of that list the app holds,
-     and "Couldn't find this order" used to be shown, about an order that
-     had just been placed successfully, until the list had been read again.
-     So when the order is not in the list, the list is read again, and until
-     a reading taken after this screen opened has come back the order is
-     loading, not missing. Only if it is still absent then is it not found. */
-  const [openedAt] = useState(() => Date.now());
-  const listIsOlder = !dataUpdatedAt || dataUpdatedAt < openedAt;
-  const stillLooking = !order && listIsOlder && !isError;
-
-  useEffect(() => {
-    // Joins a reading already under way instead of starting it again
-    if (stillLooking) refetch({ cancelRefetch: false });
-    // Once, as the screen opens
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { pulling, onPull } = usePullToRefresh(refetch);
 
   // The backend allows one open return per order. The list is newest first,
   // so this is the latest one; once that is cancelled, a new return can be
@@ -116,7 +107,7 @@ export default function OrderDetailScreen() {
         <Text className="font-display-bold text-xl text-ink">{orderId}</Text>
       </View>
 
-      {isLoading || stillLooking ? (
+      {isLoading ? (
         <LoadingState message={placed === "1" ? "Order placed. Loading its details…" : "Loading order…"} />
       ) : !order ? (
         // An order already on screen stays on screen if a later refresh fails
@@ -124,7 +115,8 @@ export default function OrderDetailScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 14 }}
-          refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.saffron[600]} />}
+          // The spinner is for a pull, not for the quiet 30-second refresh of an order on its way
+          refreshControl={<RefreshControl refreshing={pulling} onRefresh={onPull} tintColor={colors.saffron[600]} />}
         >
           {placed === "1" ? (
             <View className="flex-row items-start gap-2.5 rounded-2xl bg-cardamom-100 p-3.5" accessibilityRole="alert">
@@ -172,7 +164,7 @@ export default function OrderDetailScreen() {
             {order.products.map((item, idx) => (
               <View key={idx} className={`flex-row items-center gap-3 py-2 ${idx < order.products.length - 1 ? "border-b border-sand" : ""}`}>
                 {item.image ? (
-                  <Image source={{ uri: item.image }} className="h-12 w-12 rounded-lg" />
+                  <Image source={{ uri: sizedImage(item.image, 48) }} className="h-12 w-12 rounded-lg" />
                 ) : (
                   <View className="h-12 w-12 items-center justify-center rounded-lg bg-sand">
                     <Package size={16} color={colors.ink[500]} />

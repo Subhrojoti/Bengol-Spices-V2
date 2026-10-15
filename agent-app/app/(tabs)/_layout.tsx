@@ -17,6 +17,10 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        /* A tab that is not on screen is frozen: it keeps what it shows but
+           does no re-drawing while another tab is in use. All five tabs stay
+           mounted, and each used to re-draw whenever shared data changed. */
+        freezeOnBlur: true,
         tabBarActiveTintColor: colors.saffron[600],
         tabBarInactiveTintColor: colors.ink[300],
         tabBarStyle: {

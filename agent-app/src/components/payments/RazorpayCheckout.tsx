@@ -17,6 +17,12 @@ interface RazorpayCheckoutProps {
   onDismiss: () => void;
 }
 
+/* A value written into the page's script as a quoted string, so that it can
+   only ever be a value there. The key and the order reference used to be
+   pasted between quotes as they came: anything in them that closed the
+   quote, or the script, would have run as part of the page. */
+const inScript = (value: string) => JSON.stringify(String(value)).replace(/</g, "\\u003c");
+
 export function RazorpayCheckout({ visible, orderId, amountInPaise, keyId, onSuccess, onDismiss }: RazorpayCheckoutProps) {
   // 🔥 FIX: the session amount is already in paise (the backend passes on
   // Razorpay's own order.amount). Multiplying it by 100 again handed the
@@ -28,11 +34,11 @@ export function RazorpayCheckout({ visible, orderId, amountInPaise, keyId, onSuc
       <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
       <script>
         const options = {
-          key: "${keyId}",
-          amount: ${Math.round(amountInPaise)},
+          key: ${inScript(keyId)},
+          amount: ${Math.round(Number(amountInPaise)) || 0},
           currency: "INR",
           name: "Bengol Spices",
-          order_id: "${orderId}",
+          order_id: ${inScript(orderId)},
           handler: function (response) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: "success", ...response }));
           },

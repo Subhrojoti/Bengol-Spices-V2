@@ -8,10 +8,11 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { RazorpayCheckout, type RazorpaySuccessPayload } from "@/components/payments/RazorpayCheckout";
 import { QrPaymentModal } from "@/components/payments/QrPaymentModal";
-import { useMyOrders, useRefreshAfterOrderActivity } from "@/hooks/useOrders";
+import { UnrecordedPaymentModal } from "@/components/payments/UnrecordedPaymentModal";
+import { useOrder, useRefreshAfterOrderActivity } from "@/hooks/useOrders";
 import { orderApi } from "@/api/order.api";
 import { formatCurrency } from "@/utils/currency";
-import { getErrorMessage, isSettledPaymentFailure } from "@/api/client";
+import { getErrorMessage, isRetryableFailure, isSettledPaymentFailure } from "@/api/client";
 import { toast } from "@/utils/toast";
 import { openInMaps } from "@/utils/maps";
 import { colors } from "@/theme/colors";
@@ -24,12 +25,22 @@ type PaymentMethod = "CASH" | "ONLINE" | "QR";
 const indianMonth = (instant: string | number | Date) => new Date(new Date(instant).getTime() + 330 * 60 * 1000).toISOString().slice(0, 7);
 const isFromEarlierMonth = (placedAt: string | Date) => indianMonth(placedAt) < indianMonth(Date.now());
 
+/* An online payment Razorpay has taken that is not on the order yet, with
+   everything needed to tell the server about it again. */
+interface UnrecordedDuePayment {
+  payment: RazorpaySuccessPayload;
+  sessionAmount: number;
+  orderId: string;
+  due: number;
+  problem: string;
+}
+
 export default function CollectPaymentScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const refreshAfterOrderActivity = useRefreshAfterOrderActivity();
-  const { data: orders, isLoading, isError, error, refetch } = useMyOrders();
-  const order = orders?.find((o) => o.orderId === orderId);
+  // The one order, from the copy a list already holds or read on its own
+  const { data: order, isLoading, isError, error, refetch } = useOrder(orderId);
 
   const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +50,8 @@ export default function CollectPaymentScreen() {
 
   const [qrSession, setQrSession] = useState<{ qrCodeId: string; imageUrl: string; amount: number } | null>(null);
   const [qrVisible, setQrVisible] = useState(false);
+
+  const [unrecorded, setUnrecorded] = useState<UnrecordedDuePayment | null>(null);
 
   // Opened from a link there is no screen behind this one, and back() failed
   // with "GO_BACK was not handled"; fall back to the order itself.
@@ -62,6 +75,11 @@ export default function CollectPaymentScreen() {
       setTimeout(close, 400);
     } catch (e) {
       toast.error("Couldn't record payment", getErrorMessage(e));
+      /* Read the order again. When the reply to a payment is lost on the
+         way back, the phone can send it a second time by itself, and that
+         copy is refused ("no due amount remaining") for a payment that did
+         go in: the amounts on screen should then show it. */
+      refreshAfterOrderActivity();
     } finally {
       setSubmitting(false);
     }
@@ -81,33 +99,57 @@ export default function CollectPaymentScreen() {
     }
   };
 
-  const handleRazorpaySuccess = async (payload: RazorpaySuccessPayload) => {
-    if (!order || !razorpaySession) return;
-    const dueAmountAtTimeOfPayment = order.dueAmount;
-    setRazorpayVisible(false);
+  /* Tells the server about a payment Razorpay has taken for this order's
+     due. Called when the checkout succeeds, and again from "Try again" for a
+     payment whose confirmation got no answer. */
+  const confirmDuePayment = async (attempt: Omit<UnrecordedDuePayment, "problem">) => {
     setSubmitting(true);
     try {
       await orderApi.verifyRazorpayDuePayment({
-        razorpay_order_id: payload.razorpay_order_id,
-        razorpay_payment_id: payload.razorpay_payment_id,
-        razorpay_signature: payload.razorpay_signature,
-        orderId: order.orderId,
-        amount: razorpaySession.amount,
+        razorpay_order_id: attempt.payment.razorpay_order_id,
+        razorpay_payment_id: attempt.payment.razorpay_payment_id,
+        razorpay_signature: attempt.payment.razorpay_signature,
+        orderId: attempt.orderId,
+        amount: attempt.sessionAmount,
       });
+      setUnrecorded(null);
       // 🔥 FIX: was displaying razorpaySession.amount, echoed back from the
       // backend's Razorpay session response — if that response happens to
       // be in paise rather than rupees, this showed a 100x-inflated
       // number ("paid ₹10" appearing as "₹1000"). Displaying the amount
       // this screen itself already knows is in rupees instead, rather
       // than trusting the round-trip.
-      toast.success("Payment received", formatCurrency(dueAmountAtTimeOfPayment));
+      toast.success("Payment received", formatCurrency(attempt.due));
       refreshAfterOrderActivity();
       setTimeout(close, 400);
     } catch (e) {
-      toast.error("Couldn't confirm payment", getErrorMessage(e));
+      const problem = getErrorMessage(e);
+      /* No answer, or "try again": the money is taken and the order still
+         shows it as owed. The payment is kept so the same confirmation can
+         be sent again. It used to be dropped here, and all that was left on
+         screen was the button that pays a second time. */
+      if (isRetryableFailure(e) && !isSettledPaymentFailure(e)) {
+        setUnrecorded({ ...attempt, problem });
+      } else {
+        // Refused outright (and refunded, where money had been taken)
+        setUnrecorded(null);
+        toast.error("Couldn't confirm payment", problem);
+        refreshAfterOrderActivity();
+      }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleRazorpaySuccess = async (payload: RazorpaySuccessPayload) => {
+    if (!order || !razorpaySession) return;
+    setRazorpayVisible(false);
+    await confirmDuePayment({
+      payment: payload,
+      sessionAmount: razorpaySession.amount,
+      orderId: order.orderId,
+      due: order.dueAmount,
+    });
   };
 
   const handleGenerateQr = async () => {
@@ -279,6 +321,19 @@ export default function CollectPaymentScreen() {
         subtitle="Remaining balance for this order"
         onClose={() => setQrVisible(false)}
         onPaid={handleQrPaid}
+      />
+
+      <UnrecordedPaymentModal
+        visible={!!unrecorded}
+        amount={unrecorded?.due ?? 0}
+        reference={unrecorded?.payment.razorpay_payment_id ?? ""}
+        pending="it has not been recorded on this order yet"
+        problem={unrecorded?.problem}
+        busy={submitting}
+        onRetry={() => {
+          if (unrecorded) void confirmDuePayment(unrecorded);
+        }}
+        onGiveUp={() => setUnrecorded(null)}
       />
     </SafeAreaView>
   );

@@ -56,6 +56,17 @@ export function isSettledPaymentFailure(error: unknown): boolean {
   return typeof data?.refunded === "boolean";
 }
 
+/**
+ * True when sending the same request again may work: it got no answer at
+ * all (no signal, a timeout), or the server said it was busy or had failed.
+ * A plain refusal (400, 403, 404) will be refused again.
+ */
+export function isRetryableFailure(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === undefined || status >= 500 || status === 408 || status === 409 || status === 429;
+}
+
 export function getErrorMessage(error: unknown, fallback = "Something went wrong. Please try again."): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as { message?: string } | undefined;

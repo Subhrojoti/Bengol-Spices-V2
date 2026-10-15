@@ -6,7 +6,8 @@ export function useAssignedReturns() {
   return useQuery({
     queryKey: ["returns", "assigned"],
     queryFn: returnApi.getAssignedReturns,
-    refetchInterval: 20 * 1000,
+    // Once a minute while the app is open, as the delivery list is (it was every 20 seconds)
+    refetchInterval: 60 * 1000,
   });
 }
 

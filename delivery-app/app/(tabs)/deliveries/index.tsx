@@ -1,10 +1,11 @@
 import { View, Text, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Truck, MapPin, Phone } from "lucide-react-native";
+import { Truck, MapPin, Phone, TriangleAlert } from "lucide-react-native";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { OrderStatusBadge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState, EmptyState } from "@/components/ui/States";
 import { useAssignedOrders } from "@/hooks/useOrders";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { AssignedOrder } from "@/types/api";
@@ -13,7 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const STATUS_ORDER: Record<string, number> = { ASSIGNED: 0, SHIPPED: 1, OUT_FOR_DELIVERY: 2 };
 
 export default function DeliveriesScreen() {
-  const { data, isLoading, isError, isFetching, refetch, error } = useAssignedOrders();
+  const { data, isLoading, isError, refetch, error } = useAssignedOrders();
+  const { pulling, onPull } = usePullToRefresh(refetch);
 
   const sorted = [...(data ?? [])].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
 
@@ -30,8 +32,8 @@ export default function DeliveriesScreen() {
           data={sorted}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 4, gap: 10 }}
-          refreshing={isFetching}
-          onRefresh={refetch}
+          refreshing={pulling}
+          onRefresh={onPull}
           ListEmptyComponent={
             <EmptyState
               icon={<Truck size={24} color={colors.ink[500]} />}
@@ -73,6 +75,12 @@ function DeliveryRow({ order }: { order: AssignedOrder }) {
         <Phone size={12} color={colors.ink[500]} />
         <Text className="font-sans text-xs text-ink-500">{order.deliveryAddress.phone}</Text>
       </View>
+      {order.delivery?.couldNotDeliver?.at ? (
+        <View className="mt-2 flex-row items-center gap-1.5">
+          <TriangleAlert size={12} color={colors.chili[700]} />
+          <Text className="font-sans-semibold text-xs text-chili-700">Reported as not delivered. Waiting for the office.</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }

@@ -7,5 +7,5 @@ export const notificationApi = {
   // unwrapList handles both shapes safely either way.
   getMyNotifications: (): Promise<AppNotification[]> =>
     api.get("/api/notifications").then((r) => unwrapList<AppNotification>(r.data)),
-  markAsRead: (id: string) => api.patch<{ message: string }>(`/api/notifications/${id}/read`).then((r) => r.data),
+  markAsRead: (id: string) => api.patch<{ message: string }>(`/api/notifications/${encodeURIComponent(id)}/read`).then((r) => r.data),
 };

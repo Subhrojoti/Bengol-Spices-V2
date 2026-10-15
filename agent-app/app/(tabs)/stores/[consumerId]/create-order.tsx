@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Image, FlatList, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -11,6 +11,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { LoadingState, EmptyState, ErrorState } from "@/components/ui/States";
 import { RazorpayCheckout, type RazorpaySuccessPayload } from "@/components/payments/RazorpayCheckout";
 import { QrPaymentModal } from "@/components/payments/QrPaymentModal";
+import { UnrecordedPaymentModal } from "@/components/payments/UnrecordedPaymentModal";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useCatalog } from "@/hooks/useCatalog";
 import { usePlaceOrder, useRefreshAfterOrderActivity } from "@/hooks/useOrders";
@@ -18,12 +19,25 @@ import { orderApi, type PlaceOrderInput } from "@/api/order.api";
 import { formatCurrency } from "@/utils/currency";
 import { unitForCounting } from "@/utils/uom";
 import { isLocationPrice, resolveProductPrice } from "@/utils/pricing";
-import { getErrorMessage, isSettledPaymentFailure } from "@/api/client";
+import { getErrorMessage, isRetryableFailure, isSettledPaymentFailure } from "@/api/client";
+import { sizedImage } from "@/utils/image";
+import { newRequestId } from "@/utils/requestId";
 import { toast } from "@/utils/toast";
 import { colors } from "@/theme/colors";
 import type { CartItem, PublicProduct, StoreType } from "@/types/api";
 
 type PaymentMethod = "CASH" | "ONLINE" | "QR";
+
+/* An online payment Razorpay has taken whose order is not placed yet, with
+   everything needed to ask again: the payment, and the order exactly as it
+   was when it was paid for. */
+interface UnrecordedOnlinePayment {
+  payment: RazorpaySuccessPayload;
+  sessionAmount: number;
+  orderPayload: PlaceOrderInput;
+  paidNow: number;
+  problem: string;
+}
 
 export default function CreateOrderScreen() {
   const { consumerId, storeName, storeType } = useLocalSearchParams<{ consumerId: string; storeName: string; storeType: StoreType }>();
@@ -42,7 +56,21 @@ export default function CreateOrderScreen() {
   const [qrSession, setQrSession] = useState<{ qrCodeId: string; imageUrl: string; amount: number } | null>(null);
   const [qrVisible, setQrVisible] = useState(false);
 
+  const [unrecorded, setUnrecorded] = useState<UnrecordedOnlinePayment | null>(null);
+
   const placeOrder = usePlaceOrder();
+
+  /* The reference sent with a cash order. It stays the same for as long as
+     the order is the same, so "Place Order" pressed again after a reply
+     that never arrived gets the order already placed and not a second one;
+     a cart that has been changed since is a different order and gets a new
+     reference. */
+  const placement = useRef<{ order: string; requestId: string } | null>(null);
+  const requestIdFor = (payload: PlaceOrderInput) => {
+    const order = JSON.stringify(payload);
+    if (placement.current?.order !== order) placement.current = { order, requestId: newRequestId() };
+    return placement.current.requestId;
+  };
 
   // Rounded to paise: a raw float sum (12.1 × 3 = 36.300000000000004) showed
   // up in the amount field and was sent as the amount paid.
@@ -140,6 +168,8 @@ export default function CreateOrderScreen() {
     setCart([]);
     setRazorpaySession(null);
     setQrSession(null);
+    setUnrecorded(null);
+    placement.current = null;
     if (router.canGoBack()) router.back();
     router.push(`/orders/${orderId}?placed=1`);
   };
@@ -148,7 +178,8 @@ export default function CreateOrderScreen() {
     if (cartProblem()) return;
     setSubmitting(true);
     try {
-      const result = await placeOrder.mutateAsync(buildOrderPayload());
+      const payload = buildOrderPayload();
+      const result = await placeOrder.mutateAsync({ ...payload, requestId: requestIdFor(payload) });
       // Cash counts toward the agent's sales only once the office has verified it
       toast.success("Order placed", `${result.orderId} · ${formatCurrency(payNowAmount)} cash will count toward your target once the office verifies it`);
       finishOrder(result.orderId);
@@ -173,30 +204,52 @@ export default function CreateOrderScreen() {
     }
   };
 
-  const handleRazorpaySuccess = async (payload: RazorpaySuccessPayload) => {
-    if (!razorpaySession) return;
-    const amountPaidNow = payNowAmount;
-    setRazorpayVisible(false);
+  /* Tells the server about a payment Razorpay has taken, and has the order
+     placed with it. Called when the checkout succeeds, and again from "Try
+     again" for a payment whose confirmation got no answer. */
+  const confirmOnlineOrder = async (attempt: Omit<UnrecordedOnlinePayment, "problem">) => {
     setSubmitting(true);
     try {
       const result = await orderApi.verifyInitialPaymentAndPlaceOrder({
-        razorpay_order_id: payload.razorpay_order_id,
-        razorpay_payment_id: payload.razorpay_payment_id,
-        razorpay_signature: payload.razorpay_signature,
-        amount: razorpaySession.amount,
-        orderPayload: buildOrderPayload(),
+        razorpay_order_id: attempt.payment.razorpay_order_id,
+        razorpay_payment_id: attempt.payment.razorpay_payment_id,
+        razorpay_signature: attempt.payment.razorpay_signature,
+        amount: attempt.sessionAmount,
+        orderPayload: attempt.orderPayload,
       });
       // 🔥 FIX: same paise/rupees display fix as Collect Payment — shows
       // the amount this screen itself already knows is in rupees, rather
       // than trusting whatever unit the backend's session response echoes.
-      toast.success("Payment received", `${formatCurrency(amountPaidNow)} · Order ${result.orderId} placed`);
+      toast.success("Payment received", `${formatCurrency(attempt.paidNow)} · Order ${result.orderId} placed`);
       refreshAfterOrderActivity();
       finishOrder(result.orderId);
     } catch (e) {
-      toast.error("Couldn't place order", getErrorMessage(e));
+      const problem = getErrorMessage(e);
+      /* No answer, or "try again": the money is taken and the order is not
+         placed. The payment is kept so the same confirmation can be sent
+         again. It used to be dropped here, and all that was left on screen
+         was the button that pays a second time. */
+      if (isRetryableFailure(e) && !isSettledPaymentFailure(e)) {
+        setUnrecorded({ ...attempt, problem });
+      } else {
+        // Refused outright (and refunded, where money had been taken)
+        setUnrecorded(null);
+        toast.error("Couldn't place order", problem);
+      }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleRazorpaySuccess = async (payload: RazorpaySuccessPayload) => {
+    if (!razorpaySession) return;
+    setRazorpayVisible(false);
+    await confirmOnlineOrder({
+      payment: payload,
+      sessionAmount: razorpaySession.amount,
+      orderPayload: buildOrderPayload(),
+      paidNow: payNowAmount,
+    });
   };
 
   // 🔥 QR payment flow — agent generates a QR for the amount being paid
@@ -267,7 +320,7 @@ export default function CreateOrderScreen() {
         ListEmptyComponent={<EmptyState icon={<PackageSearch size={22} color={colors.ink[500]} />} title="No products added yet" subtitle="Tap “Add Products” to build this order." />}
         renderItem={({ item }) => (
           <Card className="flex-row items-center gap-3">
-            {item.image ? <Image source={{ uri: item.image }} className="h-12 w-12 rounded-lg" /> : <View className="h-12 w-12 rounded-lg bg-sand" />}
+            {item.image ? <Image source={{ uri: sizedImage(item.image, 48) }} className="h-12 w-12 rounded-lg" /> : <View className="h-12 w-12 rounded-lg bg-sand" />}
             <View className="flex-1">
               <Text className="font-sans-bold text-sm text-ink" numberOfLines={1}>
                 {item.name}
@@ -384,6 +437,19 @@ export default function CreateOrderScreen() {
         onClose={() => setQrVisible(false)}
         onPaid={handleQrPaid}
       />
+
+      <UnrecordedPaymentModal
+        visible={!!unrecorded}
+        amount={unrecorded?.paidNow ?? 0}
+        reference={unrecorded?.payment.razorpay_payment_id ?? ""}
+        pending="the order has not been placed yet"
+        problem={unrecorded?.problem}
+        busy={submitting}
+        onRetry={() => {
+          if (unrecorded) void confirmOnlineOrder(unrecorded);
+        }}
+        onGiveUp={() => setUnrecorded(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -439,6 +505,10 @@ function ProductPickerModal({
             data={filtered}
             keyExtractor={(item) => item._id}
             contentContainerStyle={{ padding: 20, paddingTop: 4, gap: 10 }}
+            // The search box above keeps its keyboard up while a product is tapped
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={10}
+            windowSize={7}
             ListEmptyComponent={<EmptyState icon={<PackageSearch size={22} color={colors.ink[500]} />} title="No products found" />}
             renderItem={({ item }) => (
               <ProductPickerRow item={item} storeType={storeType} onSelect={() => onSelect(item)} onOpenDetail={() => setDetailProduct(item)} />
@@ -475,7 +545,7 @@ function ProductPickerRow({
   return (
     <Pressable onPress={onOpenDetail} className="rounded-2xl border border-sand bg-white p-3 active:opacity-90">
       <View className="flex-row items-center gap-3">
-        {item.images?.front?.url ? <Image source={{ uri: item.images.front.url }} className="h-12 w-12 rounded-lg" /> : <View className="h-12 w-12 rounded-lg bg-sand" />}
+        {item.images?.front?.url ? <Image source={{ uri: sizedImage(item.images.front.url, 48) }} className="h-12 w-12 rounded-lg" /> : <View className="h-12 w-12 rounded-lg bg-sand" />}
         <View className="flex-1">
           <Text className="font-sans-bold text-sm text-ink" numberOfLines={1}>
             {item.name}

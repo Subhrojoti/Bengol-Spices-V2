@@ -12,6 +12,7 @@ import { formatCurrency } from "@/utils/currency";
 import { colors, gradients } from "@/theme/colors";
 import { getErrorMessage } from "@/api/client";
 import type { LeaderboardEntry } from "@/types/api";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 type PodiumRank = 1 | 2 | 3;
 
@@ -42,7 +43,8 @@ function ordinal(n: number): string {
 }
 
 export default function LeaderboardScreen() {
-  const { data, isLoading, isError, isFetching, refetch, error } = useLeaderboard();
+  const { data, isLoading, isError, refetch, error } = useLeaderboard();
+  const { pulling, onPull } = usePullToRefresh(refetch);
   const { data: agent } = useProfile();
 
   const entries = data ?? [];
@@ -68,8 +70,8 @@ export default function LeaderboardScreen() {
           keyExtractor={(item) => item.agentId}
           contentContainerStyle={{ padding: 20, paddingTop: 4, paddingBottom: 40, gap: 10 }}
           showsVerticalScrollIndicator={false}
-          refreshing={isFetching}
-          onRefresh={refetch}
+          refreshing={pulling}
+          onRefresh={onPull}
           ListHeaderComponent={
             <View className="mb-1">
               <HeroCard contentStyle={{ paddingHorizontal: 14, paddingTop: 22, paddingBottom: 0 }}>

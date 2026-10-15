@@ -5,11 +5,10 @@ import { Store, MapPin, Phone, Navigation, Package, RefreshCcw } from "lucide-re
 import { AppHeader } from "@/components/ui/AppHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { ReturnStatusBadge, Badge } from "@/components/ui/Badge";
+import { ReturnStatusBadge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAssignedReturns, useUpdateReturnStatus } from "@/hooks/useReturns";
-import { useDeliveryHistory } from "@/hooks/useProfile";
-import { formatCurrency } from "@/utils/currency";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { formatQuantity } from "@/utils/uom";
 import { formatDateTime } from "@/utils/date";
 import { openInMaps } from "@/utils/maps";
@@ -33,13 +32,14 @@ const ACTION_LABEL: Partial<Record<ReturnStatus, string>> = {
 export default function ReturnDetailScreen() {
   const router = useRouter();
   const { returnId } = useLocalSearchParams<{ returnId: string }>();
-  const { data: returns, isLoading, isError, isFetching, refetch, error } = useAssignedReturns();
-  const { data: history } = useDeliveryHistory();
+  const { data: returns, isLoading, isError, refetch, error } = useAssignedReturns();
   const updateStatus = useUpdateReturnStatus();
+  const { pulling, onPull } = usePullToRefresh(refetch);
 
-  // 🔥 FIX: same class of bug as the delivery detail screen — a return
-  // disappears from useAssignedReturns() once COMPLETED. Fall back to history.
-  const ret = returns?.find((r) => r.returnId === returnId) ?? history?.completedReturns.find((r) => r.returnId === returnId);
+  /* A pickup still to be done. Once it is COMPLETED it leaves this list,
+     and the screen is closed at that moment (see below); the history lists
+     finished pickups on its own, without opening this screen. */
+  const ret = returns?.find((r) => r.returnId === returnId);
 
   const handleUpdateStatus = () => {
     if (!ret) return;
@@ -78,7 +78,7 @@ export default function ReturnDetailScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 14 }}
-          refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.saffron[600]} />}
+          refreshControl={<RefreshControl refreshing={pulling} onRefresh={onPull} tintColor={colors.saffron[600]} />}
         >
           <Card>
             <View className="flex-row items-start justify-between">
@@ -136,26 +136,12 @@ export default function ReturnDetailScreen() {
               </View>
               {ret.items.map((item, idx) => (
                 <View key={idx} className={`flex-row items-center justify-between py-2 ${idx < ret.items.length - 1 ? "border-b border-sand" : ""}`}>
-                  <View className="flex-1 pr-3">
-                    <Text className="font-sans-semibold text-sm text-ink" numberOfLines={1}>{item.name}</Text>
-                    <Text className="font-sans text-xs text-ink-500">{formatQuantity(item.quantity, item.uom)}</Text>
-                  </View>
-                  <Text className="font-sans-bold text-sm text-ink">{formatCurrency(item.totalPrice)}</Text>
+                  <Text className="flex-1 pr-3 font-sans-semibold text-sm text-ink" numberOfLines={2}>{item.name}</Text>
+                  <Text className="font-sans-bold text-sm text-ink">{formatQuantity(item.quantity, item.uom)}</Text>
                 </View>
               ))}
             </Card>
           ) : null}
-
-          <Card>
-            <Text className="mb-3 font-display-bold text-base text-ink">Refund Status</Text>
-            <View className="flex-row items-center justify-between">
-              <Text className="font-sans text-sm text-ink-500">Amount</Text>
-              <Text className="font-sans-bold text-sm text-ink">{formatCurrency(ret.refundStatus.amount)}</Text>
-            </View>
-            <View className="mt-2">
-              <Badge label={ret.refundStatus.status} variant={ret.refundStatus.status === "PROCESSED" ? "success" : "warning"} />
-            </View>
-          </Card>
 
           {NEXT_STATUS[ret.status] ? (
             <Button

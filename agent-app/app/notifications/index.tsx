@@ -9,10 +9,12 @@ import { formatRelative } from "@/utils/date";
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { AppNotification } from "@/types/api";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { data, isLoading, isError, isFetching, refetch, error } = useNotifications();
+  const { data, isLoading, isError, refetch, error } = useNotifications();
+  const { pulling, onPull } = usePullToRefresh(refetch);
   const markAsRead = useMarkNotificationRead();
 
   return (
@@ -33,8 +35,8 @@ export default function NotificationsScreen() {
           data={[...(data ?? [])].sort((a, b) => (a.isRead === b.isRead ? 0 : a.isRead ? 1 : -1))}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 10 }}
-          refreshing={isFetching}
-          onRefresh={refetch}
+          refreshing={pulling}
+          onRefresh={onPull}
           ListEmptyComponent={<EmptyState icon={<Bell size={22} color={colors.ink[500]} />} title="No notifications yet" />}
           renderItem={({ item }) => <NotificationRow item={item} onPress={() => !item.isRead && markAsRead.mutate(item._id)} />}
         />

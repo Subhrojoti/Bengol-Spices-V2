@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/ui/AppHeader";
 import { ReturnStatusBadge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState, EmptyState } from "@/components/ui/States";
 import { useAssignedReturns } from "@/hooks/useReturns";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { AssignedReturn } from "@/types/api";
@@ -13,7 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const STATUS_ORDER: Record<string, number> = { PICKUP_ASSIGNED: 0, PICKED_UP: 1, RECEIVED_AT_WAREHOUSE: 2 };
 
 export default function ReturnsScreen() {
-  const { data, isLoading, isError, isFetching, refetch, error } = useAssignedReturns();
+  const { data, isLoading, isError, refetch, error } = useAssignedReturns();
+  const { pulling, onPull } = usePullToRefresh(refetch);
 
   const sorted = [...(data ?? [])].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
 
@@ -30,8 +32,8 @@ export default function ReturnsScreen() {
           data={sorted}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 4, gap: 10 }}
-          refreshing={isFetching}
-          onRefresh={refetch}
+          refreshing={pulling}
+          onRefresh={onPull}
           ListEmptyComponent={
             <EmptyState icon={<Undo2 size={24} color={colors.ink[500]} />} title="No return pickups assigned" />
           }

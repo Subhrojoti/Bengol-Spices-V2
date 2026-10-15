@@ -15,6 +15,8 @@ import { matchesPaymentFilter, paymentStateOf, type PaymentFilter, type PaymentS
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { Order } from "@/types/api";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 
 const STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "info"> = {
   DELIVERED: "success",
@@ -97,7 +99,10 @@ interface MonthSection {
 export default function StoreOrdersScreen() {
   const { consumerId, storeName } = useLocalSearchParams<{ consumerId: string; storeName: string }>();
   const router = useRouter();
-  const { data: orders, isLoading, isError, isFetching, refetch, error } = useOrdersByStore(consumerId);
+  const { data: orders, isLoading, isError, refetch, error } = useOrdersByStore(consumerId);
+  const { pulling, onPull } = usePullToRefresh(refetch);
+  // Coming back from an order: its delivery or payment may have moved on
+  useRefetchOnFocus(["orders", "store", consumerId]);
   const { downloadInvoice, downloading } = useInvoiceDownload();
 
   const [query, setQuery] = useState("");
@@ -229,8 +234,10 @@ export default function StoreOrdersScreen() {
           contentContainerStyle={{ padding: 20, paddingTop: 10, paddingBottom: 32 }}
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
-          refreshing={isFetching}
-          onRefresh={refetch}
+          initialNumToRender={8}
+          windowSize={7}
+          refreshing={pulling}
+          onRefresh={onPull}
           ListHeaderComponent={header}
           ListEmptyComponent={
             <EmptyState icon={<Search size={22} color={colors.ink[500]} />} title="No order matches" subtitle="Try another order ID or date, or clear the filter." />

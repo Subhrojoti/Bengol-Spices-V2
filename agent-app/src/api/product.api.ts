@@ -10,5 +10,5 @@ export const productApi = {
   // the admin set for that territory, defaults everywhere else. Same
   // fields as the public catalogue, so the pricing helper needs no change.
   getStoreCatalog: (consumerId: string): Promise<PublicProduct[]> =>
-    api.get(`/agent/store/${consumerId}/products`).then((r) => unwrapList<PublicProduct>(r.data)),
+    api.get(`/agent/store/${encodeURIComponent(consumerId)}/products`).then((r) => unwrapList<PublicProduct>(r.data)),
 };

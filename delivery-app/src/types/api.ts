@@ -38,14 +38,13 @@ export type OrderStatus =
   | "DELIVERED"
   | "CANCELLED";
 
+// What is in the parcel. Prices are not part of it: the backend sends a
+// delivery partner nothing about money.
 export interface OrderProduct {
-  productId?: string;
+  _id?: string;
   name: string;
   quantity: number;
-  unitPrice: number;
   uom: string;
-  totalPrice: number;
-  gstPercentage: number;
   image?: string;
 }
 
@@ -75,13 +74,16 @@ export interface AssignedOrder {
   consumerId: string;
   // Missing on a few older orders, and null if the store record was removed
   store?: PopulatedStore | null;
-  agentId: string;
   products: OrderProduct[];
-  totalAmount: number;
-  paidAmount: number;
-  dueAmount: number;
-  paymentMode: "CASH" | "ONLINE" | "MIXED" | "QR";
   status: OrderStatus;
+  delivery?: {
+    assignedAt?: string;
+    deliveredAt?: string;
+    // The partner's open report that the order could not be delivered
+    couldNotDeliver?: { reason: string; note?: string; at: string };
+    // The office has allowed this one to be delivered without the location check
+    locationWaiver?: { at: string };
+  };
   statusHistory: StatusHistoryEntry[];
   orderLocation: { latitude: number; longitude: number };
   deliveryAddress: {
@@ -95,6 +97,16 @@ export interface AssignedOrder {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+/** Sent with the active orders: how a delivery is checked, and why one can fail. */
+export interface DeliveryRules {
+  // Is a delivery refused unless the partner is at the store?
+  locationRequired: boolean;
+  // How close to the store's saved position counts as being there
+  radiusMetres: number;
+  // code → wording, e.g. STORE_CLOSED → "Store was closed"
+  couldNotDeliverReasons: Record<string, string>;
 }
 
 export interface DeliveryDashboardData {
@@ -146,17 +158,17 @@ export interface AssignedReturn {
   storeDetails: { storeName: string; ownerName: string; phone: string } | null;
   pickupLocation: { latitude: number; longitude: number; address: string } | null;
   items: OrderProduct[];
-  payment: {
-    totalAmount: number;
-    paidAmount: number;
-    dueAmount: number;
-    paymentMode: string;
-  } | null;
-  refundStatus: {
-    amount: number;
-    status: "PROCESSED" | "PENDING";
-    method: string | null;
-  };
+}
+
+/* A finished pickup, as the history lists it: the return record itself,
+   without the store and item details an assigned pickup carries. */
+export interface CompletedReturn {
+  _id: string;
+  returnId: string;
+  orderId: string;
+  reason: string;
+  status: ReturnStatus;
+  updatedAt: string;
 }
 
 export interface AppNotification {
@@ -181,5 +193,5 @@ export interface Faq {
 
 export interface DeliveryHistoryData {
   deliveredOrders: AssignedOrder[];
-  completedReturns: AssignedReturn[];
+  completedReturns: CompletedReturn[];
 }

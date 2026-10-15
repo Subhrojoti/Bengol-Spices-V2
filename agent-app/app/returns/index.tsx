@@ -11,6 +11,7 @@ import { getErrorMessage } from "@/api/client";
 import { toast } from "@/utils/toast";
 import { colors } from "@/theme/colors";
 import type { ReturnRequest } from "@/types/api";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 const STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "info"> = {
   COMPLETED: "success",
@@ -24,7 +25,8 @@ const STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "info"> 
 
 export default function ReturnsScreen() {
   const router = useRouter();
-  const { data, isLoading, isError, isFetching, refetch, error } = useMyReturns();
+  const { data, isLoading, isError, refetch, error } = useMyReturns();
+  const { pulling, onPull } = usePullToRefresh(refetch);
   const cancelReturn = useCancelReturn();
 
   const handleCancel = (returnId: string) => {
@@ -63,8 +65,8 @@ export default function ReturnsScreen() {
           data={data}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 10 }}
-          refreshing={isFetching}
-          onRefresh={refetch}
+          refreshing={pulling}
+          onRefresh={onPull}
           ListEmptyComponent={<EmptyState icon={<Undo2 size={22} color={colors.ink[500]} />} title="No returns yet" />}
           renderItem={({ item }) => <ReturnRow item={item} onCancel={() => handleCancel(item.returnId)} />}
         />

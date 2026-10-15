@@ -22,8 +22,9 @@ export function useInvoiceDownload() {
     setDownloading(true);
     try {
       const token = await tokenStorage.get();
-      const url = `${API_URL}/api/invoice/download/${orderId}`;
-      const destination = new File(Paths.cache, `invoice-${orderId}.pdf`);
+      const url = `${API_URL}/api/invoice/download/${encodeURIComponent(orderId)}`;
+      // Only what an order number is made of goes into the file's name
+      const destination = new File(Paths.cache, `invoice-${orderId.replace(/[^A-Za-z0-9_-]/g, "_")}.pdf`);
       const downloaded = await File.downloadFileAsync(url, destination, {
         headers: { Authorization: `Bearer ${token}` },
         idempotent: true,
