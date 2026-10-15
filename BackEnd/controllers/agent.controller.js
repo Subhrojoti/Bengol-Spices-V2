@@ -9,6 +9,8 @@ import DeliveryPartner from "../models/DeliveryPartner.js";
 import Product from "../models/Product.js";
 import mongoose from "mongoose";
 import { TIER_FIELDS } from "../utils/pricing.js";
+import { PERSON_FIELD_LIMITS, checkTextFields } from "../utils/formFields.js";
+import { publicMessage } from "../utils/publicError.js";
 
 /* Checks the location prices sent with a territory. A blank or zero tier
    means "use the default"; a product with every tier blank is dropped.
@@ -141,6 +143,15 @@ export const applyAgent = async (req, res) => {
       ifscCode,
       bankName,
     } = req.body;
+
+    // Text, and not absurdly long (utils/formFields.js)
+    const badField = checkTextFields(req.body, PERSON_FIELD_LIMITS);
+
+    if (badField) {
+      await cleanupCloudinaryFiles(uploadedFiles);
+
+      return res.status(400).json({ success: false, message: badField });
+    }
 
     /* =============================
        BASIC VALIDATION
@@ -360,12 +371,20 @@ export const applyAgent = async (req, res) => {
       });
     }
 
+    // A field the record's own rules refuse (a pincode, an IFSC code) is the applicant's to correct
+    if (error?.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: publicMessage(error, "Some of the details are not valid. Please check them and try again."),
+      });
+    }
+
     /* =============================
        GENERIC ERROR
     ============================= */
     return res.status(500).json({
       success: false,
-      message: error.message || "Internal Server Error",
+      message: publicMessage(error, "The application could not be submitted. Please try again."),
     });
   }
 };
@@ -411,7 +430,18 @@ export const getAgentProfile = async (req, res) => {
 // ASSIGN SALES LOCATION
 export const assignSalesLocation = async (req, res) => {
   try {
-    const { agentId, pincodes, state, city } = req.body;
+    const { agentId, pincodes, state } = req.body;
+
+    // Optional, but text when it is there: anything else failed at the
+    // database and answered 500
+    if (req.body.city !== undefined && req.body.city !== null && typeof req.body.city !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "City must be text",
+      });
+    }
+
+    const city = typeof req.body.city === "string" ? req.body.city.trim().slice(0, 80) : undefined;
 
     // Checked by type as well: a pincode list sent as text, or a state that
     // is not text, used to throw further down and answer 500
@@ -439,12 +469,16 @@ export const assignSalesLocation = async (req, res) => {
     }
 
     // ✅ Validate pincodes
-    const invalidPins = pincodes.filter((pin) => !/^[0-9]{6}$/.test(pin));
+    // Text of six digits each: a list inside the list also read as "six
+    // digits" to the pattern, and then failed at the database with a 500
+    const invalidPins = pincodes.filter(
+      (pin) => typeof pin !== "string" || !/^[0-9]{6}$/.test(pin),
+    );
 
     if (invalidPins.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `Invalid pincodes: ${invalidPins.join(", ")}`,
+        message: `Invalid pincodes: ${invalidPins.map((pin) => String(pin).slice(0, 12)).slice(0, 10).join(", ")}`,
       });
     }
 

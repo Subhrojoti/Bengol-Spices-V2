@@ -12,8 +12,18 @@ import {
    address and purchases could be walked through. Staff still see all of
    them; an agent sees their own orders, a delivery partner the orders
    assigned to them. */
+/* 🔒 An employee, though, was let through on the role alone. An invoice
+   carries the store's name, phone, address, GST number and everything it
+   bought and paid, so it now takes a permission that already shows those:
+   "View All Orders" (where the Invoice button is) or "View Payment Info". */
+const STAFF_MAY_SEE_INVOICES = ["canGetAllOrders", "canSeePaymentInfo"];
+
 const canSeeOrder = async (user, orderId) => {
-  if (user.role === "ADMIN" || user.role === "EMPLOYEE") return true;
+  if (user.role === "ADMIN") return true;
+
+  if (user.role === "EMPLOYEE") {
+    return STAFF_MAY_SEE_INVOICES.some((key) => user.permissions?.[key] === true);
+  }
 
   const order = await Order.findOne({ orderId })
     .select("agentId delivery.partnerId")

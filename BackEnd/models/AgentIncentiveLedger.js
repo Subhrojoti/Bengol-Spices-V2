@@ -30,6 +30,12 @@ const ledgerSchema = new mongoose.Schema(
     },
 
     note: String,
+    // For a payout: who at the office recorded it
+    recordedBy: {
+      id: String,
+      role: String,
+      name: String,
+    },
 
     // For an additional sales incentive: the month's record that earned it
     salesPeriodId: {

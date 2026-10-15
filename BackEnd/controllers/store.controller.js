@@ -6,6 +6,7 @@ import AgentSalesLocation from "../models/AgentSalesLocation.js";
 import Counter from "../models/Counter.js";
 import Product from "../models/Product.js";
 import { updateTargetProgress } from "../services/target.service.js";
+import { publicMessage } from "../utils/publicError.js";
 import {
   STORE_TYPES,
   applyLocationPrices,
@@ -300,9 +301,14 @@ export const createStore = async (req, res) => {
         );
     }
 
+    const fallback = "The store could not be registered. Please check the details and try again.";
+    const message = publicMessage(error, fallback);
+    // Not one of this form's own refusals: worth a line in the log
+    if (message === fallback) console.error("CREATE STORE ERROR:", error);
+
     return res.status(400).json({
       success: false,
-      message: error.message,
+      message,
     });
   }
 };
@@ -352,7 +358,8 @@ export const getAllStores = async (req, res) => {
       .select(
         "consumerId storeName ownerName phone address storeType image status registeredBy createdAt",
       )
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.json({
       success: true,

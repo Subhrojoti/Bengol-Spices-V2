@@ -55,7 +55,16 @@ const storage = new CloudinaryStorage({
   },
 });
 
+/* Only the size of each file was limited. A form could still carry any
+   number of files and fields, and a megabyte of text in each field. These
+   are far above what any form in the panels or the apps sends. */
 export const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 6,
+    fields: 60,
+    fieldSize: 1024 * 1024,
+    parts: 70,
+  },
 });

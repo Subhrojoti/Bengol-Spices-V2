@@ -4,7 +4,11 @@ import Counter from "../models/Counter.js";
 import Agent from "../models/Agent.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import { createNotification } from "../services/notification.service.js";
+import { withLock } from "../services/payment.service.js";
 import mongoose from "mongoose";
+
+// The agent app's own box takes 500 characters; nothing took any limit here
+const REASON_MAX = 1000;
 
 export const initiateReturn = async (req, res) => {
   try {
@@ -16,6 +20,13 @@ export const initiateReturn = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Return reason is required",
+      });
+    }
+
+    if (reason.trim().length > REASON_MAX) {
+      return res.status(400).json({
+        success: false,
+        message: `Please keep the reason under ${REASON_MAX} characters`,
       });
     }
 
@@ -45,19 +56,6 @@ export const initiateReturn = async (req, res) => {
       });
     }
 
-    // ❌ Prevent duplicate return. A cancelled one does not count: it used to
-    // block the order from ever being returned again.
-    const existingReturn = await Return.findOne({
-      orderId,
-      status: { $ne: "CANCELLED" },
-    });
-    if (existingReturn) {
-      return res.status(400).json({
-        success: false,
-        message: "Return already initiated for this order",
-      });
-    }
-
     // 🔍 Fetch latest agent data from DB
     const agent = await Agent.findById(req.user.id).select("name agentId role");
 
@@ -68,55 +66,83 @@ export const initiateReturn = async (req, res) => {
       });
     }
 
-    // 🔥 Generate Return ID using counter
-    const year = new Date().getFullYear();
+    /* Looked for and opened while holding this order's return lock. Two
+       copies of the same request arriving together used to both find no
+       return yet, and both opened one. */
+    const locked = await withLock(`return:${orderId}`, async () => {
+      // ❌ Prevent duplicate return. A cancelled one does not count: it used
+      // to block the order from ever being returned again.
+      const existingReturn = await Return.findOne({
+        orderId,
+        status: { $ne: "CANCELLED" },
+      });
+      if (existingReturn) return null;
 
-    const counter = await Counter.findOneAndUpdate(
-      { _id: `return-${year}` },
-      { $inc: { seq: 1 } },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true,
-      },
-    );
+      // 🔥 Generate Return ID using counter
+      const year = new Date().getFullYear();
 
-    const serial = String(counter.seq).padStart(4, "0");
-    const returnId = `RET${year}-${serial}`;
-
-    // ✅ Create Return
-    const newReturn = await Return.create({
-      returnId,
-      orderId,
-      consumerId: order.consumerId,
-      agentId: order.agentId,
-      reason: reason.trim(),
-
-      initiatedBy: {
-        id: agent.agentId,
-        name: agent.name,
-        role: agent.role,
-      },
-
-      status: "INITIATED",
-
-      statusHistory: [
+      const counter = await Counter.findOneAndUpdate(
+        { _id: `return-${year}` },
+        { $inc: { seq: 1 } },
         {
-          status: "INITIATED",
-          changedBy: {
-            id: agent.agentId,
-            name: agent.name,
-            role: agent.role,
-          },
-          note: "Return initiated by agent",
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
         },
-      ],
+      );
+
+      const serial = String(counter.seq).padStart(4, "0");
+      const returnId = `RET${year}-${serial}`;
+
+      // ✅ Create Return
+      return Return.create({
+        returnId,
+        orderId,
+        consumerId: order.consumerId,
+        agentId: order.agentId,
+        reason: reason.trim(),
+
+        initiatedBy: {
+          id: agent.agentId,
+          name: agent.name,
+          role: agent.role,
+        },
+
+        status: "INITIATED",
+
+        statusHistory: [
+          {
+            status: "INITIATED",
+            changedBy: {
+              id: agent.agentId,
+              name: agent.name,
+              role: agent.role,
+            },
+            note: "Return initiated by agent",
+          },
+        ],
+      });
     });
+
+    if (locked.busy) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "A return for this order is being requested right now. Please wait a moment.",
+      });
+    }
+
+    if (!locked.value) {
+      return res.status(400).json({
+        success: false,
+        message: "Return already initiated for this order",
+      });
+    }
 
     return res.status(201).json({
       success: true,
       message: "Return initiated successfully",
-      returnId: newReturn.returnId,
+      returnId: locked.value.returnId,
     });
   } catch (error) {
     console.error("INITIATE RETURN ERROR:", error);
@@ -237,10 +263,15 @@ export const getAssignedReturns = async (req, res) => {
     // 2️⃣ Collect orderIds
     const orderIds = returns.map((r) => r.orderId);
 
-    // 3️⃣ Fetch all related orders in ONE query
+    // 3️⃣ Fetch all related orders in ONE query. Only where to go and what
+    // to collect: a partner is sent nothing about money (see below).
     const orders = await Order.find({
       orderId: { $in: orderIds },
-    }).lean();
+    })
+      .select(
+        "orderId deliveryAddress orderLocation products._id products.name products.quantity products.uom products.image",
+      )
+      .lean();
 
     // 4️⃣ Convert orders to map for fast lookup
     const orderMap = {};
@@ -252,8 +283,11 @@ export const getAssignedReturns = async (req, res) => {
     const enrichedReturns = returns.map((ret) => {
       const order = orderMap[ret.orderId];
 
+      // The refund (how much, by what method) is the office's business
+      const { refund: _refund, ...details } = ret.toObject();
+
       return {
-        ...ret.toObject(),
+        ...details,
 
         storeDetails: order
           ? {
@@ -273,19 +307,11 @@ export const getAssignedReturns = async (req, res) => {
 
         items: order ? order.products : [],
 
-        payment: order
-          ? {
-              totalAmount: order.totalAmount,
-              paidAmount: order.paidAmount,
-              dueAmount: order.dueAmount,
-              paymentMode: order.paymentMode,
-            }
-          : null,
-
+        /* The order's value, what was paid and owed, and the refund amount
+           and method used to be sent here. A partner collecting a return
+           handles goods, not money, so they no longer are. */
         refundStatus: {
-          amount: ret.refund?.amount || 0,
           status: ret.status === "REFUND_PROCESSED" ? "PROCESSED" : "PENDING",
-          method: ret.refund?.method || null,
         },
       };
     });
@@ -445,7 +471,7 @@ export const cancelReturn = async (req, res) => {
     // agent could cancel a return. A reason is recorded when given.
     const reason =
       typeof req.body?.reason === "string" && req.body.reason.trim()
-        ? req.body.reason
+        ? req.body.reason.trim().slice(0, REASON_MAX)
         : "Cancelled by agent";
 
     const returnRequest = await Return.findOne({ returnId });

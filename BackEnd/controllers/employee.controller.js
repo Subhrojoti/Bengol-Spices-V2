@@ -5,6 +5,11 @@ import { sendEmployeeWelcomeMail } from "../utils/email.js";
 import { createNotification } from "../services/notification.service.js";
 import cloudinary from "../config/cloudinary.js";
 
+// Every permission an employee can be given, as the Employee model lists them
+const PERMISSION_KEYS = Object.keys(Employee.schema.paths)
+  .filter((path) => path.startsWith("permissions."))
+  .map((path) => path.slice("permissions.".length));
+
 // The photo is uploaded before this runs; a refused request must not leave it behind
 const discardUpload = async (file) => {
   if (!file?.filename) return;
@@ -16,13 +21,52 @@ const discardUpload = async (file) => {
 // ADMIN CREATE EMPLOYEE
 export const createEmployee = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!name || !email || !password) {
+    /* Text, all three. A field sent twice arrives as a list, and anything
+       that was not text threw further down (email.trim) and answered 500. */
+    if (
+      typeof req.body.name !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !req.body.name.trim() ||
+      !email.trim() ||
+      !password
+    ) {
       await discardUpload(req.file);
       return res.status(400).json({
         success: false,
         message: "All fields are required",
+      });
+    }
+
+    const name = req.body.name.trim();
+
+    if (name.length > 80) {
+      await discardUpload(req.file);
+      return res.status(400).json({
+        success: false,
+        message: "Name must be 80 characters or fewer",
+      });
+    }
+
+    /* The welcome email with the Employee ID goes to this address, and it
+       is what the admin later knows the account by. Nothing checked that it
+       was an address at all. */
+    if (email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      await discardUpload(req.file);
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid email address",
+      });
+    }
+
+    // bcrypt reads only the first 72 bytes; a longer one is a mistake or an attack
+    if (password.length > 128) {
+      await discardUpload(req.file);
+      return res.status(400).json({
+        success: false,
+        message: "Password must be 128 characters or fewer",
       });
     }
 
@@ -188,7 +232,36 @@ export const getAllEmployees = async (req, res) => {
 export const updateEmployeePermissions = async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const { permissions } = req.body;
+
+    /* Each permission is on or off, nothing else. Whatever was sent used to
+       be handed to the database as it came: a value that was not true or
+       false failed there with a 500, and a body with no "permissions" at
+       all answered "updated successfully" having changed nothing. Only the
+       permissions that exist are read; anything else in the body is
+       ignored, as it always was. */
+    const sent = req.body.permissions;
+
+    if (!sent || typeof sent !== "object" || Array.isArray(sent)) {
+      return res.status(400).json({
+        success: false,
+        message: "Send the permissions to change",
+      });
+    }
+
+    const permissions = {};
+
+    for (const key of PERMISSION_KEYS) {
+      if (!Object.hasOwn(sent, key)) continue;
+
+      if (typeof sent[key] !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: `${key} must be true or false`,
+        });
+      }
+
+      permissions[key] = sent[key];
+    }
 
     const employee = await Employee.findOne({ employeeId });
 

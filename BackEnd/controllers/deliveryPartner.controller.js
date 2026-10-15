@@ -6,6 +6,12 @@ import Order from "../models/Order.js";
 import Return from "../models/Return.js";
 import Agent from "../models/Agent.js";
 import mongoose from "mongoose";
+import { PERSON_FIELD_LIMITS, checkTextFields } from "../utils/formFields.js";
+import { publicMessage } from "../utils/publicError.js";
+import {
+  COULD_NOT_DELIVER_REASONS,
+  getDeliverySettings,
+} from "../services/deliveryTrail.service.js";
 /* REGISTER */
 export const registerDeliveryPartner = async (req, res) => {
   let uploadedPublicId = null;
@@ -30,6 +36,10 @@ export const registerDeliveryPartner = async (req, res) => {
 
     if (!req.file) throw new Error("Document is required");
     uploadedPublicId = req.file.filename;
+
+    // Text, and not absurdly long (utils/formFields.js)
+    const badField = checkTextFields(req.body, PERSON_FIELD_LIMITS);
+    if (badField) throw new Error(badField);
 
     if (
       !name ||
@@ -147,9 +157,14 @@ export const registerDeliveryPartner = async (req, res) => {
       });
     }
 
+    const fallback = "The application could not be submitted. Please check the details and try again.";
+    const message = publicMessage(error, fallback);
+    // Not one of this form's own refusals: worth a line in the log
+    if (message === fallback) console.error("DELIVERY PARTNER REGISTER ERROR:", error);
+
     res.status(400).json({
       success: false,
-      message: error.message,
+      message,
     });
   }
 };
@@ -297,12 +312,37 @@ export const getAllDeliveryPartners = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch delivery partners",
+      message: "Failed to fetch delivery partners",
     });
   }
 };
 
 /* Get My assigned orders (DELIVERY PARTNER) */
+/* What a delivery partner is sent about an order: where it goes, what is
+   in it, and how far along it is. Nothing about money. The order's value,
+   what has been paid, what is owed and each product's price were all sent
+   before, and shown; a partner collects no money and needs none of it. */
+const PARTNER_ORDER_FIELDS = [
+  "orderId",
+  "consumerId",
+  "store",
+  "status",
+  "statusHistory",
+  "orderLocation",
+  "deliveryAddress",
+  "products._id",
+  "products.name",
+  "products.quantity",
+  "products.uom",
+  "products.image",
+  "delivery.assignedAt",
+  "delivery.deliveredAt",
+  "delivery.couldNotDeliver",
+  "delivery.locationWaiver.at",
+  "createdAt",
+  "updatedAt",
+].join(" ");
+
 export const getMyAssignedOrders = async (req, res) => {
   try {
     const partnerId = req.user.id;
@@ -313,20 +353,32 @@ export const getMyAssignedOrders = async (req, res) => {
         $in: ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"],
       },
     })
+      .select(PARTNER_ORDER_FIELDS)
       // Without deliveryCode: the store owner reads it out at handover, and
       // showing it here let a partner confirm without visiting the store
       .populate("store", "storeName address location")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const settings = await getDeliverySettings();
 
     return res.status(200).json({
       success: true,
       count: orders.length,
       data: orders,
+      /* What the app needs to know before the partner presses Delivered:
+         must they be at the store, and how close. The check itself is made
+         here on the server, whatever the app does. */
+      rules: {
+        locationRequired: settings.blockFarDeliveries,
+        radiusMetres: settings.radiusMetres,
+        couldNotDeliverReasons: COULD_NOT_DELIVER_REASONS,
+      },
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch assigned orders",
+      message: "Failed to fetch assigned orders",
     });
   }
 };
@@ -532,28 +584,37 @@ export const getProfile = async (req, res) => {
       data,
     });
   } catch (error) {
+    console.error("GET DELIVERY PARTNER PROFILE ERROR:", error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to load the profile",
     });
   }
 };
 
-/* Shared helper — delivered orders + completed returns for one partner */
-async function fetchPartnerHistory(partnerId) {
-  const [deliveredOrders, completedReturns] = await Promise.all([
-    Order.find({
-      "delivery.partnerId": partnerId,
-      status: "DELIVERED",
-    })
-      .populate("store", "storeName address location")
-      .sort({ updatedAt: -1 }),
+/* Shared helper — delivered orders + completed returns for one partner.
+   `forPartner` is the partner reading their own history: the same list
+   without the money (order values, refunds). The office's view of a
+   partner's history keeps everything. */
+async function fetchPartnerHistory(partnerId, { forPartner = false } = {}) {
+  const orders = Order.find({
+    "delivery.partnerId": partnerId,
+    status: "DELIVERED",
+  })
+    .populate("store", "storeName address location")
+    .sort({ updatedAt: -1 });
 
-    Return.find({
-      "pickup.partnerId": partnerId,
-      status: { $in: ["COMPLETED", "REFUND_PROCESSED"] },
-    }).sort({ updatedAt: -1 }),
-  ]);
+  const returns = Return.find({
+    "pickup.partnerId": partnerId,
+    status: { $in: ["COMPLETED", "REFUND_PROCESSED"] },
+  }).sort({ updatedAt: -1 });
+
+  if (forPartner) {
+    orders.select(PARTNER_ORDER_FIELDS).lean();
+    returns.select("-refund").lean();
+  }
+
+  const [deliveredOrders, completedReturns] = await Promise.all([orders, returns]);
 
   return { deliveredOrders, completedReturns };
 }
@@ -561,7 +622,7 @@ async function fetchPartnerHistory(partnerId) {
 /* GET MY DELIVERY & RETURN HISTORY (DELIVERY PARTNER) */
 export const getMyDeliveryHistory = async (req, res) => {
   try {
-    const data = await fetchPartnerHistory(req.user.id);
+    const data = await fetchPartnerHistory(req.user.id, { forPartner: true });
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("GET DELIVERY HISTORY ERROR:", error);

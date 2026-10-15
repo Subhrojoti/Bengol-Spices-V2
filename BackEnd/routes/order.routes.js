@@ -1,6 +1,7 @@
 import express from "express";
 import {
   placeOrder,
+  getMyOrder,
   getMyOrders,
   getAllOrders,
   // createShipment,
@@ -30,6 +31,7 @@ import {
 } from "../controllers/order.controller.js";
 import { protect } from "../middleware/auth.js";
 import { isAdmin, isAgent, isDeliveryPartner } from "../middleware/role.js";
+import { reportCouldNotDeliver } from "../controllers/delivery.controller.js";
 import { checkPermission } from "../middleware/permission.js";
 
 const router = express.Router();
@@ -40,6 +42,8 @@ router.post("/", protect, isAgent, placeOrder);
 router.get("/store/:consumerId", protect, getOrdersByStoreConsumerId);
 // GET MY ORDERS
 router.get("/my-orders", protect, isAgent, getMyOrders);
+// One of the agent's own orders, without downloading the whole list
+router.get("/mine/:orderId", protect, isAgent, getMyOrder);
 // ADMIN / EMPLOYEE
 router.get("/all", protect, checkPermission("canGetAllOrders"), getAllOrders);
 
@@ -77,6 +81,13 @@ router.put(
   protect,
   isDeliveryPartner,
   updateDeliveryStatus,
+);
+// The partner could not hand the order over, and says why (Delivery Partner)
+router.post(
+  "/:orderId/could-not-deliver",
+  protect,
+  isDeliveryPartner,
+  reportCouldNotDeliver,
 );
 
 // Collect Payment (Agent Access Only)

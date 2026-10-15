@@ -4,6 +4,13 @@ import { withLock } from "../services/payment.service.js";
 
 const roundRupees = (value) => Math.round(Number(value) * 100) / 100;
 
+/* Who is signed in, for the record of a payout. The admin has no account
+   of its own; an employee is known by their Employee ID. */
+const actorOf = (user) =>
+  user.role === "EMPLOYEE"
+    ? { id: user.employeeId || String(user.id || ""), role: "EMPLOYEE", name: user.name || "Employee" }
+    : { id: String(user.id || "admin"), role: "ADMIN", name: "Admin" };
+
 /* =====================================================
    ✅ ADMIN - AGENT INCENTIVE SUMMARY LIST
 ===================================================== */
@@ -86,8 +93,9 @@ export const getAgentIncentiveList = async (req, res) => {
     }
 
     // 🔸 Search (name / agentId / phone)
-    if (search) {
-      const s = search.toLowerCase();
+    // Text only: ?search=a&search=b arrives as a list, which threw and answered 500
+    if (typeof search === "string" && search.trim()) {
+      const s = search.trim().toLowerCase();
 
       result = result.filter(
         (r) =>
@@ -128,7 +136,7 @@ export const getAgentIncentiveList = async (req, res) => {
 // Admin can record a payout for an agent's incentives. This will create a "PAYOUT" entry in the AgentIncentiveLedger and reduce the pending balance for that agent.
 export const payoutIncentive = async (req, res) => {
   try {
-    const { agentId, note } = req.body;
+    const { agentId } = req.body;
 
     if (typeof agentId !== "string" || !agentId.trim() || !req.body.amount) {
       return res.status(400).json({
@@ -136,6 +144,21 @@ export const payoutIncentive = async (req, res) => {
         message: "agentId and amount required",
       });
     }
+
+    // A few words at most, and only words: anything else failed at the
+    // database with a 500 once the amount had passed its checks
+    if (
+      req.body.note !== undefined &&
+      req.body.note !== null &&
+      (typeof req.body.note !== "string" || req.body.note.length > 300)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "The note must be text of 300 characters or fewer",
+      });
+    }
+
+    const note = typeof req.body.note === "string" ? req.body.note.trim() : undefined;
 
     // Text such as "abc" passed both checks below (NaN compares false) and
     // then failed at the database with a 500
@@ -157,7 +180,7 @@ export const payoutIncentive = async (req, res) => {
        both were recorded, paying the agent more than was owed. They now run
        one at a time per agent. */
     const locked = await withLock(`incentive-payout:${agentId}`, () =>
-      recordPayout({ agentId, amount, note }),
+      recordPayout({ agentId, amount, note, by: actorOf(req.user) }),
     );
 
     if (locked.busy) {
@@ -179,7 +202,7 @@ export const payoutIncentive = async (req, res) => {
 };
 
 // Checks the balance and records the payout; runs under the agent's payout lock
-const recordPayout = async ({ agentId, amount, note }) => {
+const recordPayout = async ({ agentId, amount, note, by }) => {
   // ✅ CHECK PENDING BALANCE
   const summary = await AgentIncentiveLedger.aggregate([
     {
@@ -220,6 +243,8 @@ const recordPayout = async ({ agentId, amount, note }) => {
     type: "PAYOUT",
     source: "MANUAL",
     note,
+    // Money leaving the business: who said it was paid
+    recordedBy: by,
   });
 
   return {
@@ -278,7 +303,8 @@ export const getIncentiveHistory = async (req, res) => {
   try {
     const agentId = req.user.agentId;
 
-    const history = await AgentIncentiveLedger.find({ agentId }).sort({
+    // Without who at the office recorded a payout: that is the office's own record
+    const history = await AgentIncentiveLedger.find({ agentId }).select("-recordedBy").sort({
       createdAt: -1,
     });
 

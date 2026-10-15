@@ -25,6 +25,7 @@ import AgentIncentiveLedger from "../models/AgentIncentiveLedger.js";
 import Payment from "../models/Payment.js";
 import { paymentsNeedingAttention } from "./payment.service.js";
 import { LATE_AFTER_DAYS } from "./cashVerification.service.js";
+import { deliveryAlertCounts } from "./deliveryTrail.service.js";
 
 // An order that has not moved for this long while out for delivery
 const STALLED_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
@@ -72,6 +73,26 @@ const sections = {
 
       return { count: row?.count || 0, oldest: row?.oldest || null };
     },
+  },
+
+  /* A partner has reported that they could not deliver an order, and the
+     office has not yet said what happens to it */
+  deliveriesFailed: {
+    permissions: ["canAssignDelivery"],
+    load: deliveryAlertCounts.couldNotDeliver,
+  },
+
+  /* Deliveries confirmed away from the store (or with no position, or tried
+     from far away), not yet looked at */
+  deliveryLocationFlags: {
+    permissions: ["canAssignDelivery"],
+    load: deliveryAlertCounts.locationFlags,
+  },
+
+  /* Out for delivery for more than a day */
+  outForDeliveryLong: {
+    permissions: ["canAssignDelivery"],
+    load: deliveryAlertCounts.outForDeliveryLong,
   },
 
   /* Money owed past its due date, on orders that were not cancelled */

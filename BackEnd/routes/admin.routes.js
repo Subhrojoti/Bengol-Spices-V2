@@ -19,6 +19,16 @@ import {
   rejectCash,
 } from "../controllers/cashVerification.controller.js";
 
+import {
+  allowWithoutLocation,
+  getDeliveryAlerts,
+  getDeliveryTrail,
+  getSettings as getDeliverySettings,
+  markDeliveryEventReviewed,
+  retryDelivery,
+  updateSettings as updateDeliverySettings,
+} from "../controllers/delivery.controller.js";
+
 import { protect } from "../middleware/auth.js";
 import { isAdmin } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
@@ -117,5 +127,43 @@ router.post(
   checkPermission("canVerifyPayments"),
   rejectCash,
 );
+
+/* Deliveries: what needs a look (a failed delivery, one confirmed away
+   from the store, one out for too long), and each order's trail of who did
+   what, when and where. For whoever assigns deliveries; the trail is also
+   open to whoever can see orders, to settle a dispute about one. A
+   delivery partner's login is refused by checkPermission. */
+router.get(
+  "/delivery/alerts",
+  checkPermission("canAssignDelivery"),
+  getDeliveryAlerts,
+);
+router.get(
+  "/delivery/orders/:orderId/trail",
+  checkPermission(["canAssignDelivery", "canGetAllOrders"]),
+  getDeliveryTrail,
+);
+router.post(
+  "/delivery/orders/:orderId/retry",
+  checkPermission("canAssignDelivery"),
+  retryDelivery,
+);
+router.post(
+  "/delivery/orders/:orderId/allow-without-location",
+  checkPermission("canAssignDelivery"),
+  allowWithoutLocation,
+);
+router.post(
+  "/delivery/events/:eventId/review",
+  checkPermission("canAssignDelivery"),
+  markDeliveryEventReviewed,
+);
+router.get(
+  "/delivery/settings",
+  checkPermission("canAssignDelivery"),
+  getDeliverySettings,
+);
+// Whether a far-away delivery is refused, and how far is far: admin only
+router.put("/delivery/settings", isAdmin, updateDeliverySettings);
 
 export default router;

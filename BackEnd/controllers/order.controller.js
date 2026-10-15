@@ -23,6 +23,15 @@ import {
 } from "../utils/paymentVerification.js";
 import { quantityWithUnit } from "../utils/uom.js";
 import { publish } from "../services/liveEvents.js";
+import {
+  CARRYING,
+  actorOf,
+  getDeliverySettings,
+  recordDeliveryEvent,
+  storeOfOrder,
+  storePointOf,
+} from "../services/deliveryTrail.service.js";
+import { checkAtStore, formatDistance, readLocation } from "../utils/geo.js";
 import mongoose from "mongoose";
 import GatewayPayment from "../models/GatewayPayment.js";
 import {
@@ -94,6 +103,39 @@ const fetchVerifiedRazorpayPayment = async (paymentId, razorpayOrderId) => {
 
   return payment;
 };
+
+/* A reference the payment gateway issued: "qr_…" for a QR code. It is put
+   into the address of the request made to the gateway, so anything that is
+   not letters and digits after the prefix ("../payments/…", say) would ask
+   the gateway, with the company's own keys, for something else entirely.
+   Checked for shape before it goes anywhere. */
+const isGatewayId = (value, prefix) =>
+  typeof value === "string" &&
+  value.startsWith(`${prefix}_`) &&
+  /^[A-Za-z0-9_]{8,60}$/.test(value);
+
+// More than any single order here comes to; the gateway has limits of its own
+const MAX_PAYMENT_RUPEES = 10000000;
+
+/* Far more lines than a real order has (the apps add each product once).
+   Every line is looked up, has stock taken for it and is printed on the
+   invoice, so a request carrying thousands of them was a lot of work to be
+   able to ask for. */
+const MAX_ORDER_LINES = 200;
+
+// The app's reference for one press of "Place Order" (see models/Order.js)
+const isRequestId = (value) =>
+  typeof value === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(value);
+
+// What an agent is told when the order they are placing is already placed
+const alreadyPlacedAnswer = (order) => ({
+  success: true,
+  message: "Order placed successfully",
+  orderId: order.orderId,
+  alreadyPlaced: true,
+  // Only cash orders are placed this way, and cash waits for the office
+  paymentVerification: "PENDING",
+});
 
 // Signature check that takes the same time whether or not it matches
 const signatureMatches = (razorpayOrderId, razorpayPaymentId, signature) => {
@@ -252,6 +294,35 @@ export const placeOrder = async (req, res) => {
       });
     }
 
+    if (products.length > MAX_ORDER_LINES) {
+      return res.status(400).json({
+        success: false,
+        message: `An order can have ${MAX_ORDER_LINES} products at most`,
+      });
+    }
+
+    /* The same press of "Place Order", sent again because its reply never
+       reached the phone. The order it placed is the answer; placing it
+       again took the stock, the cash and the invoice a second time.
+       Not for the pay-first flows: those are held to one order by the
+       payment itself, and a payment must never be answered with an order
+       it did not pay for. */
+    const requestId =
+      req.gatewayPaymentVerified !== true && isRequestId(req.body.requestId)
+        ? req.body.requestId
+        : undefined;
+
+    if (requestId) {
+      const already = await Order.findOne({
+        agentId,
+        clientRequestId: requestId,
+      })
+        .select("orderId")
+        .lean();
+
+      if (already) return res.status(201).json(alreadyPlacedAnswer(already));
+    }
+
     /* =============================
        STORE VALIDATION + OWNERSHIP
        ============================= */
@@ -290,7 +361,15 @@ export const placeOrder = async (req, res) => {
 
     for (const item of products) {
       // BASIC VALIDATION
+      /* A line has to be a line. [null] in place of the products reached
+         "item.name" and threw, and the caller was answered 500 with the
+         error's own words. */
       if (
+        !item ||
+        typeof item !== "object" ||
+        Array.isArray(item) ||
+        typeof item.name !== "string" ||
+        typeof item.uom !== "string" ||
         !item.name ||
         !item.uom ||
         !item.quantity ||
@@ -303,6 +382,16 @@ export const placeOrder = async (req, res) => {
         return res.status(400).json({
           success: false,
           message: "Invalid product details",
+        });
+      }
+
+      /* The order record holds quantities from 1 up. Half a unit passed
+         the check above, had stock taken for it, and only then failed, as
+         a server error. */
+      if (Number(item.quantity) < 1) {
+        return res.status(400).json({
+          success: false,
+          message: `The quantity of ${item.name} must be at least 1`,
         });
       }
 
@@ -524,6 +613,7 @@ export const placeOrder = async (req, res) => {
         },
       ],
       paymentStatus: dueAmount === 0 ? "COMPLETED" : "PENDING",
+      ...(requestId && { clientRequestId: requestId }),
     };
 
     /* A number that turns out to be taken is not a reason to refuse the
@@ -532,11 +622,22 @@ export const placeOrder = async (req, res) => {
        the counter had crept past the numbers in use. The counter is caught
        up and the order saved under the next free number instead. */
     let order = null;
+    let placedByTwin = false;
 
-    for (let attempt = 0; attempt < 5 && !order; attempt++) {
+    for (let attempt = 0; attempt < 5 && !order && !placedByTwin; attempt++) {
       try {
         order = await Order.create(orderFields);
       } catch (createError) {
+        /* Two copies of the same press arrived together, both found no
+           order yet, and the other one saved first. */
+        if (
+          createError.code === 11000 &&
+          createError.keyPattern?.clientRequestId
+        ) {
+          placedByTwin = true;
+          continue;
+        }
+
         if (createError.code !== 11000 || !createError.keyPattern?.orderId) {
           throw createError;
         }
@@ -546,8 +647,27 @@ export const placeOrder = async (req, res) => {
       }
     }
 
+    if (placedByTwin) {
+      // This copy placed nothing, so the stock it took goes back
+      await releaseStock(reservedLines);
+      reservedLines = [];
+
+      const first = await Order.findOne({
+        agentId,
+        clientRequestId: requestId,
+      })
+        .select("orderId")
+        .lean();
+
+      if (first) return res.status(201).json(alreadyPlacedAnswer(first));
+    }
+
     if (!order) {
-      throw new Error("Could not give this order a number. Please try again.");
+      // `expose`: wording written for the person placing the order
+      throw Object.assign(
+        new Error("Could not give this order a number. Please try again."),
+        { expose: true },
+      );
     }
 
     /* The order now owns the stock it reserved. Releasing it on a later
@@ -675,9 +795,14 @@ export const placeOrder = async (req, res) => {
       );
     }
 
+    /* Only wording meant for the caller is sent. Whatever else went wrong
+       is in the log above; its text (a database message, a line of code)
+       used to be sent to the app as it was. */
     return res.status(500).json({
       success: false,
-      message: error.message || "Internal Server Error",
+      message: error.expose
+        ? error.message
+        : "The order could not be placed. Please try again.",
     });
   }
 };
@@ -700,7 +825,9 @@ export const getOrdersByStoreConsumerId = async (req, res) => {
       const orders = await Order.find({
         consumerId,
         agentId: user.agentId, // IMPORTANT
-      }).sort({ createdAt: -1 });
+      })
+        .sort({ createdAt: -1 })
+        .lean();
 
       return res.json({
         success: true,
@@ -710,11 +837,20 @@ export const getOrdersByStoreConsumerId = async (req, res) => {
       });
     }
 
-    // 🔐 ADMIN & EMPLOYEE ACCESS
-    if (user.role === "ADMIN" || user.role === "EMPLOYEE") {
-      const orders = await Order.find({ consumerId }).sort({
-        createdAt: -1,
-      });
+    /* 🔐 ADMIN, and staff allowed to see orders.
+
+       Any employee login used to be answered here, whatever it had been
+       given: someone allowed only to manage products, say, could read every
+       order of every store (value, payments, phone, address) by walking the
+       store numbers, which run in sequence. The full order list has always
+       asked for "View All Orders"; this now asks for the same. */
+    if (
+      user.role === "ADMIN" ||
+      (user.role === "EMPLOYEE" && user.permissions?.canGetAllOrders === true)
+    ) {
+      const orders = await Order.find({ consumerId })
+        .sort({ createdAt: -1 })
+        .lean();
 
       return res.json({
         success: true,
@@ -736,6 +872,47 @@ export const getOrdersByStoreConsumerId = async (req, res) => {
   }
 };
 
+/* ONE ORDER OF THE LOGGED-IN AGENT
+
+   The app's order screen used to find its order inside the agent's whole
+   list of orders, so opening one order (or refreshing it) downloaded all of
+   them. This returns just the one, in the same shape as an entry of that
+   list. Only ever the agent's own: another agent's order ID answers 404,
+   the same as one that does not exist. */
+export const getMyOrder = async (req, res) => {
+  try {
+    const agentId = req.user.agentId;
+    const { orderId } = req.params;
+
+    if (!agentId) {
+      return res.status(401).json({
+        success: false,
+        message: "Agent identity missing in token",
+      });
+    }
+
+    const order = await Order.findOne({ orderId: String(orderId), agentId }).lean();
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    const [withCash] = await withCashVerification([order]);
+
+    return res.json({ success: true, order: withCash });
+  } catch (error) {
+    console.error("GET MY ORDER ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch the order",
+    });
+  }
+};
+
 // GET ORDERS PLACED BY LOGGED-IN AGENT
 export const getMyOrders = async (req, res) => {
   try {
@@ -748,7 +925,7 @@ export const getMyOrders = async (req, res) => {
       });
     }
 
-    const orders = await Order.find({ agentId }).sort({ createdAt: -1 });
+    const orders = await Order.find({ agentId }).sort({ createdAt: -1 }).lean();
 
     return res.json({
       success: true,
@@ -769,7 +946,11 @@ export const getMyOrders = async (req, res) => {
 // GET ALL ORDERS (ADMIN / EMPLOYEE)
 export const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
+    /* Read as plain data. The list is every order there is, and turning
+       each into a full document object only to turn it straight back into
+       JSON took most of the time this request spent (about three quarters
+       of it at 1,500 orders). What is sent is the same. */
+    const orders = await Order.find().sort({ createdAt: -1 }).lean();
 
     // ✅ match using STRING orderId
     const orderIds = orders.map((order) => order.orderId);
@@ -791,7 +972,7 @@ export const getAllOrders = async (req, res) => {
       const invoice = invoiceMap[order.orderId];
 
       return {
-        ...order.toObject(),
+        ...order,
         invoiceLink: invoice
           ? `${req.protocol}://${req.get("host")}/api/invoice/download/${order.orderId}`
           : null,
@@ -821,7 +1002,10 @@ export const getActiveOrders = async (req, res) => {
       status: {
         $in: ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"],
       },
-    }).sort({ createdAt: -1 });
+    })
+      .sort({ createdAt: -1 })
+      // plain data, as in the full list above
+      .lean();
 
     res.json({
       success: true,
@@ -1023,6 +1207,17 @@ export const cancelOrder = async (req, res) => {
       );
     }
 
+    // A partner had it: the cancellation belongs in the delivery trail too
+    if (cancelled.delivery?.partnerId) {
+      await recordDeliveryEvent({
+        orderId: cancelled.orderId,
+        action: "CANCELLED",
+        by: { id: String(cancelledById || ""), role: cancelledByRole, name: cancelledByName },
+        partnerId: cancelled.delivery.partnerId,
+        reason: reason.trim(),
+      });
+    }
+
     return res.json({
       success: true,
       message: "Order cancelled successfully",
@@ -1062,7 +1257,19 @@ export const assignDeliveryPartner = async (req, res) => {
       });
     }
 
-    if (order.status !== "CONFIRMED" && order.status !== "ASSIGNED") {
+    /* An order already on its way stays with its partner, with one
+       exception: the partner has reported that they could not deliver it.
+       The office may then hand it to someone else, and it starts again
+       from ASSIGNED with them. */
+    const afterFailedAttempt =
+      CARRYING.includes(order.status) &&
+      Boolean(order.delivery?.couldNotDeliver?.at);
+
+    if (
+      order.status !== "CONFIRMED" &&
+      order.status !== "ASSIGNED" &&
+      !afterFailedAttempt
+    ) {
       return res.status(400).json({
         success: false,
         message: "Order cannot be assigned at this stage",
@@ -1093,8 +1300,17 @@ export const assignDeliveryPartner = async (req, res) => {
        become since it was read, so an order cancelled in that moment (its
        stock already handed back) went out for delivery anyway. The filter
        only matches an order that can still be assigned. */
+    const previousPartnerId = order.delivery?.partnerId || null;
+
     const assigned = await Order.findOneAndUpdate(
-      { _id: order._id, status: { $in: ["CONFIRMED", "ASSIGNED"] } },
+      afterFailedAttempt
+        ? {
+            _id: order._id,
+            status: order.status,
+            // Still reported as failed: not delivered, or retried, since
+            "delivery.couldNotDeliver.at": { $exists: true },
+          }
+        : { _id: order._id, status: { $in: ["CONFIRMED", "ASSIGNED"] } },
       {
         $set: {
           status: "ASSIGNED",
@@ -1144,6 +1360,33 @@ export const assignDeliveryPartner = async (req, res) => {
     }).catch((notifyError) =>
       console.error("ASSIGNMENT NOTIFICATION FAILED:", notifyError),
     );
+
+    /* The partner who could not deliver it still has the goods, and has to
+       be told they are no longer theirs to deliver */
+    if (afterFailedAttempt && previousPartnerId) {
+      await createNotification({
+        title: "Order given to another partner",
+        message: `Order ${order.orderId} has been given to another delivery partner. Please return the goods to the office.`,
+        recipientId: previousPartnerId,
+        recipientModel: "DeliveryPartner",
+        meta: { orderId: order.orderId },
+      }).catch((notifyError) =>
+        console.error("REASSIGNMENT NOTIFICATION FAILED:", notifyError),
+      );
+    }
+
+    await recordDeliveryEvent({
+      orderId: order.orderId,
+      action: "ASSIGNED",
+      by: await actorOf(req.user),
+      partnerId: partner._id,
+      partnerName: partner.name,
+      note: afterFailedAttempt
+        ? "Given to another partner after a failed delivery"
+        : previousPartnerId
+          ? "Moved from another partner"
+          : undefined,
+    });
 
     res.json({
       success: true,
@@ -1204,6 +1447,70 @@ export const updateDeliveryStatus = async (req, res) => {
       });
     }
 
+    /* Where the partner's phone says it is, read once as they press the
+       button. It is written into the delivery trail with every step, and
+       for the last step it is compared with the store's saved position. */
+    const location = readLocation(req.body.location);
+    const [settings, store, actor] = await Promise.all([
+      getDeliverySettings(),
+      storeOfOrder(order),
+      actorOf(req.user),
+    ]);
+    const storeLocation = storePointOf(order, store);
+    const place = checkAtStore(location, storeLocation, settings.radiusMetres);
+
+    const trail = (action, extra = {}) =>
+      recordDeliveryEvent({
+        orderId: order.orderId,
+        action,
+        by: actor,
+        partnerId: order.delivery.partnerId,
+        partnerName: actor.name,
+        location: location || undefined,
+        storeLocation: storeLocation || undefined,
+        distance: place.distance ?? undefined,
+        allowed: settings.radiusMetres,
+        enforced: settings.blockFarDeliveries,
+        ...extra,
+      });
+
+    // The office's permission to skip the location check for this one order
+    const waived = Boolean(order.delivery.locationWaiver?.at);
+
+    /* 🔒 A delivery is confirmed at the store. With the block switched on,
+       a partner who is not there (or whose phone will not say where it is)
+       is refused here, before the delivery code is even looked at, so a
+       code cannot be tried out from somewhere else either. With the block
+       off the delivery goes ahead and is flagged for the office instead. */
+    if (status === "DELIVERED" && settings.blockFarDeliveries && !waived && place.problem) {
+      await trail("DELIVERY_REFUSED", { problem: place.problem });
+
+      const storeName = order.deliveryAddress?.storeName || "the store";
+      const refusals = {
+        NO_LOCATION: {
+          code: "LOCATION_REQUIRED",
+          message:
+            "Your location is needed to confirm a delivery. Turn on location for the Bengol Delivery app on your phone, then try again at the store.",
+        },
+        MOCKED: {
+          code: "MOCK_LOCATION",
+          message:
+            "A fake-location (mock GPS) app is active on this phone. Turn it off, then try again at the store.",
+        },
+        TOO_FAR: {
+          code: "TOO_FAR",
+          message: `You are about ${formatDistance(place.distance ?? 0)} from ${storeName}. Go to the store (within ${settings.radiusMetres} m) and try again. If you are already there, report it to the office from this order.`,
+        },
+      };
+
+      return res.status(400).json({
+        success: false,
+        ...refusals[place.problem],
+        distance: place.distance,
+        allowed: settings.radiusMetres,
+      });
+    }
+
     /* 🔒 FIX: every store gets a delivery code when it is registered, and
        its agent gives that code to the store owner, but nothing ever asked
        for it: a partner could mark any assigned order delivered without
@@ -1231,13 +1538,6 @@ export const updateDeliveryStatus = async (req, res) => {
           message: "Enter the store's 6-digit delivery code",
         });
       }
-
-      const store =
-        (order.store &&
-          (await Store.findById(order.store).select("deliveryCode").lean())) ||
-        (await Store.findOne({ consumerId: order.consumerId })
-          .select("deliveryCode")
-          .lean());
 
       if (!store?.deliveryCode) {
         return res.status(409).json({
@@ -1315,6 +1615,8 @@ export const updateDeliveryStatus = async (req, res) => {
       if (!codesMatch(deliveryCode, store.deliveryCode)) {
         const attempts = attempt.delivery?.codeAttempts || 0;
 
+        await trail("DELIVERY_REFUSED", { problem: "WRONG_CODE" });
+
         if (attempts >= MAX_CODE_ATTEMPTS) {
           await lockNow();
 
@@ -1358,7 +1660,11 @@ export const updateDeliveryStatus = async (req, res) => {
     if (status === "DELIVERED") {
       update.$set["delivery.codeAttempts"] = 0;
       update.$set["delivery.deliveredAt"] = now;
-      update.$unset = { "delivery.codeLockedUntil": "" };
+      // Delivered after all: an earlier "could not deliver" report is closed
+      update.$unset = {
+        "delivery.codeLockedUntil": "",
+        "delivery.couldNotDeliver": "",
+      };
     }
 
     const moved = await Order.findOneAndUpdate(
@@ -1377,6 +1683,27 @@ export const updateDeliveryStatus = async (req, res) => {
         message:
           "This order was changed a moment ago. Refresh to see where it stands.",
       });
+    }
+
+    /* Only the last step is judged against the store: a partner collects
+       an order at the office, not at the shop. A delivery that went through
+       away from the store, or with no position at all, is flagged for the
+       office unless the office had allowed it. */
+    if (status === "DELIVERED") {
+      const flagged = await trail("DELIVERED", {
+        problem: place.problem || undefined,
+        waived: waived || undefined,
+      });
+
+      if (flagged?.review?.needed) {
+        publish(
+          "DELIVERY_ALERT",
+          { kind: "LOCATION", orderId: order.orderId },
+          "canAssignDelivery",
+        );
+      }
+    } else {
+      await trail(status);
     }
 
     res.json({
@@ -1494,7 +1821,9 @@ export const getAgentDueOrders = async (req, res) => {
       agentId,
       dueAmount: { $gt: 0 },
       status: { $ne: "CANCELLED" },
-    }).sort({ dueDate: 1 });
+    })
+      .sort({ dueDate: 1 })
+      .lean();
 
     res.json({
       success: true,
@@ -1765,6 +2094,11 @@ export const createRazorpayOrder = async (req, res) => {
   try {
     const { orderId } = req.body;
 
+    // Anything but text threw at the database and answered 500
+    if (typeof orderId !== "string" || !orderId) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
     const order = await Order.findOne({ orderId });
 
     if (!order) {
@@ -1932,6 +2266,13 @@ export const createOrderPayment = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Minimum amount should be ₹1",
+      });
+    }
+
+    if (amount > MAX_PAYMENT_RUPEES) {
+      return res.status(400).json({
+        success: false,
+        message: "That amount is too large to collect in one payment",
       });
     }
 
@@ -2143,6 +2484,13 @@ export const createInitialPaymentQr = async (req, res) => {
       });
     }
 
+    if (amount > MAX_PAYMENT_RUPEES) {
+      return res.status(400).json({
+        success: false,
+        message: "That amount is too large to collect in one payment",
+      });
+    }
+
     const qrCode = await razorpayInstance.qrCode.create({
       type: "upi_qr",
       name: "Bengol Spices Order Payment",
@@ -2177,6 +2525,13 @@ export const createInitialPaymentQr = async (req, res) => {
 export const createDuePaymentQr = async (req, res) => {
   try {
     const { orderId } = req.body;
+
+    // Anything but text threw at the database and answered 500
+    if (typeof orderId !== "string" || !orderId) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
 
     const order = await Order.findOne({ orderId });
     if (!order) {
@@ -2238,6 +2593,12 @@ export const checkQrPaymentStatus = async (req, res) => {
   try {
     const { qrCodeId } = req.params;
 
+    if (!isGatewayId(qrCodeId, "qr")) {
+      return res
+        .status(404)
+        .json({ success: false, message: "QR code not found" });
+    }
+
     const qrCode = await razorpayInstance.qrCode.fetch(qrCodeId);
 
     const paid =
@@ -2252,6 +2613,13 @@ export const checkQrPaymentStatus = async (req, res) => {
       amountReceived: qrCode.payments_amount_received / 100,
     });
   } catch (error) {
+    // The gateway knows no such QR code: that is "not found", not a fault here
+    if ([400, 404].includes(error?.statusCode)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "QR code not found" });
+    }
+
     console.error("CHECK QR STATUS ERROR:", error);
     return res.status(500).json({
       success: false,
@@ -2271,6 +2639,13 @@ export const verifyQrAndPlaceOrder = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "QR code reference is missing",
+      });
+    }
+
+    if (!isGatewayId(qrCodeId, "qr")) {
+      return res.status(400).json({
+        success: false,
+        message: "QR code reference is not valid",
       });
     }
 
@@ -2393,6 +2768,20 @@ export const verifyDueQrPayment = async (req, res) => {
         success: false,
         message: "QR code reference is missing",
       });
+    }
+
+    if (!isGatewayId(qrCodeId, "qr")) {
+      return res.status(400).json({
+        success: false,
+        message: "QR code reference is not valid",
+      });
+    }
+
+    // Anything but text threw at the database and answered 500
+    if (typeof orderId !== "string" || !orderId) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
     }
 
     const order = await Order.findOne({ orderId })

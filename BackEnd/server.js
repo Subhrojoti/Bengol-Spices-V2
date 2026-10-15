@@ -80,8 +80,15 @@ const stripQueryOperators = (value) => {
   }
 };
 
+/* A request sent with no body at all (a PUT with nothing in it, a login
+   form posted empty) reaches the routes with no `req.body`. Nearly every
+   route starts by reading a field out of it, which threw, and the caller
+   was answered "500, something failed" for what is simply a missing field.
+   With an empty body in its place each route gives its own proper answer
+   ("reason is required", "invalid credentials"...). */
 app.use((req, res, next) => {
-  if (req.body) stripQueryOperators(req.body);
+  if (req.body === undefined || req.body === null) req.body = {};
+  else stripQueryOperators(req.body);
   next();
 });
 
@@ -113,6 +120,14 @@ app.use(
   cors({
     origin: corsOrigins,
     credentials: true,
+    /* The panels are served from one address and call this API at another,
+       so the browser first asks, with a separate OPTIONS request, whether
+       each call is allowed. Nothing told it how long that answer holds, and
+       a browser then remembers it for about five seconds: nearly every
+       request the admin panel made was really two. The answer is the same
+       every time, so the browser may keep it for two hours (the longest
+       Chrome honours). */
+    maxAge: 2 * 60 * 60,
   }),
 );
 

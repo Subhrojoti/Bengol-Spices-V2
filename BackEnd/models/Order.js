@@ -30,6 +30,15 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
 
+    /* The agent app's own reference for one press of "Place Order". When
+       the reply to that press is lost on the way back (a weak signal, this
+       server restarting) the app asks again with the same reference and is
+       answered with the order it has already placed, not a second one.
+       Absent on orders placed from anywhere that sends none. */
+    clientRequestId: {
+      type: String,
+    },
+
     /* =============================
        PRODUCTS ORDERED
        ============================= */
@@ -307,6 +316,29 @@ const orderSchema = new mongoose.Schema(
       codeLockedUntil: {
         type: Date,
       },
+
+      /* The partner's open report that this delivery could not be made.
+         The order stays where it was (the partner still has the goods);
+         this is what tells the office to decide: ask them to try again,
+         give it to someone else, or cancel. Removed when that is decided,
+         or when the order is delivered after all. Every report is also
+         kept in the delivery trail (models/DeliveryEvent). */
+      couldNotDeliver: {
+        reason: { type: String }, // a key of COULD_NOT_DELIVER_REASONS
+        note: { type: String },
+        at: { type: Date },
+      },
+
+      /* The office's permission to mark this one order delivered without
+         the location check. A new partner starts without it. */
+      locationWaiver: {
+        at: { type: Date },
+        by: {
+          id: String,
+          role: String,
+          name: String,
+        },
+      },
     },
 
     deliveryOtp: {
@@ -348,5 +380,16 @@ orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ agentId: 1, createdAt: -1 });
 orderSchema.index({ "delivery.partnerId": 1, status: 1 });
 orderSchema.index({ paymentStatus: 1, dueDate: 1 });
+
+/* One order per reference, per agent. This is what turns away the second of
+   two copies of the same request arriving at the same moment; only orders
+   that carry a reference are in the index at all. */
+orderSchema.index(
+  { agentId: 1, clientRequestId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientRequestId: { $type: "string" } },
+  },
+);
 
 export default mongoose.model("Order", orderSchema);

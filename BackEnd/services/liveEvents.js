@@ -15,6 +15,19 @@ const clients = new Set();
 // 25s keeps the stream open and is ignored by the browser
 const HEARTBEAT_MS = 25 * 1000;
 
+/* 🔒 Who is listening is checked when a stream opens, and a stream then
+   stays open for as long as the panel does: all day, or for as long as
+   anything else cares to hold the connection. Nothing looked again. An
+   employee who was deactivated, or whose permission was taken away, went on
+   being sent every new order and every cash payment for as long as they
+   kept the connection, and so did a sign-in that had since run out.
+
+   So no stream lives longer than this. The panel reconnects by itself
+   within a second (hooks/useLiveOrders.jsx), and reconnecting goes through
+   the same sign-in check as any other request: the account must still be
+   active, the sign-in still valid, and the permissions are read afresh. */
+const MAX_STREAM_MS = Number(process.env.EVENT_STREAM_MAX_MS) || 30 * 60 * 1000;
+
 const mayReceive = (user, permission) =>
   user.role === "ADMIN" ||
   (user.role === "EMPLOYEE" && user.permissions?.[permission] === true);
@@ -32,19 +45,37 @@ export const openEventStream = (req, res) => {
   const client = { res, user: req.user };
   clients.add(client);
 
+  /* Everything that ends a stream goes through here, and takes it off the
+     list first: writing to a response that has already ended is an error
+     nothing would be listening for. */
+  let open = true;
+  const drop = () => {
+    if (!open) return;
+    open = false;
+    clearInterval(heartbeat);
+    clearTimeout(recycle);
+    clients.delete(client);
+  };
+
   const heartbeat = setInterval(() => {
     try {
       res.write(": ping\n\n");
     } catch {
-      clients.delete(client);
-      clearInterval(heartbeat);
+      drop();
     }
   }, HEARTBEAT_MS);
 
-  req.on("close", () => {
-    clearInterval(heartbeat);
-    clients.delete(client);
-  });
+  const recycle = setTimeout(() => {
+    drop();
+    try {
+      res.end();
+    } catch {
+      /* already gone */
+    }
+  }, MAX_STREAM_MS);
+  recycle.unref();
+
+  req.on("close", drop);
 };
 
 /**
