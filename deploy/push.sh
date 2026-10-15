@@ -328,12 +328,12 @@ deploy_nginx() {
   local tmp="/tmp/bengol-nginx-$$"
 
   $SSH "rm -rf ${tmp} && mkdir -p ${tmp}" || return 1
-  scp -q -P "${VPS_PORT}" deploy/nginx/bengolspices.com.conf deploy/nginx/api.bengolspices.com.conf \
+  scp -q -P "${VPS_PORT}" deploy/nginx/bengolspices.com.conf deploy/nginx/api.bengolspices.com.conf deploy/nginx/panels.bengolspices.com.conf \
       "${VPS_USER}@${VPS_HOST}:${tmp}/" || return 1
 
   $SSH "TMP_DIR='${tmp}' SITE_HOST='${SITE_HOST}' API_HOST='${API_HOST}' bash -s" <<'REMOTE'
 set -u
-FILES="bengolspices.com.conf api.bengolspices.com.conf"
+FILES="bengolspices.com.conf api.bengolspices.com.conf panels.bengolspices.com.conf"
 # Overridable only so this block can be rehearsed against a scratch folder
 NGINX_DIR="${NGINX_DIR:-/etc/nginx}"
 BACKUP_ROOT="${BACKUP_ROOT:-/root/bengol-backups}"
@@ -364,7 +364,9 @@ if [ -z "$changed" ]; then
 fi
 
 site_before=$(status "$SITE_HOST" /)
-login_before=$(status "$SITE_HOST" /admin/login)
+# The admin and employee logins have their own addresses and /admin/login here
+# redirects to them; the agent login is a page this site still serves itself
+login_before=$(status "$SITE_HOST" /agent/login)
 api_before=$(status "$API_HOST" /products/public/allProduct)
 
 mkdir -p "$BACKUP" && chmod 700 "$BACKUP_ROOT"
@@ -400,15 +402,15 @@ systemctl reload nginx
 sleep 2
 
 site_after=$(status "$SITE_HOST" /)
-login_after=$(status "$SITE_HOST" /admin/login)
+login_after=$(status "$SITE_HOST" /agent/login)
 api_after=$(status "$API_HOST" /products/public/allProduct)
 echo "    home page   $site_before -> $site_after"
-echo "    admin login $login_before -> $login_after"
+echo "    agent login $login_before -> $login_after"
 echo "    API         $api_before -> $api_after"
 
 broken=""
 [ "$site_before" = "200" ] && [ "$site_after" != "200" ] && broken="the home page"
-[ "$login_before" = "200" ] && [ "$login_after" != "200" ] && broken="the admin login"
+[ "$login_before" = "200" ] && [ "$login_after" != "200" ] && broken="the agent login"
 [ "$api_before" != "$api_after" ] && broken="the API"
 
 if [ -n "$broken" ]; then
@@ -459,7 +461,10 @@ fi
 echo "  Website"
 line "/" "HTTP $(status https://$SITE_HOST/)"
 line "/about" "HTTP $(status https://$SITE_HOST/about)  $(curl -sk -m 15 https://$SITE_HOST/about | grep -o '<title>[^<]*</title>' | head -1)"
-line "/admin/login" "HTTP $(status https://$SITE_HOST/admin/login)"
+line "/agent/login" "HTTP $(status https://$SITE_HOST/agent/login)"
+line "/admin/login" "HTTP $(status https://$SITE_HOST/admin/login)  (302 to admin.bengolspices.com expected)"
+line "https://admin.bengolspices.com/admin/login" "HTTP $(status https://admin.bengolspices.com/admin/login)"
+line "https://employee.bengolspices.com/employee/login" "HTTP $(status https://employee.bengolspices.com/employee/login)"
 line "/an-address-that-does-not-exist" "HTTP $(status https://$SITE_HOST/an-address-that-does-not-exist)  (404 expected)"
 line "/home" "HTTP $(status https://$SITE_HOST/home)  (301 expected)"
 line "/robots.txt" "HTTP $(status https://$SITE_HOST/robots.txt)"
