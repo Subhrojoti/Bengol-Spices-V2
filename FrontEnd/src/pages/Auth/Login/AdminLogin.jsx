@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, KeyRound, Loader2, Mail, ShieldCheck } from "lucide-react";
 import AuthShell, { AuthField } from "./AuthShell";
 import { adminLogin } from "../../../api/services";
+import useSignedOutNotice from "../../../hooks/useSignedOutNotice";
 
 const THEME = {
   panel: "bg-[#0b1220]",
@@ -19,6 +20,8 @@ const STATEMENTS = [
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  // Sent here because the session ended: say so, once
+  useSignedOutNotice();
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);

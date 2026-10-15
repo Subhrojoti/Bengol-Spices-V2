@@ -8,6 +8,7 @@ import {
   Loader2,
   MapPin,
   PackageCheck,
+  PackageX,
   Phone,
   RefreshCcw,
   RotateCcw,
@@ -36,6 +37,12 @@ import {
    cannot be dispatched instead of letting the click fail. */
 const ORDER_ASSIGNABLE = ["CONFIRMED", "ASSIGNED"];
 const RETURN_ASSIGNABLE = ["INITIATED"];
+
+/* An order already on its way stays with its partner, unless that partner
+   has reported that they could not deliver it: then it can be handed on. */
+const reportedFailed = (order) =>
+  ["SHIPPED", "OUT_FOR_DELIVERY"].includes(order?.status) &&
+  Boolean(order?.delivery?.couldNotDeliver?.at);
 
 const n = (v) => Number(v || 0);
 const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
@@ -88,7 +95,7 @@ const Empty = ({ icon, title, hint }) => (
   </div>
 );
 
-export default function DeliveryManagement() {
+export default function DeliveryManagement({ focusOrderId, onFocused }) {
   const [orders, setOrders] = useState([]);
   const [returns, setReturns] = useState([]);
   const [partners, setPartners] = useState([]);
@@ -138,6 +145,19 @@ export default function DeliveryManagement() {
     load();
   }, [load]);
 
+  /* Arriving from a delivery alert ("Give to another partner"): that order
+     is picked already, so only the partner is left to choose */
+  useEffect(() => {
+    if (!focusOrderId || status !== "ready") return;
+
+    const order = orders.find((o) => o.orderId === focusOrderId);
+    setQueue("ORDERS");
+    setQueueSearch("");
+    setSelectedId(order?._id || null);
+    if (!order) toast.error(`${focusOrderId} is no longer waiting to be delivered`);
+    onFocused?.();
+  }, [focusOrderId, status, orders, onFocused]);
+
   const storeById = useMemo(() => {
     const map = {};
     storeRecords.forEach((store) => {
@@ -170,7 +190,9 @@ export default function DeliveryManagement() {
 
   const canAssign = (item) =>
     Boolean(item) &&
-    (isOrders ? ORDER_ASSIGNABLE : RETURN_ASSIGNABLE).includes(item.status);
+    (isOrders
+      ? ORDER_ASSIGNABLE.includes(item.status) || reportedFailed(item)
+      : RETURN_ASSIGNABLE.includes(item.status));
 
   /** Why the selected item cannot be dispatched, in plain words. */
   const blockedReason = (item) => {
@@ -407,9 +429,11 @@ export default function DeliveryManagement() {
                   blocked ? "text-amber-700" : "text-slate-500"
                 }`}>
                 {blocked ||
-                  (currentPartnerId
-                    ? `Currently with ${partnerById[currentPartnerId]?.name || "a partner"}. Pick another to reassign.`
-                    : "Choose a partner on the right to dispatch it.")}
+                  (isOrders && reportedFailed(selected)
+                    ? `${partnerById[currentPartnerId]?.name || "The partner"} reported they could not deliver it. Pick another partner to hand it to.`
+                    : currentPartnerId
+                      ? `Currently with ${partnerById[currentPartnerId]?.name || "a partner"}. Pick another to reassign.`
+                      : "Choose a partner on the right to dispatch it.")}
               </p>
             </>
           )}
@@ -601,7 +625,13 @@ export default function DeliveryManagement() {
                     )}
 
                     <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2.5">
-                      {partner ? (
+                      {isOrders && reportedFailed(item) ? (
+                        <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-rose-600">
+                          <PackageX size={12} />
+                          Could not deliver
+                          {partner ? <span className="font-normal text-slate-500">· {partner.name}</span> : null}
+                        </span>
+                      ) : partner ? (
                         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-500">
                           <Truck size={11} className="text-slate-400" />
                           {partner.name}
@@ -795,7 +825,11 @@ export default function DeliveryManagement() {
         tone="warning"
         icon={<RotateCcw size={18} />}
         title="Move this to another partner?"
-        description="The partner currently handling it will lose the job and the new one will be notified."
+        description={
+          isOrders && reportedFailed(selected)
+            ? "The partner who could not deliver it will be told to return the goods to the office, and the new one will be notified. The order starts again from Assigned."
+            : "The partner currently handling it will lose the job and the new one will be notified."
+        }
         detail={
           reassignTarget && (
             <div className="space-y-2 text-[14px]">

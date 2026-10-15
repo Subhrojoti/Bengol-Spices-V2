@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ShoppingBag } from "lucide-react";
+import { PackageX, ShoppingBag } from "lucide-react";
 
 const API_ROOT = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -151,6 +151,34 @@ export default function useLiveOrders({ tokenKey, ordersPath }) {
         if (type === "CASH_VERIFICATION") {
           window.dispatchEvent(
             new CustomEvent("live:cash-verification", { detail: payload.payment }),
+          );
+        }
+
+        /* A delivery partner could not hand an order over, or a delivery
+           was confirmed away from the store. The first is announced, since
+           the partner is standing there waiting; both refresh the delivery
+           alerts and the dashboard. */
+        if (type === "DELIVERY_ALERT") {
+          if (payload.kind === "COULD_NOT_DELIVER") {
+            toast("Delivery could not be made", {
+              id: `delivery-${payload.orderId}`,
+              description: [payload.orderId, payload.storeName, payload.reason]
+                .filter(Boolean)
+                .join(" · "),
+              icon: <PackageX size={18} />,
+              duration: 10000,
+              action: {
+                label: "View",
+                onClick: () =>
+                  navigateRef.current(
+                    `${ordersPath.replace(/[^/]+$/, "delivery")}?tab=alerts`,
+                  ),
+              },
+            });
+          }
+
+          window.dispatchEvent(
+            new CustomEvent("live:delivery-alert", { detail: payload }),
           );
         }
       } catch {

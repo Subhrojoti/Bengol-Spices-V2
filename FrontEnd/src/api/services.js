@@ -959,3 +959,48 @@ export const rejectCashPayment = async (paymentId, reason) => {
   );
   return response.data;
 };
+
+/* Deliveries: what the office should look at (a failed delivery, one
+   confirmed away from the store, one out for too long), each order's trail
+   of who did what, when and where, and the few things the office can do */
+export const getDeliveryAlerts = async () => {
+  const response = await axiosInstance.get("/admin/delivery/alerts");
+  return response.data;
+};
+
+export const getDeliveryTrail = async (orderId) => {
+  const response = await axiosInstance.get(
+    `/admin/delivery/orders/${encodeURIComponent(orderId)}/trail`,
+  );
+  return response.data;
+};
+
+// A flagged delivery has been looked at
+export const reviewDeliveryEvent = async (eventId) => {
+  const response = await axiosInstance.post(
+    `/admin/delivery/events/${eventId}/review`,
+  );
+  return response.data;
+};
+
+// Ask the same partner to try a failed delivery again
+export const retryDelivery = async (orderId) => {
+  const response = await axiosInstance.post(
+    `/admin/delivery/orders/${encodeURIComponent(orderId)}/retry`,
+  );
+  return response.data;
+};
+
+// Let one order be marked delivered without the location check
+export const allowDeliveryWithoutLocation = async (orderId) => {
+  const response = await axiosInstance.post(
+    `/admin/delivery/orders/${encodeURIComponent(orderId)}/allow-without-location`,
+  );
+  return response.data;
+};
+
+// Admin only: { blockFarDeliveries, radiusMetres }
+export const updateDeliverySettings = async (changes) => {
+  const response = await axiosInstance.put("/admin/delivery/settings", changes);
+  return response.data;
+};

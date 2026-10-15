@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Truck, UserCheck } from "lucide-react";
+import { BellRing, Truck, UserCheck } from "lucide-react";
 
 import DeliveryManagement from "./tabs/DeliveryManagement";
 import DeliveryApproval from "./tabs/DeliveryApproval";
+import DeliveryAlerts from "./tabs/DeliveryAlerts";
 
 const TABS = [
   { key: "dispatch", label: "Dispatch", icon: Truck, Component: DeliveryManagement },
+  { key: "alerts", label: "Alerts", icon: BellRing, Component: DeliveryAlerts },
   { key: "approval", label: "Partner Approval", icon: UserCheck, Component: DeliveryApproval },
 ];
 
@@ -20,6 +22,14 @@ export default function Delivery() {
 
   const Current =
     TABS.find((t) => t.key === active)?.Component || DeliveryManagement;
+
+  /* "Give to another partner" on an alert: over to Dispatch, with that
+     order already picked, so only the new partner is left to choose */
+  const [focusOrderId, setFocusOrderId] = useState(null);
+  const reassign = (orderId) => {
+    setFocusOrderId(orderId);
+    setActive("dispatch");
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -55,7 +65,11 @@ export default function Delivery() {
       </div>
 
       <div className="px-5 pb-10 lg:px-8">
-        <Current />
+        <Current
+          onReassign={reassign}
+          focusOrderId={focusOrderId}
+          onFocused={() => setFocusOrderId(null)}
+        />
       </div>
     </div>
   );

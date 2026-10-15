@@ -10,7 +10,9 @@ import {
   Clock3,
   HandCoins,
   KeyRound,
+  MapPinOff,
   PackageSearch,
+  PackageX,
   RotateCcw,
   Truck,
   UserPlus,
@@ -114,6 +116,41 @@ const ROWS = [
     title: (s) =>
       `${plural(s.count, "confirmed order needs", "confirmed orders need")} a delivery partner`,
     detail: (s) => (age(s.oldest) ? `The oldest was placed ${age(s.oldest)} ago` : null),
+  },
+  {
+    /* A partner could not hand an order over and is waiting to be told what
+       to do with it */
+    key: "deliveriesFailed",
+    tone: "urgent",
+    icon: PackageX,
+    tab: "delivery",
+    query: "?tab=alerts",
+    title: (s) =>
+      `${plural(s.count, "delivery", "deliveries")} could not be made`,
+    detail: (s) =>
+      age(s.oldest)
+        ? `The oldest was reported ${age(s.oldest)} ago; the partner is waiting to hear what to do`
+        : "The partner is waiting to hear what to do",
+  },
+  {
+    key: "deliveryLocationFlags",
+    tone: "action",
+    icon: MapPinOff,
+    tab: "delivery",
+    query: "?tab=alerts",
+    title: (s) =>
+      `${plural(s.count, "delivery", "deliveries")} away from the store to review`,
+    detail: () => "Confirmed or attempted somewhere other than the store, or with no location",
+  },
+  {
+    key: "outForDeliveryLong",
+    tone: "action",
+    icon: Clock3,
+    tab: "delivery",
+    query: "?tab=alerts",
+    title: (s) =>
+      `${plural(s.count, "order has", "orders have")} been out for delivery for over a day`,
+    detail: (s) => (age(s.oldest) ? `The longest: ${age(s.oldest)}` : null),
   },
   {
     key: "ordersStalled",
@@ -220,9 +257,12 @@ export default function NeedsAttention({ refreshKey = 0 }) {
     window.addEventListener("live:order-placed", onLiveOrder);
     // Cash recorded, approved or rejected: the cash row changes too
     window.addEventListener("live:cash-verification", onLiveOrder);
+    // A failed delivery reported, or one confirmed away from the store
+    window.addEventListener("live:delivery-alert", onLiveOrder);
     return () => {
       window.removeEventListener("live:order-placed", onLiveOrder);
       window.removeEventListener("live:cash-verification", onLiveOrder);
+      window.removeEventListener("live:delivery-alert", onLiveOrder);
     };
   }, []);
 

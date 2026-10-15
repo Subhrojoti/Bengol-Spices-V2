@@ -34,6 +34,7 @@ import {
 } from "../../../../api/services";
 import { downloadCsv, fileDate, sheetDate } from "../../../../utils/csv";
 import { quantityWithUnit } from "../../../../utils/uom";
+import DeliveryTrail from "../Delivery/DeliveryTrail";
 
 /* Mirrors the server's guards so the UI offers only what will succeed.
    Cancelling used to be offered on PLACED orders alone, although the API
@@ -283,6 +284,8 @@ export default function OrderManagement() {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [invoiceId, setInvoiceId] = useState(null);
+  // The order whose delivery trail is open
+  const [trailFor, setTrailFor] = useState(null);
 
   // The queue of orders waiting to be confirmed: collapsed to a few by default
   const [queueOpen, setQueueOpen] = useState(false);
@@ -552,9 +555,22 @@ export default function OrderManagement() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error(
-        error?.response?.data?.message || "No invoice is available yet",
-      );
+      /* The file is asked for as a download, so a refusal arrives as a
+         download too and its message has to be read out of it. It used to
+         be looked for where it never is, and every failure said "No invoice
+         is available yet", including "could not be prepared just now,
+         try again". */
+      let reason = error?.response?.data?.message;
+
+      if (!reason && typeof error?.response?.data?.text === "function") {
+        try {
+          reason = JSON.parse(await error.response.data.text())?.message;
+        } catch {
+          /* not a message: the general wording below */
+        }
+      }
+
+      toast.error(reason || "No invoice is available yet");
     } finally {
       setInvoiceId(null);
     }
@@ -1009,9 +1025,10 @@ export default function OrderManagement() {
                             Products
                           </p>
                           <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
-                            {(order.products || []).map((p) => (
+                            {(order.products || []).map((p, index) => (
                               <div
-                                key={p._id}
+                                // an order line from long ago may carry no id of its own
+                                key={p._id || index}
                                 className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                                 <span className="min-w-0 truncate text-[14px] text-slate-700">
                                   {p.name}
@@ -1041,6 +1058,16 @@ export default function OrderManagement() {
                             )}
                             Invoice
                           </button>
+
+                          {/* Who handled the delivery, when and from where */}
+                          {order.delivery?.partnerId && (
+                            <button
+                              onClick={() => setTrailFor(order.orderId)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50">
+                              <MapPin size={14} />
+                              Delivery trail
+                            </button>
+                          )}
 
                           {canCancel(order) && (
                             <button
@@ -1108,6 +1135,10 @@ export default function OrderManagement() {
         onConfirm={runConfirm}
         onClose={() => setConfirmTarget(null)}
       />
+
+      {trailFor && (
+        <DeliveryTrail orderId={trailFor} onClose={() => setTrailFor(null)} />
+      )}
 
       <CancelDialog
         order={cancelTarget}

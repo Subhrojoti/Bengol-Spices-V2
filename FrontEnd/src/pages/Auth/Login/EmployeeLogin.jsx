@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, IdCard, KeyRound, Loader2, UserRound } from "lucide-react";
 import AuthShell, { AuthField } from "./AuthShell";
 import { employeeLogin } from "../../../api/services";
+import useSignedOutNotice from "../../../hooks/useSignedOutNotice";
 
 const THEME = {
   panel: "bg-[#1b1035]",
@@ -19,6 +20,8 @@ const STATEMENTS = [
 
 export default function EmployeeLogin() {
   const navigate = useNavigate();
+  // Sent here because the session ended: say so, once
+  useSignedOutNotice();
 
   const [form, setForm] = useState({ employeeId: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);

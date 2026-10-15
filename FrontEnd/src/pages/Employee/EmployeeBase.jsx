@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import PanelLayout from "../../components/layout/PanelLayout";
@@ -27,27 +27,31 @@ const EmployeeBase = () => {
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
+  // The employee's own record could not be read (no connection, a server error)
+  const [failed, setFailed] = useState(false);
 
   /* Fetched once here and handed to the sidebar. The sidebar used to fetch
      the same profile a second time on every page load. */
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const res = await getEmployeeProfile();
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await getEmployeeProfile();
 
-        const permissions = res?.employee?.permissions || {};
-        localStorage.setItem("permissions", JSON.stringify(permissions));
+      const permissions = res?.employee?.permissions || {};
+      localStorage.setItem("permissions", JSON.stringify(permissions));
 
-        if (res?.employee) setProfile(res.employee);
-      } catch (error) {
-        console.error("Failed to load employee profile", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
+      if (res?.employee) setProfile(res.employee);
+      setFailed(false);
+    } catch (error) {
+      console.error("Failed to load employee profile", error);
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const handleLogout = () => {
     localStorage.removeItem("employeeToken");
@@ -85,6 +89,39 @@ const EmployeeBase = () => {
         }}>
         <CircularProgress />
       </Box>
+    );
+  }
+
+  /* What this employee may open comes with their record. Without it the
+     panel would open with every section refused, as if they had been given
+     no access at all, when the truth is only that it could not be read. */
+  if (failed && !profile) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-slate-50 p-6">
+        <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-[17px] font-semibold text-slate-800">
+            Could not load your account
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-500">
+            Check your connection and try again.
+          </p>
+          <div className="mt-5 flex justify-center gap-2">
+            <button
+              onClick={() => {
+                setLoading(true);
+                loadProfile();
+              }}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+              Retry
+            </button>
+            <button
+              onClick={handleLogout}
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
