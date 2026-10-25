@@ -1,3 +1,4 @@
+import { storeOperation } from "../services/storeOperation.service.js";
 import express from "express";
 import {
   assignReturnPickup,
@@ -15,12 +16,12 @@ import { checkPermission } from "../middleware/permission.js";
 
 const router = express.Router();
 
-router.post("/:orderId/initiate", protect, isAgent, initiateReturn);
+router.post("/:orderId/initiate", protect, isAgent, storeOperation(initiateReturn));
 router.put(
   "/:returnId/assign-pickup",
   protect,
   checkPermission("canAssignReturn"),
-  assignReturnPickup,
+  storeOperation(assignReturnPickup),
 );
 
 router.get("/my-returns", protect, isAgent, getMyReturns);
@@ -38,7 +39,7 @@ router.put(
   "/delivery/:returnId/status",
   protect,
   isDeliveryPartner,
-  updateReturnStatus,
+  storeOperation(updateReturnStatus),
 );
 
 //GET ALL RETURNS (Admin & Employee with permission)
@@ -53,8 +54,8 @@ router.get(
 );
 
 // Cancel Return (Agent)
-router.put("/:returnId/cancel", protect, isAgent, cancelReturn);
+router.put("/:returnId/cancel", protect, isAgent, storeOperation(cancelReturn));
 // Agent app builds already installed send POST here; without this they got
 // "Route not found" and Cancel Return did nothing
-router.post("/:returnId/cancel", protect, isAgent, cancelReturn);
+router.post("/:returnId/cancel", protect, isAgent, storeOperation(cancelReturn));
 export default router;

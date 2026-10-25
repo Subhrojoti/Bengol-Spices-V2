@@ -8,6 +8,7 @@ import {
 import { protect } from "../middleware/auth.js";
 import { isAgent } from "../middleware/role.js";
 import { upload } from "../middleware/upload.js";
+import { agentStoreCreation } from "../services/storeOperation.service.js";
 import {
   assignSalesLocation,
   getSalesLocations,
@@ -17,7 +18,7 @@ import { checkPermission } from "../middleware/permission.js";
 const router = express.Router();
 
 // 🔥 DIRECT STORE CREATION (NO OTP)
-router.post("/register", protect, isAgent, upload.single("image"), createStore);
+router.post("/register", protect, isAgent, agentStoreCreation, upload.single("image"), createStore);
 
 // GET MY STORES
 router.get("/my-stores", protect, isAgent, getMyStores);

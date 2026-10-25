@@ -76,6 +76,11 @@ const storeSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Original creator is immutable in transfers; legacy assignment falls back to it.
+    currentAgentId: { type: String, index: true },
+    ownershipVersion: { type: Number, default: 0 },
+    archivedAt: Date,
+    archivedBy: { id: String, role: String, name: String },
 
     image: {
       url: { type: String },
@@ -94,5 +99,6 @@ const storeSchema = new mongoose.Schema(
 // 🔥 Indexes for filtering
 storeSchema.index({ "address.state": 1 });
 storeSchema.index({ "address.pincode": 1 });
+storeSchema.index({ currentAgentId: 1, status: 1, consumerId: 1 });
 
 export default mongoose.model("Store", storeSchema);

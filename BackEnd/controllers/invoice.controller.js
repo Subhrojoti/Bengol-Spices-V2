@@ -1,5 +1,6 @@
 import Invoice from "../models/Invoice.js";
 import Order from "../models/Order.js";
+import { mayReadStoreHistory } from "../services/storeAccess.service.js";
 import { invoiceFileName } from "../utils/invoiceNumber.js";
 import { isGuessableInvoiceUrl } from "../utils/uploadPdf.js";
 import {
@@ -26,11 +27,11 @@ const canSeeOrder = async (user, orderId) => {
   }
 
   const order = await Order.findOne({ orderId })
-    .select("agentId delivery.partnerId")
+    .select("agentId consumerId delivery.partnerId")
     .lean();
   if (!order) return false;
 
-  if (user.role === "AGENT") return order.agentId === user.agentId;
+  if (user.role === "AGENT") return mayReadStoreHistory(order.consumerId, user.agentId);
 
   if (user.role === "DELIVERY_PARTNER") {
     return String(order.delivery?.partnerId) === String(user.id);

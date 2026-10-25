@@ -1,3 +1,4 @@
+import { storeOperation } from "../services/storeOperation.service.js";
 import express from "express";
 import {
   placeOrder,
@@ -37,7 +38,7 @@ import { checkPermission } from "../middleware/permission.js";
 const router = express.Router();
 
 // PLACE ORDER (AGENT)
-router.post("/", protect, isAgent, placeOrder);
+router.post("/", protect, isAgent, storeOperation(placeOrder));
 // STORE-WISE ORDERS
 router.get("/store/:consumerId", protect, getOrdersByStoreConsumerId);
 // GET MY ORDERS
@@ -91,7 +92,7 @@ router.post(
 );
 
 // Collect Payment (Agent Access Only)
-router.post("/:orderId/collect-payment", protect, isAgent, collectPayment);
+router.post("/:orderId/collect-payment", protect, isAgent, storeOperation(collectPayment));
 
 // Get Payment Info (Admin / Employee with permission)
 router.get(
@@ -121,8 +122,8 @@ router.get(
 );
 
 // Razorpay Payment Gateway route
-router.post("/razorpay/create", protect, isAgent, createRazorpayOrder);
-router.post("/razorpay/verify", protect, isAgent, verifyRazorpayPayment);
+router.post("/razorpay/create", protect, isAgent, storeOperation(createRazorpayOrder));
+router.post("/razorpay/verify", protect, isAgent, storeOperation(verifyRazorpayPayment));
 
 // Razorpay Inital Payment Route (Agent Access Only)
 router.post(
@@ -135,7 +136,7 @@ router.post(
   "/razorpay/verify-initial-payment",
   protect,
   isAgent,
-  verifyPaymentAndPlaceOrder,
+  storeOperation(verifyPaymentAndPlaceOrder),
 );
 
 router.post(
@@ -144,7 +145,7 @@ router.post(
   isAgent,
   createInitialPaymentQr,
 );
-router.post("/razorpay/create-due-qr", protect, isAgent, createDuePaymentQr);
+router.post("/razorpay/create-due-qr", protect, isAgent, storeOperation(createDuePaymentQr));
 router.get(
   "/razorpay/qr-status/:qrCodeId",
   protect,
@@ -155,9 +156,9 @@ router.post(
   "/razorpay/verify-qr-and-place-order",
   protect,
   isAgent,
-  verifyQrAndPlaceOrder,
+  storeOperation(verifyQrAndPlaceOrder),
 );
-router.post("/razorpay/verify-due-qr", protect, isAgent, verifyDueQrPayment);
+router.post("/razorpay/verify-due-qr", protect, isAgent, storeOperation(verifyDueQrPayment));
 
 // Razorpay / QR payments taken but not applied or refunded automatically
 router.get(

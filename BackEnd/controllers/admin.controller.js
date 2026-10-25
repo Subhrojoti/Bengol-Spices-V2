@@ -13,6 +13,8 @@ import {
 } from "../utils/email.js";
 import { getAdminDashboard } from "../services/dashboard.service.js";
 import { getAttention } from "../services/attention.service.js";
+import { actorOf } from "../services/adminManagement.service.js";
+import { getSalesOverview } from "../services/dashboardSales.service.js";
 
 /* The status change is saved before the email goes out. When the email
    failed, the admin used to get an error for a change that had already
@@ -44,6 +46,9 @@ export const approveAgent = async (req, res) => {
     /* Approved but no password set yet (the email failed, or its link ran
        out): approving again sends a fresh set-password link. */
     const resending = agent.status === "APPROVED";
+    if ((!resending && agent.status !== "PENDING") || (agent.accessStatus || "ACTIVE") !== "ACTIVE") {
+      return res.status(409).json({ success: false, message: "Only a pending application can be approved. Disabled accounts use Reactivate; rejected applicants must reapply." });
+    }
 
     if (resending && agent.password) {
       return res.status(400).json({
@@ -64,7 +69,12 @@ export const approveAgent = async (req, res) => {
       .digest("hex");
     agent.passwordResetExpires = Date.now() + 15 * 60 * 1000;
 
-    await agent.save();
+    const approved = await Agent.findOneAndUpdate(
+      { _id: agent._id, status: resending ? "APPROVED" : "PENDING", $or: [{ applicationVersion: agent.applicationVersion || 1 }, { applicationVersion: { $exists: false } }], accessStatus: { $in: [null, "ACTIVE"] }, ...(resending && { password: { $in: [null, ""] } }) },
+      { $set: { status: "APPROVED", passwordResetToken: agent.passwordResetToken, passwordResetExpires: agent.passwordResetExpires, applicationDecidedAt: new Date(), applicationDecidedBy: actorOf(req.user) } },
+      { new: true },
+    );
+    if (!approved) return res.status(409).json({ success: false, message: "The application changed. Refresh and review it again." });
 
     const emailSent = await trySendEmail("AGENT APPROVAL", () =>
       sendAgentApprovalMail({
@@ -130,10 +140,10 @@ export const rejectAgent = async (req, res) => {
       });
     }
 
-    if (agent.status === "REJECTED") {
+    if (agent.status !== "PENDING") {
       return res.status(400).json({
         success: false,
-        message: "Agent already rejected",
+        message: "Only pending applications can be rejected. Use account access actions for existing agents.",
       });
     }
 
@@ -141,7 +151,12 @@ export const rejectAgent = async (req, res) => {
     agent.passwordResetToken = undefined;
     agent.passwordResetExpires = undefined;
 
-    await agent.save();
+    const rejected = await Agent.findOneAndUpdate(
+      { _id: agent._id, status: "PENDING", $or: [{ applicationVersion: agent.applicationVersion || 1 }, { applicationVersion: { $exists: false } }] },
+      { $set: { status: "REJECTED", rejectionReason: (typeof req.body.reason === "string" && req.body.reason.trim().slice(0, 500)) || "Application rejected by the office", applicationDecidedAt: new Date(), applicationDecidedBy: actorOf(req.user) }, $unset: { passwordResetToken: "", passwordResetExpires: "" } },
+      { new: true },
+    );
+    if (!rejected) return res.status(409).json({ success: false, message: "The application changed. Refresh and review it again." });
 
     // 📧 SEND REJECTION EMAIL
     const emailSent = await trySendEmail("AGENT REJECTION", () =>
@@ -185,7 +200,9 @@ export const getDashboardSummary = async (req, res) => {
       });
     }
 
-    const data = await getAdminDashboard({ year });
+    const [data, salesOverview] = await Promise.all([getAdminDashboard({ year }), getSalesOverview()]);
+    data.salesOverview = salesOverview;
+    res.setHeader("Cache-Control", "no-store");
 
     res.json({
       success: true,

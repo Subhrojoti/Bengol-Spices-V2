@@ -34,6 +34,7 @@ import {
 import { checkAtStore, formatDistance, readLocation } from "../utils/geo.js";
 import mongoose from "mongoose";
 import GatewayPayment from "../models/GatewayPayment.js";
+import { findManagedStore, historyConsumerIds, mayReadStoreHistory, managesStore } from "../services/storeAccess.service.js";
 import {
   announceCashToVerify,
   applyDuePayment,
@@ -136,6 +137,19 @@ const alreadyPlacedAnswer = (order) => ({
   // Only cash orders are placed this way, and cash waits for the office
   paymentVerification: "PENDING",
 });
+
+// A completed gateway request must respect today's assignment on every replay.
+const replyToGateway = async (req, res, record) => {
+  if (record?.orderId) {
+    const order = await Order.findOne({ orderId: record.orderId }).select("consumerId").lean();
+    if (!order || !(await mayReadStoreHistory(order.consumerId, req.user.agentId))) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+  } else if (record?.agentId && record.agentId !== req.user.agentId) {
+    return res.status(404).json({ success: false, message: "Payment not found" });
+  }
+  return respondToClaimedGatewayPayment(res, record);
+};
 
 // Signature check that takes the same time whether or not it matches
 const signatureMatches = (razorpayOrderId, razorpayPaymentId, signature) => {
@@ -317,20 +331,20 @@ export const placeOrder = async (req, res) => {
         agentId,
         clientRequestId: requestId,
       })
-        .select("orderId")
+        .select("orderId consumerId")
         .lean();
 
-      if (already) return res.status(201).json(alreadyPlacedAnswer(already));
+      if (already) {
+        if (!(await mayReadStoreHistory(already.consumerId, agentId))) return res.status(404).json({ success: false, message: "Order not found" });
+        return res.status(201).json(alreadyPlacedAnswer(already));
+      }
     }
 
     /* =============================
        STORE VALIDATION + OWNERSHIP
        ============================= */
 
-    const store = await Store.findOne({
-      consumerId,
-      registeredBy: agentId,
-    });
+    const store = await findManagedStore(consumerId, agentId);
 
     if (!store) {
       return res.status(403).json({
@@ -820,11 +834,13 @@ export const getOrdersByStoreConsumerId = async (req, res) => {
     }
 
     // 🔐 AGENT ACCESS CONTROL
-    // Agent can only see orders of stores created by himself
+    // Store history follows current management; original order attribution stays intact.
     if (user.role === "AGENT") {
+      if (!(await mayReadStoreHistory(consumerId, user.agentId))) {
+        return res.status(404).json({ success: false, message: "Store not found" });
+      }
       const orders = await Order.find({
         consumerId,
-        agentId: user.agentId, // IMPORTANT
       })
         .sort({ createdAt: -1 })
         .lean();
@@ -891,7 +907,7 @@ export const getMyOrder = async (req, res) => {
       });
     }
 
-    const order = await Order.findOne({ orderId: String(orderId), agentId }).lean();
+    const order = await Order.findOne({ orderId: String(orderId), consumerId: { $in: await historyConsumerIds(agentId) } }).lean();
 
     if (!order) {
       return res.status(404).json({
@@ -925,7 +941,7 @@ export const getMyOrders = async (req, res) => {
       });
     }
 
-    const orders = await Order.find({ agentId }).sort({ createdAt: -1 }).lean();
+    const orders = await Order.find({ consumerId: { $in: await historyConsumerIds(agentId) } }).sort({ createdAt: -1 }).lean();
 
     return res.json({
       success: true,
@@ -1818,7 +1834,7 @@ export const getAgentDueOrders = async (req, res) => {
     const agentId = req.user.agentId;
 
     const orders = await Order.find({
-      agentId,
+      consumerId: { $in: await historyConsumerIds(agentId) },
       dueAmount: { $gt: 0 },
       status: { $ne: "CANCELLED" },
     })
@@ -2105,7 +2121,7 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.agentId !== req.user.agentId) {
+    if (!(await managesStore(order.consumerId, req.user.agentId))) {
       return res.status(403).json({
         message: "You are not allowed to collect payment for this order",
       });
@@ -2212,7 +2228,7 @@ export const verifyRazorpayPayment = async (req, res) => {
       razorpayPaymentIds: [razorpay_payment_id],
     });
 
-    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    if (!began.ok) return replyToGateway(req, res, began.record);
     claim = began.record;
 
     // Recorded before payments were claimed like this
@@ -2225,7 +2241,7 @@ export const verifyRazorpayPayment = async (req, res) => {
         status: "APPLIED",
         orderId: existing.orderId,
       });
-      return respondToClaimedGatewayPayment(res, {
+      return replyToGateway(req, res, {
         status: "APPLIED",
         orderId: existing.orderId,
       });
@@ -2374,7 +2390,7 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
       razorpayPaymentIds: [razorpay_payment_id],
     });
 
-    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    if (!began.ok) return replyToGateway(req, res, began.record);
     claim = began.record;
 
     // Recorded before payments were claimed like this, or by an attempt
@@ -2388,7 +2404,7 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
         status: "APPLIED",
         orderId: existing.orderId,
       });
-      return respondToClaimedGatewayPayment(res, {
+      return replyToGateway(req, res, {
         status: "APPLIED",
         orderId: existing.orderId,
       });
@@ -2539,7 +2555,7 @@ export const createDuePaymentQr = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Order not found" });
     }
-    if (order.agentId !== req.user.agentId) {
+    if (!(await managesStore(order.consumerId, req.user.agentId))) {
       return res.status(403).json({
         success: false,
         message: "You are not allowed to collect payment for this order",
@@ -2600,6 +2616,16 @@ export const checkQrPaymentStatus = async (req, res) => {
     }
 
     const qrCode = await razorpayInstance.qrCode.fetch(qrCodeId);
+
+    if (qrCode.notes?.agentId !== req.user.agentId) {
+      return res.status(404).json({ success: false, message: "QR code not found" });
+    }
+    if (qrCode.notes?.orderId) {
+      const associated = await Order.findOne({ orderId: qrCode.notes.orderId }).select("consumerId").lean();
+      if (!associated || !(await managesStore(associated.consumerId, req.user.agentId))) {
+        return res.status(404).json({ success: false, message: "QR code not found" });
+      }
+    }
 
     const paid =
       qrCode.status === "closed" &&
@@ -2700,7 +2726,7 @@ export const verifyQrAndPlaceOrder = async (req, res) => {
       razorpayPaymentIds: paymentIds,
     });
 
-    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    if (!began.ok) return replyToGateway(req, res, began.record);
     claim = began.record;
 
     // Used before QR codes were claimed like this
@@ -2710,7 +2736,7 @@ export const verifyQrAndPlaceOrder = async (req, res) => {
         status: "APPLIED",
         orderId: alreadyUsed.orderId,
       });
-      return respondToClaimedGatewayPayment(res, {
+      return replyToGateway(req, res, {
         status: "APPLIED",
         orderId: alreadyUsed.orderId,
       });
@@ -2785,7 +2811,7 @@ export const verifyDueQrPayment = async (req, res) => {
     }
 
     const order = await Order.findOne({ orderId })
-      .select("orderId agentId")
+      .select("orderId agentId consumerId")
       .lean();
 
     if (!order) {
@@ -2794,7 +2820,7 @@ export const verifyDueQrPayment = async (req, res) => {
         .json({ success: false, message: "Order not found" });
     }
 
-    if (order.agentId !== req.user.agentId) {
+    if (!(await managesStore(order.consumerId, req.user.agentId))) {
       return res.status(403).json({
         success: false,
         message: "You are not allowed to collect payment for this order",
@@ -2844,7 +2870,7 @@ export const verifyDueQrPayment = async (req, res) => {
       razorpayPaymentIds: paymentIds,
     });
 
-    if (!began.ok) return respondToClaimedGatewayPayment(res, began.record);
+    if (!began.ok) return replyToGateway(req, res, began.record);
     claim = began.record;
 
     // Recorded before QR codes were claimed like this
@@ -2854,7 +2880,7 @@ export const verifyDueQrPayment = async (req, res) => {
         status: "APPLIED",
         orderId: alreadyUsed.orderId,
       });
-      return respondToClaimedGatewayPayment(res, {
+      return replyToGateway(req, res, {
         status: "APPLIED",
         orderId: alreadyUsed.orderId,
       });

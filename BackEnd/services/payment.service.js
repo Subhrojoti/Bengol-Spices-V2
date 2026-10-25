@@ -8,6 +8,7 @@ import { updateInvoiceAfterPayment } from "./invoice.service.js";
 import { updateTargetProgress } from "./target.service.js";
 import { syncAfterSale } from "./salesTarget.service.js";
 import { publish } from "./liveEvents.js";
+import { managesStore } from "./storeAccess.service.js";
 import {
   needsVerification,
   pendingVerification,
@@ -37,12 +38,12 @@ export const announceCashToVerify = (payment) =>
 
 const LOCK_MS = 2 * 60 * 1000;
 
-const acquireLock = async (key) => {
+const acquireLock = async (key, leaseMs = LOCK_MS) => {
   // The unique index is what makes the lock work; make sure it exists
   await OperationLock.init();
 
   const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + LOCK_MS);
+  const expiresAt = new Date(Date.now() + leaseMs);
 
   try {
     await OperationLock.create({ key, token, expiresAt });
@@ -66,8 +67,8 @@ const acquireLock = async (key) => {
  * @returns {Promise<{busy: true} | {busy: false, value: any}>} busy when
  *   another request holds the lock right now
  */
-export const withLock = async (key, fn) => {
-  const token = await acquireLock(key);
+export const withLock = async (key, fn, { leaseMs = LOCK_MS } = {}) => {
+  const token = await acquireLock(key, leaseMs);
   if (!token) return { busy: true };
 
   try {
@@ -116,7 +117,7 @@ export const applyDuePayment = async ({
 
     if (!order) return refuse(404, "Order not found");
 
-    if (order.agentId !== agentId) {
+    if (!(await managesStore(order.consumerId, agentId))) {
       return refuse(403, "You are not allowed to collect payment for this order");
     }
 

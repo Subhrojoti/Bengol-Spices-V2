@@ -20,6 +20,7 @@ import ConfirmDialog from "../../../../../components/common/ConfirmDialog";
 import Pagination from "../../../../../components/common/Pagination";
 import usePagination from "../../../../../hooks/usePagination";
 import { agentList, approveAgent, rejectAgent } from "../../../../../api/services";
+import AgentAdministration from "../AgentAdministration";
 
 const STATUS = {
   APPROVED: { label: "Approved", pill: "bg-emerald-50 text-emerald-700 ring-emerald-600/20" },
@@ -141,6 +142,9 @@ export default function AgentManagement() {
   /* Pending confirmation: { agent, action: "approve" | "reject" } */
   const [pendingAction, setPendingAction] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [administration, setAdministration] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const isAdminPanel = window.location.pathname.startsWith("/admin");
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -199,7 +203,7 @@ export default function AgentManagement() {
 
       const response = approving
         ? await approveAgent(agent.agentId)
-        : await rejectAgent(agent.agentId);
+        : await rejectAgent(agent.agentId, rejectionReason);
 
       setAgents((prev) =>
         prev.map((a) =>
@@ -224,6 +228,7 @@ export default function AgentManagement() {
         );
       }
       setPendingAction(null);
+      setRejectionReason("");
     } catch (error) {
       console.error(error);
       toast.error(
@@ -259,6 +264,7 @@ export default function AgentManagement() {
     <>
       {/* ===== TOOLBAR ===== */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
+        {isAdminPanel && <button className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" onClick={() => setAdministration({})}>Manage agents &amp; stores</button>}
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => {
             const selected = statusFilter === f.key;
@@ -384,10 +390,13 @@ export default function AgentManagement() {
 
                         <td className="px-5 py-3.5">
                           <StatusPill status={agent.status} />
+                          {agent.accessStatus && agent.accessStatus !== "ACTIVE" && <p className="mt-1 text-xs font-semibold text-rose-600">{agent.accessStatus}</p>}
+                          {(agent.applicationVersion || 1) > 1 && <p className="mt-1 text-xs text-slate-500">Application #{agent.applicationVersion}</p>}
                         </td>
 
                         <td className="px-5 py-3.5">
                           <div className="flex items-center justify-end gap-2">
+                            {isAdminPanel && <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700" onClick={() => setAdministration(agent)}>Manage</button>}
                             {agent.status === "PENDING" && (
                               <>
                                 <button
@@ -550,6 +559,7 @@ export default function AgentManagement() {
       </div>
 
       {/* ===== CONFIRMATION ===== */}
+      {administration && <AgentAdministration agents={agents} agent={administration} onClose={() => setAdministration(null)} onChanged={() => load(true)} />}
       <ConfirmDialog
         open={Boolean(pendingAction)}
         busy={busy}
@@ -579,7 +589,7 @@ export default function AgentManagement() {
         }
         detail={
           pendingAction && (
-            <div className="flex items-center gap-3">
+            <div className="space-y-3"><div className="flex items-center gap-3">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[13px] font-bold text-slate-600 ring-1 ring-slate-200">
                 {initialsOf(pendingAction.agent.name)}
               </span>
@@ -591,7 +601,7 @@ export default function AgentManagement() {
                   {pendingAction.agent.agentId} · {pendingAction.agent.email}
                 </p>
               </div>
-            </div>
+            </div>{pendingAction.action === "reject" && <label className="block text-sm text-slate-700">Rejection reason (kept with this application)<textarea className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2" maxLength={500} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} /></label>}</div>
           )
         }
         confirmLabel={

@@ -6,6 +6,7 @@ import { createNotification } from "./notification.service.js";
 import { updateTargetProgress } from "./target.service.js";
 import { syncAfterVerification } from "./salesTarget.service.js";
 import { publish } from "./liveEvents.js";
+import { historyConsumerIds } from "./storeAccess.service.js";
 import { dateKeyOf, dayRange, isDateKey, monthKeyOf, monthRange } from "../utils/salesTarget.js";
 
 /* A sales target counts money collected on an order placed in the same
@@ -272,6 +273,8 @@ const tell = (agentId, title, message, meta) =>
        reason to report it as failed. createNotification has logged it. */
   });
 
+const collectorOf = (payment) => payment.collectedBy?.role === "AGENT" && payment.collectedBy.id ? payment.collectedBy.id : payment.agentId;
+
 const announce = (payment) =>
   publish(
     "CASH_VERIFICATION",
@@ -392,10 +395,12 @@ export const approveCashPayment = async ({ paymentId, note, actor, now = new Dat
 
   await syncAfterVerification(payment.agentId, payment.createdAt, now);
 
-  tell(
-    payment.agentId,
+  await tell(
+    collectorOf(payment),
     "✅ Cash payment verified",
-    isOwnMonth(payment, order)
+    collectorOf(payment) !== payment.agentId
+      ? `${inr(payment.amount)} you collected for order ${payment.orderId} has been verified. Historical sales attribution remains with the original order agent.`
+      : isOwnMonth(payment, order)
       ? `${inr(payment.amount)} you collected for order ${payment.orderId} on ${day(payment.createdAt)} has been verified and now counts toward your sales.`
       : `${inr(payment.amount)} you collected for order ${payment.orderId} on ${day(payment.createdAt)} has been verified. It was a due from an earlier month, so it does not count toward a sales target.`,
     { kind: "CASH_VERIFICATION", status: APPROVED, orderId: payment.orderId, paymentId: String(payment._id) },
@@ -435,8 +440,8 @@ export const rejectCashPayment = async ({ paymentId, reason, actor, now = new Da
 
   if (!payment) return whyNot(paymentId, "REJECT");
 
-  tell(
-    payment.agentId,
+  await tell(
+    collectorOf(payment),
     "Cash payment not verified",
     `${inr(payment.amount)} you recorded for order ${payment.orderId} on ${day(payment.createdAt)} was not verified: ${why} It does not count toward your sales until this is settled with the office.`,
     { kind: "CASH_VERIFICATION", status: REJECTED, orderId: payment.orderId, paymentId: String(payment._id) },
@@ -549,7 +554,7 @@ export const cashPaymentsOfAgent = async (agentId, { status } = {}) => {
     ? String(status).toUpperCase()
     : null;
 
-  const base = { agentId, "verification.status": { $in: VERIFICATION_STATUSES } };
+  const base = { consumerId: { $in: await historyConsumerIds(agentId) }, "verification.status": { $in: VERIFICATION_STATUSES } };
 
   const [payments, totals] = await Promise.all([
     Payment.find(wanted ? { ...base, "verification.status": wanted } : base)

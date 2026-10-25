@@ -11,6 +11,7 @@ import mongoose from "mongoose";
 import { TIER_FIELDS } from "../utils/pricing.js";
 import { PERSON_FIELD_LIMITS, checkTextFields } from "../utils/formFields.js";
 import { publicMessage } from "../utils/publicError.js";
+import { reapplyRejectedAgent } from "../services/agentApplication.service.js";
 
 /* Checks the location prices sent with a territory. A blank or zero tier
    means "use the default"; a product with every tier blank is dropped.
@@ -198,18 +199,22 @@ export const applyAgent = async (req, res) => {
     // 🔥 FIX: trim before checking. findOne() doesn't apply the schema's
     // trim to the query, so " test@x.com" wouldn't match a stored
     // "test@x.com" and a duplicate could slip past this check.
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedPhone = phone.trim();
 
     // 🔥 FIX: this used to only check email. Agent.phone had no
     // uniqueness check at all (now fixed at the schema level too), so the
     // same real phone number could be used across multiple agent
     // applications with nothing to stop it.
-    const existingAgent = await Agent.findOne({
+    const identityMatches = await Agent.find({
       $or: [{ email: trimmedEmail }, { phone: trimmedPhone }],
-    }).lean();
+    }).collation({ locale: "en", strength: 2 }).limit(2).lean();
+    const existingAgent = identityMatches[0];
+    const canReapply = identityMatches.length === 1 && existingAgent.status === "REJECTED" &&
+      (existingAgent.accessStatus || "ACTIVE") === "ACTIVE" &&
+      existingAgent.email.trim().toLowerCase() === trimmedEmail && existingAgent.phone === trimmedPhone;
 
-    if (existingAgent) {
+    if (existingAgent && !canReapply) {
       await cleanupCloudinaryFiles(uploadedFiles);
 
       const conflictField =
@@ -288,9 +293,16 @@ export const applyAgent = async (req, res) => {
     const currentYear = new Date().getFullYear();
 
     let agent;
+    if (canReapply) {
+      agent = await reapplyRejectedAgent(existingAgent, agentData);
+      if (!agent) {
+        await cleanupCloudinaryFiles(uploadedFiles);
+        return res.status(409).json({ success: false, message: "An application is already pending or the account has changed. Please contact the office." });
+      }
+    }
     let retries = 5;
 
-    while (retries > 0) {
+    while (!agent && retries > 0) {
       try {
         const counter = await Counter.findByIdAndUpdate(
           `agent-${currentYear}`,

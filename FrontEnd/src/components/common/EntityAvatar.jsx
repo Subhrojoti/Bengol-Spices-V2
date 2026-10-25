@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Store } from "lucide-react";
 
 /**
@@ -43,31 +43,28 @@ const initialsOf = (name) =>
     .join("")
     .toUpperCase();
 
-const EntityAvatar = ({
+const AvatarContent = ({
   src,
+  fallbackSrc,
   name,
   fallback,
   className = "h-12 w-12 rounded-xl",
   imgClassName = "object-cover",
   bordered = true,
 }) => {
-  const [failed, setFailed] = useState(false);
-
-  /* A new src deserves a fresh attempt — otherwise one broken URL would keep
-     the fallback showing after the element is reused for another entity. */
-  useEffect(() => {
-    setFailed(false);
-  }, [src]);
+  const [failed, setFailed] = useState(0);
 
   const border = bordered ? "border border-slate-200" : "";
 
-  if (src && !failed) {
+  const imageSrc = failed === 1 ? fallbackSrc : src;
+  if (imageSrc && failed < 2) {
     return (
       <img
-        src={src}
+        src={imageSrc}
         alt=""
         loading="lazy"
-        onError={() => setFailed(true)}
+        decoding="async"
+        onError={() => setFailed(failed === 0 && fallbackSrc && fallbackSrc !== src ? 1 : 2)}
         className={`shrink-0 ${border} ${imgClassName} ${className}`}
       />
     );
@@ -88,4 +85,8 @@ const EntityAvatar = ({
   );
 };
 
-export default EntityAvatar;
+// A new URL resets the image attempt before painting, without an effect that
+// schedules another render for every photo entering the list.
+export default function EntityAvatar(props) {
+  return <AvatarContent key={JSON.stringify([props.src, props.fallbackSrc])} {...props} />;
+}

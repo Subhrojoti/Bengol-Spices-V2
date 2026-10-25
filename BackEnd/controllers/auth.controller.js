@@ -6,6 +6,7 @@ import Employee from "../models/Employee.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import { sendPasswordResetMail } from "../utils/email.js";
 import { frontendBaseUrl } from "../utils/frontendUrl.js";
+import { agentMaySignIn } from "../utils/agentAccess.js";
 
 // Generate link for the Password
 
@@ -97,10 +98,10 @@ export const agentLogin = async (req, res) => {
       });
     }
 
-    if (agent.status !== "APPROVED") {
+    if (!agentMaySignIn(agent)) {
       return res.status(403).json({
         success: false,
-        message: "Agent not approved yet",
+        message: "Agent access is not active. Please contact the office.",
       });
     }
 
@@ -127,6 +128,7 @@ export const agentLogin = async (req, res) => {
       {
         id: agent._id, // MongoDB _id (internal use)
         agentId: agent.agentId, // BS2026-001 (business use)
+        sessionVersion: agent.sessionVersion || 0,
         role: agent.role, // AGENT / ADMIN
       },
       process.env.JWT_SECRET,
@@ -245,7 +247,7 @@ export const changePassword = async (req, res) => {
     );
 
     const token = jwt.sign(
-      { id: agent._id, agentId: agent.agentId, role: agent.role },
+      { id: agent._id, agentId: agent.agentId, role: agent.role, sessionVersion: agent.sessionVersion || 0 },
       process.env.JWT_SECRET,
       { expiresIn: "30d" },
     );

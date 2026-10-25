@@ -1,5 +1,4 @@
 import PDFDocument from "pdfkit";
-import axios from "axios";
 import fs from "fs";
 import { fileURLToPath } from "url";
 
@@ -26,8 +25,8 @@ const SELLER = {
   email: "support@bengolspices.com",
 };
 
-const LOGO_URL =
-  "https://res.cloudinary.com/dn8rh6hng/image/upload/v1776851019/a_r4twsz.png";
+// Included in backend deploys; independent of working directory, HTTP and static hosting.
+const LOGO_FILE = fileURLToPath(new URL("../assets/invoice-logo.png", import.meta.url));
 
 /* Helvetica has no ₹, so the symbol comes from a one-glyph subset of
    Arimo Bold (SIL Open Font License, licence beside the file). */
@@ -493,7 +492,8 @@ const layoutRows = (doc, items) =>
 const drawHeader = (doc, data, header, logo, pageNumber) => {
   const hb = header.bottom;
 
-  put(doc, "Tax Invoice", 266.4, 31, { font: F.b, size: 12, align: "center" });
+  put(doc, "Ordered Confirm Invoice", 266.4, 20, { font: F.b, size: 12, align: "center" });
+  put(doc, "Tax Invoice", 266.4, 31, { size: 7, align: "center" });
   if (pageNumber > 1) {
     put(doc, `Page ${pageNumber}`, 501, 31, {
       font: F.i,
@@ -508,17 +508,11 @@ const drawHeader = (doc, data, header, logo, pageNumber) => {
   vline(doc, BOX_MID, 34, hb - 1);
 
   /* ── Seller ── */
-  if (logo) {
-    try {
-      doc.image(logo, 37, 34, {
-        fit: [68, 45],
-        align: "center",
-        valign: "center",
-      });
-    } catch {
-      // An unreadable logo should never stop the invoice
-    }
-  }
+  doc.image(logo, 39, 40, {
+    fit: [64, header.sellerBottom - 45],
+    align: "center",
+    valign: "center",
+  });
 
   header.seller.forEach((line) =>
     put(doc, line.text, 107, line.y, { font: line.font, scale: line.scale }),
@@ -975,16 +969,9 @@ let logoCache = null;
 
 const loadLogo = async () => {
   if (logoCache) return logoCache;
-  try {
-    const res = await axios.get(LOGO_URL, {
-      responseType: "arraybuffer",
-      timeout: 10000,
-    });
-    logoCache = Buffer.from(res.data);
-    return logoCache;
-  } catch {
-    return null;
-  }
+  // Fail visibly if a deploy omitted the required asset, rather than issue a logo-less file.
+  logoCache = fs.readFileSync(LOGO_FILE);
+  return logoCache;
 };
 
 export const generateInvoicePDFBuffer = async (invoice, order = null) => {
@@ -997,8 +984,10 @@ export const generateInvoicePDFBuffer = async (invoice, order = null) => {
       const doc = new PDFDocument({
         size: "A4",
         margin: 0,
-        info: { Title: `Tax Invoice ${data.invoiceNumber}` },
+        info: { Title: `Ordered Confirm Invoice - Tax Invoice ${data.invoiceNumber}` },
       });
+      // Reuse one embedded image across pages rather than embedding the PNG repeatedly.
+      const logoImage = doc.openImage(logo);
       const buffers = [];
       doc.on("data", (b) => buffers.push(b));
       doc.on("end", () => resolve(Buffer.concat(buffers)));
@@ -1024,7 +1013,7 @@ export const generateInvoicePDFBuffer = async (invoice, order = null) => {
         if (i > 0) doc.addPage({ size: "A4", margin: 0 });
         const isLast = i === plan.pages.length - 1;
 
-        const hb = drawHeader(doc, data, header, logo, i + 1);
+        const hb = drawHeader(doc, data, header, logoImage, i + 1);
         drawItemsHeader(doc, hb);
 
         const lastBaseline = pageRows.length

@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import Agent from "../models/Agent.js";
 import Employee from "../models/Employee.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
+import { agentSessionMatches } from "../utils/agentAccess.js";
 
 /* A token only proves who someone WAS when they logged in. For every role
    with an account record, the record is checked on each request, so:
@@ -16,7 +17,7 @@ const ACCOUNTS = {
   AGENT: {
     model: Agent,
     activeStatus: "APPROVED",
-    fields: "status passwordChangedAt",
+    fields: "status passwordChangedAt accessStatus sessionVersion",
   },
   EMPLOYEE: {
     model: Employee,
@@ -88,6 +89,9 @@ export const protect = async (req, res, next) => {
 
     if (record.status !== account.activeStatus) {
       return unauthorized(res, "Your account is no longer active.");
+    }
+    if (decoded.role === "AGENT" && !agentSessionMatches(record, decoded)) {
+      return unauthorized(res, "Your access has changed. Please contact the office or sign in again.");
     }
 
     // A second of slack for a login made in the same instant as the reset

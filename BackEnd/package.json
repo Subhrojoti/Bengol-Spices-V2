@@ -4,6 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "backup": "node scripts/backup-db.js"
@@ -31,6 +32,9 @@
     "yup": "^1.7.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@napi-rs/canvas": "^1.0.13",
+    "mongodb-memory-server": "^11.3.0",
+    "nodemon": "^3.1.14",
+    "pdfjs-dist": "^6.4.299"
   }
 }

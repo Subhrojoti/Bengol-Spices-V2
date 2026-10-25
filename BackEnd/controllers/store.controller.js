@@ -5,6 +5,7 @@ import AgentTargetProgress from "../models/AgentTargetProgress.js";
 import AgentSalesLocation from "../models/AgentSalesLocation.js";
 import Counter from "../models/Counter.js";
 import Product from "../models/Product.js";
+import { findManagedStore, managedStoreFilter } from "../services/storeAccess.service.js";
 import { updateTargetProgress } from "../services/target.service.js";
 import { publicMessage } from "../utils/publicError.js";
 import {
@@ -31,10 +32,7 @@ export const getStoreCatalog = async (req, res) => {
   try {
     const { consumerId } = req.params;
 
-    const store = await Store.findOne({
-      consumerId,
-      registeredBy: req.user.agentId,
-    })
+    const store = await findManagedStore(consumerId, req.user.agentId)
       .select("consumerId storeName storeType address.state")
       .lean();
 
@@ -273,6 +271,7 @@ export const createStore = async (req, res) => {
       },
       storeType: cleanStoreType,
       registeredBy: req.user.agentId,
+      currentAgentId: req.user.agentId,
       image: {
         url: req.file.path,
         publicId: req.file.filename,
@@ -326,7 +325,7 @@ export const getMyStores = async (req, res) => {
       });
     }
 
-    const stores = await Store.find({ registeredBy: agentId }).sort({
+    const stores = await Store.find(managedStoreFilter(agentId)).sort({
       createdAt: -1,
     });
 
@@ -356,7 +355,7 @@ export const getAllStores = async (req, res) => {
   try {
     const stores = await Store.find()
       .select(
-        "consumerId storeName ownerName phone address storeType image status registeredBy createdAt",
+        "consumerId storeName ownerName phone address storeType image status registeredBy currentAgentId createdAt",
       )
       .sort({ createdAt: -1 })
       .lean();

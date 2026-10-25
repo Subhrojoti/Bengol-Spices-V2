@@ -7,7 +7,6 @@ import {
   Ban,
   CheckCircle2,
   ChevronDown,
-  Download,
   FileText,
   IndianRupee,
   Inbox,
@@ -15,13 +14,10 @@ import {
   MapPin,
   PackageCheck,
   RefreshCcw,
-  Search,
-  Store,
   Truck,
-  UserRound,
 } from "lucide-react";
 import StatusPill from "../../../../components/common/StatusPill";
-import EntityAvatar from "../../../../components/common/EntityAvatar";
+import OrderStoreSidebar from "./OrderStoreSidebar";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
 import Pagination from "../../../../components/common/Pagination";
 import usePagination from "../../../../hooks/usePagination";
@@ -182,10 +178,11 @@ const Empty = ({ icon, title, hint }) => (
 
 const CancelDialog = ({ order, open, busy, onClose, onConfirm }) => {
   const [reason, setReason] = useState("");
-
-  useEffect(() => {
-    if (open) setReason("");
-  }, [open]);
+  const [reasonFor, setReasonFor] = useState(order?.orderId);
+  if (reasonFor !== order?.orderId) {
+    setReasonFor(order?.orderId);
+    setReason("");
+  }
 
   const tooShort = reason.trim().length < 5;
 
@@ -277,7 +274,6 @@ export default function OrderManagement() {
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [expandedHistory, setExpandedHistory] = useState(null);
 
-  const [storeSearch, setStoreSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
   const [confirmTarget, setConfirmTarget] = useState(null);
@@ -376,19 +372,6 @@ export default function OrderManagement() {
     return Object.values(grouped).sort((a, b) => b.orders.length - a.orders.length);
   }, [orders, storeById]);
 
-  const visibleStores = useMemo(() => {
-    const term = storeSearch.trim().toLowerCase();
-    if (!term) return stores;
-
-    return stores.filter(
-      (s) =>
-        [s.consumerId, s.name, s.owner, s.phone, s.agentId, s.state, s.city]
-          .filter(Boolean)
-          .some((f) => String(f).toLowerCase().includes(term)) ||
-        s.orders.some((o) => String(o.orderId).toLowerCase().includes(term)),
-    );
-  }, [stores, storeSearch]);
-
   const activeStore = useMemo(
     () => stores.find((s) => s.consumerId === selectedStore) || null,
     [stores, selectedStore],
@@ -408,11 +391,9 @@ export default function OrderManagement() {
     return activeStore.orders.filter((o) => o.status === statusFilter);
   }, [activeStore, statusFilter]);
 
-  const [storePager, storePagerTop] = usePagination(visibleStores, { resetKey: storeSearch });
   const [orderPager, orderPagerTop] = usePagination(visibleOrders, {
     resetKey: `${selectedStore}|${statusFilter}`,
   });
-  const { showItem: showStore } = storePager;
   const { showItem: showOrder, page: orderPage } = orderPager;
 
   const stats = useMemo(
@@ -445,19 +426,23 @@ export default function OrderManagement() {
     setScrollTo(order._id);
   }, []);
 
+  const selectStore = useCallback((consumerId) => {
+    setSelectedStore((current) => current === consumerId ? null : consumerId);
+    setExpandedOrder(null);
+    setStatusFilter("ALL");
+  }, []);
+
   useEffect(() => {
     if (!scrollTo) return;
 
-    /* The order may be on a later page of its store's orders, and the store
-       on a later page of the store list: turn to both before looking for it */
+    // The sidebar independently reveals the store; turn to the order's page.
     showOrder((o) => o._id === scrollTo);
-    showStore((s) => s.consumerId === selectedStore);
 
     const element = document.getElementById(`order-${scrollTo}`);
     if (!element) return; // not drawn yet; this runs again when it is
     element.scrollIntoView({ behavior: "smooth", block: "center" });
     setScrollTo(null);
-  }, [scrollTo, visibleOrders, expandedOrder, orderPage, selectedStore, showOrder, showStore]);
+  }, [scrollTo, visibleOrders, expandedOrder, orderPage, showOrder]);
 
   /* Arriving with ?order=… opens that order. A brand-new order may not be
      in the list yet (the notice can be clicked before the list has
@@ -490,10 +475,10 @@ export default function OrderManagement() {
     );
   }, [wanted, status, refreshing, orders, focusOrder, load, setParams]);
 
-  const exportOrders = () => {
+  const exportOrders = useCallback(() => {
     const count = downloadCsv(`bengol-orders-${fileDate()}.csv`, ORDER_COLUMNS, orders);
     toast.success(`${count} order${count === 1 ? "" : "s"} exported`);
-  };
+  }, [orders]);
 
   const applyStatus = (orderId, next) =>
     setOrders((prev) =>
@@ -695,156 +680,17 @@ export default function OrderManagement() {
       )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* ===== STORES ===== */}
-        {/* Kept in view beside a long order list, and only as tall as its own
-            content: it used to stretch to the orders column while the list
-            inside stayed capped, cutting off the last store above a blank area */}
-        <Card className="overflow-hidden lg:sticky lg:top-4 lg:col-span-4 lg:self-start">
-          <div className="border-b border-slate-100 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-[16px] font-semibold leading-tight text-slate-800">
-                  Stores
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  {visibleStores.length} with orders
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {/* Every order, one per row, for a spreadsheet */}
-                <button
-                  onClick={exportOrders}
-                  disabled={orders.length === 0}
-                  title="Export all orders as a spreadsheet (CSV)"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
-                  <Download size={13} />
-                  Export
-                </button>
-                <button
-                  onClick={() => load(true)}
-                  disabled={refreshing}
-                  title="Refresh"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
-                  <RefreshCcw size={13} className={refreshing ? "animate-spin" : ""} />
-                </button>
-              </div>
-            </div>
-
-            <div className="relative">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                value={storeSearch}
-                onChange={(e) => setStoreSearch(e.target.value)}
-                placeholder="Search store, agent or order"
-                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[14px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-          </div>
-
-          {status === "loading" ? (
-            <ListSkeleton />
-          ) : visibleStores.length === 0 ? (
-            <Empty
-              icon={<Store size={26} />}
-              title={stores.length === 0 ? "No orders yet" : "No stores match"}
-              hint={
-                stores.length === 0
-                  ? "Orders placed by agents will appear here."
-                  : "Try a different store, agent or order id."
-              }
-            />
-          ) : (
-            <>
-            <div
-              ref={storePagerTop}
-              className="scroll-mt-24 max-h-[30rem] space-y-2.5 overflow-y-auto p-4 lg:max-h-[calc(100vh-14rem)]">
-              {storePager.pageItems.map((store) => {
-                const active = store.consumerId === selectedStore;
-
-                return (
-                  <button
-                    key={store.consumerId}
-                    onClick={() => {
-                      setSelectedStore(active ? null : store.consumerId);
-                      setExpandedOrder(null);
-                      setStatusFilter("ALL");
-                    }}
-                    className={`w-full rounded-xl border p-3.5 text-left transition ${
-                      active
-                        ? "border-blue-400 bg-blue-50/60 ring-2 ring-blue-100"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70"
-                    }`}>
-                    <div className="flex items-start gap-3">
-                      <EntityAvatar src={store.image} name={store.name} />
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-[15px] font-semibold text-slate-900">
-                            {store.name}
-                          </p>
-                          {store.storeType && (
-                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                              {store.storeType.slice(0, 4)}
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="font-mono text-[12.5px] tabular-nums text-slate-500">
-                          {store.consumerId}
-                        </p>
-
-                        {store.owner && (
-                          <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-slate-600">
-                            <UserRound size={12} className="shrink-0 text-slate-400" />
-                            <span className="truncate">{store.owner}</span>
-                            {store.phone && (
-                              <span className="tabular-nums text-slate-400">
-                                · {store.phone}
-                              </span>
-                            )}
-                          </p>
-                        )}
-
-                        <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-slate-500">
-                          <MapPin size={12} className="shrink-0 text-slate-400" />
-                          <span className="truncate">
-                            {[store.city, store.state].filter(Boolean).join(", ") || "—"}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2.5 text-[12.5px]">
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold tabular-nums text-slate-600">
-                        {store.orders.length} order
-                        {store.orders.length === 1 ? "" : "s"}
-                      </span>
-                      {store.due > 0 && (
-                        <span className="rounded-md bg-rose-50 px-1.5 py-0.5 font-semibold tabular-nums text-rose-600">
-                          {inr(store.due)} due
-                        </span>
-                      )}
-                      <span className="ml-auto truncate font-mono text-slate-400">
-                        {store.agentId}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <Pagination
-              {...storePager.controls}
-              compact
-              label="stores"
-              className="border-t border-slate-100 px-4 py-3"
-            />
-            </>
-          )}
-        </Card>
-
+        {/* Search/pagination stay local to the memoized store sidebar. */}
+        <OrderStoreSidebar
+          stores={stores}
+          selectedStore={selectedStore}
+          revealStoreId={scrollTo ? selectedStore : null}
+          loading={status === "loading"}
+          refreshing={refreshing}
+          onSelect={selectStore}
+          onRefresh={load}
+          onExport={exportOrders}
+        />
         {/* ===== ORDERS ===== */}
         <Card className="overflow-hidden lg:col-span-8">
           <div className="border-b border-slate-100 p-4">

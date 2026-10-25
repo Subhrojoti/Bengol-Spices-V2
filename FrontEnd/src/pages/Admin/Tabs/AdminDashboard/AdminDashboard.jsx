@@ -224,6 +224,7 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   // Bumped by Refresh, so the "needs attention" block reloads with the rest
   const [refreshKey, setRefreshKey] = useState(0);
+  const [salesPeriod, setSalesPeriod] = useState("daily");
   // Grid lines, axis labels and hover highlight, for light or dark
   const CHROME = useChartChrome();
 
@@ -253,6 +254,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     load();
+  }, [load]);
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") load(true); };
+    const timer = setInterval(refresh, 60000);
+    const events = ["live:order-placed", "live:cash-verification", "live:delivery-alert", "admin:management-changed"];
+    events.forEach((name) => window.addEventListener(name, refresh));
+    document.addEventListener("visibilitychange", refresh);
+    return () => { clearInterval(timer); events.forEach((name) => window.removeEventListener(name, refresh)); document.removeEventListener("visibilitychange", refresh); };
   }, [load]);
 
   if (status === "loading") return <Skeleton />;
@@ -284,6 +293,8 @@ export default function AdminDashboard() {
   const charts = data?.charts || {};
   const insights = data?.insights || {};
   const financials = data?.financials || {};
+  const salesOverview = data?.salesOverview;
+  const periodSales = salesOverview?.[salesPeriod] || {};
 
   const revenue = charts.revenue || [];
 
@@ -364,40 +375,48 @@ export default function AdminDashboard() {
       <NeedsAttention refreshKey={refreshKey} />
 
       {/* ===== FINANCIAL KPIs ===== */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Sales period">
+          {[["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["allTime", "All time"]].map(([key, label]) => <button key={key} aria-pressed={salesPeriod === key} onClick={() => setSalesPeriod(key)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset ${salesPeriod === key ? "bg-blue-600 text-white ring-blue-600" : "bg-white text-slate-600 ring-slate-200"}`}>{label}</button>)}
+        </div>
+        <p className="text-xs text-slate-500">India time · Weeks start Monday · {n(salesOverview?.activeAgents)} active agents · {n(salesOverview?.activeStores)} active stores</p>
+      </div>
+      <p className="text-xs text-slate-500">{periodSales.from ? `${new Date(periodSales.from).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })} to now. ` : ""}Collections include verified payments after cancellations and returns. Order value is shown separately.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          label="Total Sales"
-          value={financials.totalSales}
-          hint={`${totalOrders.toLocaleString("en-IN")} orders placed`}
+          label="Verified Collections"
+          value={periodSales.collected}
+          hint="Cash counts only after office verification"
           icon={<IndianRupee size={17} />}
           tint="#eaf1fc"
           ink="#2a78d6"
         />
         <StatCard
-          label="Profit"
-          value={financials.profit}
-          hint="Collected, less refunds"
+          label="Order Value"
+          value={periodSales.orderValue}
+          hint={`${n(periodSales.ordersPlaced).toLocaleString("en-IN")} orders placed in this period`}
           icon={<TrendingUp size={17} />}
           tint="#e6f7f0"
           ink="#12805a"
         />
         <StatCard
           label="Outstanding Due"
-          value={financials.totalDue}
-          hint="Yet to be collected"
+          value={periodSales.outstanding}
+          hint="Still owed on this period's eligible orders"
           icon={<AlertCircle size={17} />}
           tint="#fdf3e0"
           ink="#a06c00"
         />
         <StatCard
-          label="Refunds"
-          value={financials.totalRefund}
-          hint={`${n(orderStats.returnRate)}% return rate`}
+          label="Awaiting Verification"
+          value={periodSales.awaitingVerification}
+          hint={`${inr(periodSales.rejected)} rejected; excluded from collections`}
           icon={<RefreshCcw size={17} />}
           tint="#fdeaea"
           ink="#c02f2f"
         />
       </div>
+      <p className="text-xs text-slate-500">Recorded refunds ({meta?.year}): {inr(financials.totalRefund)} · Return rate: {n(orderStats.returnRate)}%.</p>
 
       {/* ===== COUNTS ===== */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -417,13 +436,13 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Panel
           className="lg:col-span-2"
-          title="Revenue & Profit"
-          subtitle="Monthly, current year"
+          title="Order Value & Recorded Payments"
+          subtitle="Monthly by order date; recorded payments may include unverified cash"
           action={
             <div className="flex items-center gap-4 shrink-0">
               {[
-                { name: "Sales", color: SERIES.sales },
-                { name: "Profit", color: SERIES.profit },
+                { name: "Order value", color: SERIES.sales },
+                { name: "Recorded payments", color: SERIES.profit },
               ].map((s) => (
                 <span key={s.name} className="flex items-center gap-1.5 text-xs text-slate-500">
                   <span
@@ -472,7 +491,7 @@ export default function AdminDashboard() {
                 <Area
                   type="monotone"
                   dataKey="sales"
-                  name="Sales"
+                  name="Order value"
                   stroke={SERIES.sales}
                   strokeWidth={2}
                   fill="url(#fillSales)"
@@ -481,7 +500,7 @@ export default function AdminDashboard() {
                 <Area
                   type="monotone"
                   dataKey="profit"
-                  name="Profit"
+                  name="Recorded payments"
                   stroke={SERIES.profit}
                   strokeWidth={2}
                   fill="url(#fillProfit)"

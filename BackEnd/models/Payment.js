@@ -95,6 +95,7 @@ const paymentSchema = new mongoose.Schema(
    out of the index. */
 paymentSchema.index({ razorpayPaymentId: 1 }, { sparse: true });
 paymentSchema.index({ razorpayOrderId: 1 }, { sparse: true });
+paymentSchema.index({ createdAt: 1 });
 
 /* "What is waiting to be verified?" is asked by the dashboard and the
    verification screen. Sparse: gateway payments have no status. */

@@ -34,9 +34,21 @@ import { isAdmin } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
 
 const router = express.Router();
+import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview, executeRemoval, getManagedStores, getManagementAudit, getAgentPurgePreview, executeAgentPurge, getCleanupStatus, retryCleanup } from "../controllers/adminManagement.controller.js";
 
 // 🔒 All routes require login
 router.use(protect);
+router.get("/store-management", isAdmin, getManagedStores);
+router.post("/store-transfers/preview", isAdmin, getTransferPreview);
+router.post("/store-transfers", isAdmin, executeTransfer);
+router.get("/store-management/:consumerId/removal-preview", isAdmin, getRemovalPreview);
+router.post("/store-management/:consumerId/remove", isAdmin, executeRemoval);
+router.post("/agents/:agentId/access", isAdmin, setAgentAccess);
+router.get("/management-audit", isAdmin, getManagementAudit);
+router.get("/agents/:agentId/purge-preview", isAdmin, getAgentPurgePreview);
+router.post("/agents/:agentId/purge", isAdmin, executeAgentPurge);
+router.get("/data-cleanups/:requestId", isAdmin, getCleanupStatus);
+router.post("/data-cleanups/:requestId/retry-media", isAdmin, retryCleanup);
 
 // =============================
 // ADMIN ONLY

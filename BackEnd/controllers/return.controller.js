@@ -6,6 +6,7 @@ import DeliveryPartner from "../models/DeliveryPartner.js";
 import { createNotification } from "../services/notification.service.js";
 import { withLock } from "../services/payment.service.js";
 import mongoose from "mongoose";
+import { managesStore, historyConsumerIds } from "../services/storeAccess.service.js";
 
 // The agent app's own box takes 500 characters; nothing took any limit here
 const REASON_MAX = 1000;
@@ -40,8 +41,8 @@ export const initiateReturn = async (req, res) => {
       });
     }
 
-    // 🔒 Only agent who placed order
-    if (order.agentId !== req.user.agentId) {
+    // Current manager may initiate returns; the order's original agentId is retained.
+    if (!(await managesStore(order.consumerId, req.user.agentId))) {
       return res.status(403).json({
         success: false,
         message: "Not authorized for this order",
@@ -443,7 +444,7 @@ export const getMyReturns = async (req, res) => {
   try {
     const agentId = req.user.agentId;
 
-    const returns = await Return.find({ agentId }).sort({ createdAt: -1 });
+    const returns = await Return.find({ consumerId: { $in: await historyConsumerIds(agentId) } }).sort({ createdAt: -1 });
 
     return res.json({
       success: true,
@@ -483,8 +484,8 @@ export const cancelReturn = async (req, res) => {
       });
     }
 
-    // Ensure the agent owns this return
-    if (returnRequest.agentId !== req.user.agentId) {
+    // Only the store's current active manager may cancel this return.
+    if (!(await managesStore(returnRequest.consumerId, req.user.agentId))) {
       return res.status(403).json({
         success: false,
         message: "You are not allowed to cancel this return",

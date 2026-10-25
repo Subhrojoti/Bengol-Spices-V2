@@ -1,0 +1,7 @@
+/* Keep the nested store viewport's layout/paint local to this panel. Wheel
+   scrolling at its ends must not also move the surrounding Orders page. */
+.order-store-scroll {
+  contain: layout paint;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}

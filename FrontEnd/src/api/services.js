@@ -4,7 +4,7 @@ import axiosInstance from "./axiosInstance";
 const API_BASE_URL = "http://localhost:8000";
 
 export const agentRegistration = async (formData) => {
-  const response = axiosInstance.post("/agent/apply", formData, {
+  const response = await axiosInstance.post("/agent/apply", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -49,9 +49,21 @@ export const approveAgent = (agentId) => {
   return axiosInstance.post(`/admin/agents/${agentId}/approve`);
 };
 
-export const rejectAgent = (agentId) => {
-  return axiosInstance.post(`/admin/agents/${agentId}/reject`);
+export const rejectAgent = (agentId, reason) => {
+  return axiosInstance.post(`/admin/agents/${agentId}/reject`, { reason });
 };
+
+// Admin-only lifecycle/assignment operations. Mutations require an explicit UI confirmation.
+export const getManagedStores = async (params) => (await axiosInstance.get("/admin/store-management", { params })).data;
+export const previewStoreTransfer = async (body) => (await axiosInstance.post("/admin/store-transfers/preview", body)).data;
+export const transferStores = async (body) => (await axiosInstance.post("/admin/store-transfers", body)).data;
+export const previewStoreRemoval = async (consumerId) => (await axiosInstance.get(`/admin/store-management/${encodeURIComponent(consumerId)}/removal-preview`)).data;
+export const removeManagedStore = async (consumerId, body) => (await axiosInstance.post(`/admin/store-management/${encodeURIComponent(consumerId)}/remove`, body)).data;
+export const changeAgentAccess = async (agentId, body) => (await axiosInstance.post(`/admin/agents/${encodeURIComponent(agentId)}/access`, body)).data;
+export const previewAgentDeletion = async (agentId) => (await axiosInstance.get(`/admin/agents/${encodeURIComponent(agentId)}/purge-preview`)).data;
+export const permanentlyDeleteAgent = async (agentId, body) => (await axiosInstance.post(`/admin/agents/${encodeURIComponent(agentId)}/purge`, body)).data;
+export const retryAgentFileCleanup = async (requestId) => (await axiosInstance.post(`/admin/data-cleanups/${encodeURIComponent(requestId)}/retry-media`)).data;
+export const getManagementAudit = async (agentId) => (await axiosInstance.get("/admin/management-audit", { params: agentId ? { agentId } : undefined })).data;
 
 export const getAgentProfile = async () => {
   const response = await axiosInstance.get("/agent/profile");
