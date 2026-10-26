@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import StatusPill from "../../../../../components/common/StatusPill";
-import EntityAvatar from "../../../../../components/common/EntityAvatar";
+import StorePhoto, { StoreSelectionCard } from "../../../../../components/common/StorePhoto";
 import ConfirmDialog from "../../../../../components/common/ConfirmDialog";
 import Pagination from "../../../../../components/common/Pagination";
 import usePagination from "../../../../../hooks/usePagination";
@@ -548,8 +548,9 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
                 const itemCount = (item.products || []).length;
 
                 return (
-                  <button
+                  <StoreSelectionCard
                     key={item._id}
+                    aria-label={`Select ${isOrders ? item.orderId : item.returnId} ${storeName} ${item.consumerId || ""}`}
                     onClick={() => setSelectedId(active ? null : item._id)}
                     className={`w-full rounded-xl border p-3.5 text-left transition ${
                       active
@@ -567,7 +568,7 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
                         photo, no owner, no contact. Dispatch is a physical
                         job, so who and where matters as much as the id. */}
                     <div className="flex items-start gap-2.5">
-                      <EntityAvatar
+                      <StorePhoto
                         src={store?.image?.url}
                         name={storeName}
                         className="h-11 w-11 rounded-lg"
@@ -653,7 +654,7 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
                         </span>
                       )}
                     </div>
-                  </button>
+                  </StoreSelectionCard>
                 );
               })}
             </div>

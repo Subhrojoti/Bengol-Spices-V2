@@ -17,7 +17,7 @@ import {
   UserRound,
 } from "lucide-react";
 import StatusPill from "../../../../components/common/StatusPill";
-import EntityAvatar from "../../../../components/common/EntityAvatar";
+import StorePhoto, { StoreSelectionCard } from "../../../../components/common/StorePhoto";
 import Pagination from "../../../../components/common/Pagination";
 import usePagination from "../../../../hooks/usePagination";
 import { getAllReturns, getAllStores } from "../../../../api/services";
@@ -352,8 +352,9 @@ export default function ReturnsManagement() {
                 const active = store.consumerId === selectedStore;
 
                 return (
-                  <button
+                  <StoreSelectionCard
                     key={store.consumerId}
+                    aria-label={`Select ${store.name} ${store.consumerId}`}
                     onClick={() => {
                       setSelectedStore(active ? null : store.consumerId);
                       setExpanded(null);
@@ -365,7 +366,7 @@ export default function ReturnsManagement() {
                         : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70"
                     }`}>
                     <div className="flex items-start gap-3">
-                      <EntityAvatar src={store.image} name={store.name} />
+                      <StorePhoto src={store.image} name={store.name} />
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -418,7 +419,7 @@ export default function ReturnsManagement() {
                         {store.agentId}
                       </span>
                     </div>
-                  </button>
+                  </StoreSelectionCard>
                 );
               })}
             </div>

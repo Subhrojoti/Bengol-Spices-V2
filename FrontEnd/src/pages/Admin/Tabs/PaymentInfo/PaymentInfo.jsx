@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { getPaymentSummary, getAllStores } from "../../../../api/services";
 import { toast } from "sonner";
-import EntityAvatar from "../../../../components/common/EntityAvatar";
+import StorePhoto, { StoreSelectionCard } from "../../../../components/common/StorePhoto";
 import Pagination from "../../../../components/common/Pagination";
 import usePagination from "../../../../hooks/usePagination";
 import PaymentIssues from "./PaymentIssues";
@@ -445,7 +445,8 @@ export default function PaymentInfo() {
 
             return (
               <Card key={store.consumerId} className="overflow-hidden">
-                <button
+                <StoreSelectionCard
+                  aria-label={`Select ${store.name} ${store.consumerId}`}
                   onClick={() => {
                     setOpenStore(open ? null : store.consumerId);
                     setOpenOrder(null);
@@ -453,7 +454,7 @@ export default function PaymentInfo() {
                   className={`flex w-full items-center gap-4 p-4 text-left transition ${
                     open ? "bg-slate-50" : "hover:bg-slate-50/70"
                   }`}>
-                  <EntityAvatar src={store.image} name={store.name} />
+                  <StorePhoto src={store.image} name={store.name} />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -513,7 +514,7 @@ export default function PaymentInfo() {
                       open ? "rotate-180" : ""
                     }`}
                   />
-                </button>
+                </StoreSelectionCard>
 
                 {open && (
                   <>

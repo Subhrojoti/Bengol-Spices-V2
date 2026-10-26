@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "test:admin": "npm run build:spa && playwright test",
-    "lint:admin": "eslint src/pages/Admin src/pages/Auth/Login/AdminLogin.jsx src/components/layout src/components/common/AdminSectionBoundary.jsx src/components/common/ConfirmDialog.jsx src/api src/config/adminRoutes.js src/routes/ProtectedRoute.jsx src/routes/PublicRoute.jsx src/routes/areas/AdminArea.jsx src/hooks/useAdminSession.js src/hooks/useLatestRequest.js src/hooks/useObjectUrl.js src/hooks/useLiveOrders.jsx src/utils/adminReads.js src/utils/adminSession.js src/utils/reportAdminError.js src/utils/safeExternalUrl.js tests scripts/admin-audit-server.mjs scripts/inventory-admin.mjs scripts/measure-admin.mjs scripts/measure-admin-navigation.mjs scripts/summarize-admin.mjs playwright.config.js --max-warnings 0",
+    "lint:admin": "eslint src/pages/Admin src/pages/Auth/Login/AdminLogin.jsx src/components/layout src/components/common/AdminSectionBoundary.jsx src/components/common/ConfirmDialog.jsx src/components/common/StorePhoto.jsx src/api src/config/adminRoutes.js src/routes/ProtectedRoute.jsx src/routes/PublicRoute.jsx src/routes/areas/AdminArea.jsx src/hooks/useAdminSession.js src/hooks/useLatestRequest.js src/hooks/useObjectUrl.js src/hooks/useLiveOrders.jsx src/utils/adminReads.js src/utils/adminSession.js src/utils/reportAdminError.js src/utils/safeExternalUrl.js tests scripts/admin-audit-server.mjs scripts/inventory-admin.mjs scripts/measure-admin.mjs scripts/measure-admin-navigation.mjs scripts/summarize-admin.mjs playwright.config.js --max-warnings 0",
     "dev": "vite",
     "build": "vite build && node scripts/prerender.mjs",
     "build:spa": "vite build",

@@ -7,6 +7,7 @@ import { useRef } from "react";
 import { toast } from "sonner";
 import { logoutAdminCookieSession } from "../../api/services";
 import { clearAdminSession, storedAdminCookieSession } from "../../utils/adminSession";
+import { StorePhotoProvider } from "../../components/common/StorePhoto";
 
 const ADMIN_ACCENT = {
   main: "#2563eb",
@@ -47,7 +48,7 @@ const AdminBase = () => {
   };
 
   return (
-    <PanelLayout
+    <StorePhotoProvider><PanelLayout
       items={adminRoutes}
       basePath="/admin"
       brandTitle="Admin Panel"
@@ -55,7 +56,7 @@ const AdminBase = () => {
       storageKey="adminPanel"
       profile={ADMIN_IDENTITY}
       onLogout={handleLogout}
-    />
+    /></StorePhotoProvider>
   );
 };
 

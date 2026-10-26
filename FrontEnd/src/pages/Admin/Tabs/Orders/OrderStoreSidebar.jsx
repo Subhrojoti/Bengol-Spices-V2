@@ -1,6 +1,6 @@
 import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Download, MapPin, RefreshCcw, Search, Store, UserRound } from "lucide-react";
-import EntityAvatar from "../../../../components/common/EntityAvatar";
+import StorePhoto, { StoreSelectionCard } from "../../../../components/common/StorePhoto";
 import Pagination from "../../../../components/common/Pagination";
 import usePagination from "../../../../hooks/usePagination";
 import { imageThumbnail } from "../../../../utils/image";
@@ -9,15 +9,16 @@ import "./OrderStoreSidebar.css";
 const inr = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
 
 const StoreCard = memo(function StoreCard({ store, active, onSelect }) {
-  return <button
+  return <StoreSelectionCard
     type="button"
     aria-pressed={active}
+    aria-label={`Select ${store.name} ${store.consumerId}`}
     onClick={() => onSelect(store.consumerId)}
     className={`w-full rounded-xl border p-3.5 text-left transition-colors ${active
       ? "border-blue-400 bg-blue-50/60 ring-2 ring-blue-100"
       : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70"}`}>
     <div className="flex items-start gap-3">
-      <EntityAvatar src={imageThumbnail(store.image)} fallbackSrc={store.image} name={store.name} />
+      <StorePhoto src={imageThumbnail(store.image)} fallbackSrc={store.image} name={store.name} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-[15px] font-semibold text-slate-900">{store.name}</p>
@@ -40,7 +41,7 @@ const StoreCard = memo(function StoreCard({ store, active, onSelect }) {
       {store.due > 0 && <span className="rounded-md bg-rose-50 px-1.5 py-0.5 font-semibold tabular-nums text-rose-600">{inr(store.due)} due</span>}
       <span className="ml-auto truncate font-mono text-slate-400">{store.agentId}</span>
     </div>
-  </button>;
+  </StoreSelectionCard>;
 });
 
 // Search and pagination are local: typing/paging the store list does not

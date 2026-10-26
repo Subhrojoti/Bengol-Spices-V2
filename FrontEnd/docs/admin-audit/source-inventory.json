@@ -1,7 +1,7 @@
 {
   "note": "Static import reachability/signals, not proof of runtime coverage. Review includes shared frontend dependencies; changes are restricted to Admin behavior.",
-  "parsedFrontendModules": 154,
-  "reachableModules": 95,
+  "parsedFrontendModules": 155,
+  "reachableModules": 96,
   "modules": [
     {
       "file": "src/App.jsx",
@@ -194,6 +194,28 @@
         "useEffect": 0,
         "useMemo": 0,
         "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/StorePhoto.jsx",
+      "sha256": "8dc8620707363383c56278413c2eeb7e3de9983142fa4985942e91c154a6bd25",
+      "lines": 60,
+      "imports": [
+        "react",
+        "@mui/material",
+        "lucide-react",
+        "./EntityAvatar",
+        "../../utils/safeExternalUrl"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 2,
         "setInterval": 0,
         "addEventListener": 0,
         "createObjectURL": 0,
@@ -613,8 +635,8 @@
     },
     {
       "file": "src/pages/Admin/AdminBase.jsx",
-      "sha256": "6330bef0bf477bcbd0cc18d2f03a5b98f55b2dd298da8245c572a936d2855285",
-      "lines": 63,
+      "sha256": "cfeb57295af6dc46556881da3b6a1eece065346ac2492447f89130dc21ca7586",
+      "lines": 64,
       "imports": [
         "react-router-dom",
         "../../components/layout/PanelLayout",
@@ -624,7 +646,8 @@
         "react",
         "sonner",
         "../../api/services",
-        "../../utils/adminSession"
+        "../../utils/adminSession",
+        "../../components/common/StorePhoto"
       ],
       "signals": {
         "useEffect": 0,
@@ -1095,8 +1118,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryManagement.jsx",
-      "sha256": "af70960700101540438ab495f9f6d74f8c1611798faaa359c30abbd43e8b3071",
-      "lines": 872,
+      "sha256": "bd69b61934e45d35ef6bb8a3242d57c5197af0f12f2341fbf63cfc19e54674bd",
+      "lines": 873,
       "imports": [
         "../../../../../utils/reportAdminError",
         "../../../../../hooks/useLatestRequest",
@@ -1104,7 +1127,7 @@
         "sonner",
         "lucide-react",
         "../../../../../components/common/StatusPill",
-        "../../../../../components/common/EntityAvatar",
+        "../../../../../components/common/StorePhoto",
         "../../../../../components/common/ConfirmDialog",
         "../../../../../components/common/Pagination",
         "../../../../../hooks/usePagination",
@@ -1184,12 +1207,12 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Orders/OrderStoreSidebar.jsx",
-      "sha256": "0463e34afa72de8c654e52313c4aae2c4df721934420e57202bb4edea457a53e",
-      "lines": 92,
+      "sha256": "e6162afc4f1a9fea176d85b4be3fd2ddbc0fcf1294732f5052aa88335f1b129d",
+      "lines": 93,
       "imports": [
         "react",
         "lucide-react",
-        "../../../../components/common/EntityAvatar",
+        "../../../../components/common/StorePhoto",
         "../../../../components/common/Pagination",
         "../../../../hooks/usePagination",
         "../../../../utils/image",
@@ -1208,8 +1231,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/PaymentInfo/PaymentInfo.jsx",
-      "sha256": "d4a24f4aaaa1af153ccaad7ca726b787a0b425958bf8a54de0ebb87fe7e72f86",
-      "lines": 688,
+      "sha256": "7b08bde78f8e0ea5227c518bb20fe601311b6ed6b912937122b7bcff17757d5b",
+      "lines": 689,
       "imports": [
         "../../../../utils/reportAdminError",
         "../../../../hooks/useLatestRequest",
@@ -1217,7 +1240,7 @@
         "lucide-react",
         "../../../../api/services",
         "sonner",
-        "../../../../components/common/EntityAvatar",
+        "../../../../components/common/StorePhoto",
         "../../../../components/common/Pagination",
         "../../../../hooks/usePagination",
         "./PaymentIssues",
@@ -1314,15 +1337,15 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Returns/ReturnManagement.jsx",
-      "sha256": "fab211dd4e3464e329c4d8fdcca24984eb37185ef3027c062cdd85bb6a0e8eb0",
-      "lines": 721,
+      "sha256": "dcff25963863eafae9e40770de17c0dcf9bc5d8da41c2b18931a5c11a2599cb6",
+      "lines": 722,
       "imports": [
         "../../../../utils/reportAdminError",
         "../../../../hooks/useLatestRequest",
         "react",
         "lucide-react",
         "../../../../components/common/StatusPill",
-        "../../../../components/common/EntityAvatar",
+        "../../../../components/common/StorePhoto",
         "../../../../components/common/Pagination",
         "../../../../hooks/usePagination",
         "../../../../api/services"

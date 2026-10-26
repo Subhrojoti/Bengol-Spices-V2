@@ -9,6 +9,10 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 frontend audit/session hardening. See [current release record](deploy/releases/2026-10-26-admin-audit.md).
 The release entries below retain the earlier deployment history.
 
+**Local Admin follow-up (not deployed):** store photos now open a responsive
+modal in Orders, Returns, Payment Info and Delivery. This uses existing image
+URLs; no backend behavior changed. See [preview notes](FrontEnd/docs/admin-audit/STORE_PHOTO_PREVIEW.md).
+
 **Deployment update (26 October 2026, Asia/Calcutta):** application release
 `bc05a475b04e4ac2451166d1bd93420ca2f52b94` is pushed to GitHub `main`
 and deployed on the production VPS. Backend deployment completed on 25 October;

@@ -310,5 +310,31 @@
       "runtimeChangesForCorrection": false
     },
     "record": "../../../deploy/releases/2026-10-26-admin-audit.md"
+  },
+  "storePhotoPreview": {
+    "date": "2026-10-26",
+    "status": "local, not pushed/deployed",
+    "scope": "Admin Orders, Returns, Payment Info and Delivery; no backend/API changes",
+    "adminLint": "passed",
+    "spaProductionBuild": "passed",
+    "browser": {
+      "existingRegressionsPassed": 64,
+      "initialRun": {
+        "passed": 70,
+        "failed": 1,
+        "reason": "New missing-image test matched duplicate store text"
+      },
+      "focusedPhotoCases": {
+        "passed": 7,
+        "failed": 0
+      },
+      "runtimeChangesForTestFix": false
+    },
+    "record": "STORE_PHOTO_PREVIEW.md",
+    "sourceInventory": {
+      "frontendModules": 155,
+      "reachableModules": 96
+    },
+    "productionMutations": false
   }
 }
