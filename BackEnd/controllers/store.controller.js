@@ -8,6 +8,7 @@ import Product from "../models/Product.js";
 import { findManagedStore, managedStoreFilter } from "../services/storeAccess.service.js";
 import { updateTargetProgress } from "../services/target.service.js";
 import { publicMessage } from "../utils/publicError.js";
+import { coverageForState, normalizePincode, normalizeSalesState } from "../utils/salesLocation.js";
 import {
   STORE_TYPES,
   applyLocationPrices,
@@ -193,8 +194,11 @@ export const createStore = async (req, res) => {
     // duplicate check and then failed the unique index with a raw error,
     // and a stray space in state or pincode failed the location check below.
     const cleanPhone = String(phone).trim();
-    const cleanState = String(state).trim().toUpperCase();
-    const cleanPincode = String(pincode).trim();
+    const cleanState = normalizeSalesState(state);
+    const cleanPincode = normalizePincode(pincode);
+    if (!/^[0-9]{6}$/.test(cleanPincode)) {
+      throw new Error("Pincode must be exactly 6 digits");
+    }
 
     const exists = await Store.findOne({ phone: cleanPhone });
     if (exists) {
@@ -221,21 +225,21 @@ export const createStore = async (req, res) => {
     // ✅ CHECK AGENT LOCATION PERMISSION
     const agentId = req.user.agentId;
 
-    const assignedLocations = await AgentSalesLocation.find({
-      agentId,
-      state: cleanState,
-    });
+    const locations = await AgentSalesLocation.find({ agentId }).select("state pincodes").lean();
+    const assignedLocations = coverageForState(locations, cleanState);
 
     if (!assignedLocations || assignedLocations.length === 0) {
-      throw new Error("You are not authorized to sell in this location");
+      throw new Error(locations.length
+        ? "State does not match your assigned coverage. Check the state spelling or ask admin to review Assign Location."
+        : "No sales coverage is assigned to your account. Ask admin to assign your pincodes in Assign Location.");
     }
 
     const allowedPincodes = assignedLocations.flatMap((loc) =>
-      (loc.pincodes || []).map((pin) => String(pin).trim()),
+      (loc.pincodes || []).map(normalizePincode),
     );
 
     if (!allowedPincodes.includes(cleanPincode)) {
-      throw new Error("You are not authorized to sell in this location");
+      throw new Error(`Pincode ${cleanPincode} is not assigned to your account in ${cleanState}. Ask admin to review Assign Location.`);
     }
 
     // 🔑 ✅ SAFE consumerId generation using Counter. Taken only once every

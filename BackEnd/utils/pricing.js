@@ -1,4 +1,5 @@
 import AgentSalesLocation from "../models/AgentSalesLocation.js";
+import { coverageForState, normalizeSalesState } from "./salesLocation.js";
 
 /* =====================================================================
    PRODUCT PRICING
@@ -30,12 +31,13 @@ const isPrice = (value) => typeof value === "number" && value > 0;
 export const getLocationOverrides = async (agentId, state) => {
   if (!agentId || !state) return new Map();
 
-  const assignment = await AgentSalesLocation.findOne({
-    agentId,
-    state: String(state).toUpperCase(),
-  })
-    .select("priceOverrides")
+  const assignments = await AgentSalesLocation.find({ agentId })
+    .select("state priceOverrides")
+    .sort({ _id: 1 })
     .lean();
+  const matches = coverageForState(assignments, state);
+  // Prefer the canonical assignment when older spelling variants coexist.
+  const assignment = matches.find((row) => row.state === normalizeSalesState(state)) || matches[0];
 
   const map = new Map();
   for (const entry of assignment?.priceOverrides || []) {

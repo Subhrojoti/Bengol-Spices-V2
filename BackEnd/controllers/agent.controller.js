@@ -12,6 +12,7 @@ import { TIER_FIELDS } from "../utils/pricing.js";
 import { PERSON_FIELD_LIMITS, checkTextFields } from "../utils/formFields.js";
 import { publicMessage } from "../utils/publicError.js";
 import { reapplyRejectedAgent } from "../services/agentApplication.service.js";
+import { normalizePincode, normalizeSalesState } from "../utils/salesLocation.js";
 
 /* Checks the location prices sent with a territory. A blank or zero tier
    means "use the default"; a product with every tier blank is dropped.
@@ -472,7 +473,10 @@ export const assignSalesLocation = async (req, res) => {
     }
 
     // ✅ Check Agent exists
-    const agent = await Agent.findOne({ agentId });
+    const cleanAgentId = agentId.trim();
+    const cleanState = normalizeSalesState(state);
+    const cleanPincodes = [...new Set(pincodes.map((pin) => typeof pin === "string" ? normalizePincode(pin) : pin))];
+    const agent = await Agent.findOne({ agentId: cleanAgentId });
     if (!agent) {
       return res.status(404).json({
         success: false,
@@ -483,7 +487,7 @@ export const assignSalesLocation = async (req, res) => {
     // ✅ Validate pincodes
     // Text of six digits each: a list inside the list also read as "six
     // digits" to the pattern, and then failed at the database with a 500
-    const invalidPins = pincodes.filter(
+    const invalidPins = cleanPincodes.filter(
       (pin) => typeof pin !== "string" || !/^[0-9]{6}$/.test(pin),
     );
 
@@ -495,9 +499,9 @@ export const assignSalesLocation = async (req, res) => {
     }
 
     const update = {
-      agentId,
-      pincodes,
-      state: state.toUpperCase(),
+      agentId: cleanAgentId,
+      pincodes: cleanPincodes,
+      state: cleanState,
       city,
       assignedBy: req.user._id,
       assignedByModel: req.user.role === "ADMIN" ? "Admin" : "Employee",
@@ -530,7 +534,7 @@ export const assignSalesLocation = async (req, res) => {
 
     // ✅ Upsert (update or create)
     const location = await AgentSalesLocation.findOneAndUpdate(
-      { agentId, state: state.toUpperCase() },
+      { agentId: cleanAgentId, state: cleanState },
       update,
       { new: true, upsert: true },
     );

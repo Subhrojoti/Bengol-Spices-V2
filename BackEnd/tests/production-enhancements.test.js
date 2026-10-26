@@ -15,6 +15,7 @@ import Invoice from "../models/Invoice.js";
 import AdminAudit from "../models/AdminAudit.js";
 import Employee from "../models/Employee.js";
 import Product from "../models/Product.js";
+import AgentSalesLocation from "../models/AgentSalesLocation.js";
 import Counter from "../models/Counter.js";
 import GatewayPayment from "../models/GatewayPayment.js";
 import Notification from "../models/Notification.js";
@@ -35,6 +36,8 @@ import { productSales } from "../services/sales.service.js";
 import { reapplyRejectedAgent } from "../services/agentApplication.service.js";
 import cloudinary from "../config/cloudinary.js";
 import { mediaAssetOf, assetIsReferenced } from "../services/mediaCleanup.service.js";
+import { createStore } from "../controllers/store.controller.js";
+import { getLocationOverrides } from "../utils/pricing.js";
 
 // Never load dotenv/server.js or accept a configured database URL in this suite.
 process.env.JWT_SECRET = crypto.randomBytes(48).toString("hex");
@@ -250,6 +253,90 @@ test("unsettled orders block removal; soft-delete agent requires reassignment an
 });
 
 const capture = () => { const result = { code: 200 }; return { result, res: { status(code) { result.code = code; return this; }, json(data) { result.data = data; return this; } } }; };
+
+test("store creation accepts assigned pins with West Bangal/spacing variants and saves canonical state for every agent", async () => {
+  const storage = storageFixture();
+  try {
+    const a = await person("A"), b = await person("B");
+    for (const agent of [a, b]) {
+      const assigned = await call("/agent/store/assign-location", admin(), "POST", {
+        agentId: ` ${agent.agentId} `, state: " west   bangal ", pincodes: [" 743503 ", "743503", "743377"], city: "KOLKATA",
+      });
+      assert.equal(assigned.status, 200);
+      assert.equal(assigned.data.data.state, "WEST BENGAL");
+      assert.deepEqual(assigned.data.data.pincodes, ["743503", "743377"]);
+    }
+    let index = 0;
+    for (const agent of [a, b]) for (const state of ["WEST BANGAL", "west   bengal", "W.B.", "WESTBENGAL"]) {
+      index++;
+      const c = capture();
+      await createStore({ user: { agentId: agent.agentId }, body: {
+        storeName: `Store ${index}`, ownerName: "Owner", phone: String(9000000000 + index),
+        state, city: "Kolkata", street: "Test", pincode: " 743503 ",
+        latitude: 22.5 + index / 10000, longitude: 88.3, storeType: "RETAILER",
+      }, file: { path: "https://example.invalid/synthetic.png", filename: `synthetic-${index}` } }, c.res);
+      assert.equal(c.result.code, 201, c.result.data.message);
+      const store = await Store.findOne({ consumerId: c.result.data.consumerId }).lean();
+      assert.equal(store.address.state, "WEST BENGAL");
+      assert.equal(store.address.pincode, "743503");
+      assert.equal(store.registeredBy, agent.agentId);
+    }
+    assert.equal(await Store.countDocuments(), 8);
+    assert.equal(storage.calls.length, 0);
+  } finally { storage.restore(); }
+});
+
+test("store coverage still rejects unassigned pins, different states and other agents; no IDs or stores consumed", async () => {
+  const storage = storageFixture();
+  try {
+    await person("A"); await person("B");
+    await AgentSalesLocation.create({ agentId: "A", state: "WEST BENGAL", pincodes: ["743503"], assignedByModel: "Admin" });
+    await AgentSalesLocation.create({ agentId: "B", state: "WEST BENGAL", pincodes: ["700082"], assignedByModel: "Admin" });
+    const cases = [
+      ["A", "WEST BANGAL", "700082", /Pincode 700082 is not assigned/],
+      ["A", "BIHAR", "743503", /State does not match/],
+      ["B", "WEST BENGAL", "743503", /Pincode 743503 is not assigned/],
+      ["NONE", "WEST BENGAL", "743503", /No sales coverage/],
+      ["A", "WEST BENGAL", "74350", /exactly 6 digits/],
+      ["A", "WEST BENGL", "743503", /State does not match/],
+    ];
+    for (const [agentId, state, pincode, message] of cases) {
+      const c = capture();
+      await createStore({ user: { agentId }, body: {
+        storeName: "Refused", ownerName: "Owner", phone: "9000000000", state, pincode,
+        city: "Kolkata", street: "Test", latitude: 22.5, longitude: 88.3, storeType: "RETAILER",
+      }, file: { path: "https://example.invalid/refused.png", filename: "synthetic-refused" } }, c.res);
+      assert.equal(c.result.code, 400);
+      assert.match(c.result.data.message, message);
+    }
+    assert.equal(await Store.countDocuments(), 0);
+    assert.equal(await Counter.countDocuments(), 0);
+    assert.equal(storage.calls.length, cases.length);
+  } finally { storage.restore(); }
+});
+
+test("normalized legacy coverage preserves location prices and assignment saves retain omitted overrides", async () => {
+  await person("A");
+  const productId = new mongoose.Types.ObjectId();
+  await AgentSalesLocation.collection.insertOne({ agentId: "A", state: "west   bangal", pincodes: ["743503"], priceOverrides: [{ productId, retailerPrice: 75 }] });
+  assert.equal((await getLocationOverrides("A", "WEST BENGAL")).get(String(productId)).retailerPrice, 75);
+  const storage = storageFixture();
+  try {
+    const c = capture();
+    await createStore({ user: { agentId: "A" }, body: {
+      storeName: "Legacy coverage", ownerName: "Owner", phone: "9000000000", state: "WEST BENGAL", pincode: "743503",
+      city: "Kolkata", street: "Test", latitude: 22.5, longitude: 88.3, storeType: "RETAILER",
+    }, file: { path: "https://example.invalid/legacy.png", filename: "synthetic-legacy" } }, c.res);
+    assert.equal(c.result.code, 201, c.result.data.message);
+  } finally { storage.restore(); }
+  // Existing canonical territory is edited in place and keeps its prices.
+  await AgentSalesLocation.create({ agentId: "A", state: "WEST BENGAL", pincodes: ["743503"], assignedByModel: "Admin", priceOverrides: [{ productId, retailerPrice: 65 }] });
+  const saved = await call("/agent/store/assign-location", admin(), "POST", { agentId: "A", state: "WEST BANGAL", pincodes: ["743377"] });
+  assert.equal(saved.status, 200);
+  assert.equal(await AgentSalesLocation.countDocuments({ agentId: "A", state: "WEST BENGAL" }), 1);
+  assert.equal((await getLocationOverrides("A", "W.B.")).get(String(productId)).retailerPrice, 65);
+  assert.deepEqual(saved.data.data.pincodes, ["743377"]);
+});
 
 test("legacy accounts retain login; blocking denies login; employees cannot use the admin management APIs", async () => {
   const a = await person("A", { password: await bcrypt.hash("Secret123", 4) });

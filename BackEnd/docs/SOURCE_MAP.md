@@ -5,8 +5,8 @@ See [backend context](../../BACKEND_CONTEXT.md) and [implementation report](PROD
 
 ## Offline validation
 
-- Parsed **115** first-party JS/MJS files, including test and documentation scripts.
-- Checked **409** relative imports: all files and static named/default exports resolve.
+- Parsed **116** first-party JS/MJS files, including test and documentation scripts.
+- Checked **415** relative imports: all files and static named/default exports resolve.
 - Extracted **141** registered method/path entries, including health.
 - This script imports no application code and connects to no services.
 - Runtime tests/build results and remaining live checks are recorded in the implementation report.
@@ -60,11 +60,11 @@ Local imports: [models/Agent.js](../models/Agent.js), [models/store.js](../model
 
 ### controllers/agent.controller.js
 
-[controllers/agent.controller.js](../controllers/agent.controller.js), 671 lines. SHA-256: `23ed6522928f09575887575e074795177c8176caf0125b91bef6b1038ab716d4`.
+[controllers/agent.controller.js](../controllers/agent.controller.js), 675 lines. SHA-256: `0505118414dc46a428109ca3a0e88f6c335177f42cf24fd75f76c1a986477b63`.
 
-Exports: [applyAgent](../controllers/agent.controller.js#L100), [getAgentProfile](../controllers/agent.controller.js#L405), [assignSalesLocation](../controllers/agent.controller.js#L443), [agentDashboard](../controllers/agent.controller.js#L555), [leaderboard](../controllers/agent.controller.js#L598), [getSalesLocations](../controllers/agent.controller.js#L646).
+Exports: [applyAgent](../controllers/agent.controller.js#L101), [getAgentProfile](../controllers/agent.controller.js#L406), [assignSalesLocation](../controllers/agent.controller.js#L444), [agentDashboard](../controllers/agent.controller.js#L559), [leaderboard](../controllers/agent.controller.js#L602), [getSalesLocations](../controllers/agent.controller.js#L650).
 
-Local imports: [models/Agent.js](../models/Agent.js), [utils/email.js](../utils/email.js), [config/cloudinary.js](../config/cloudinary.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [services/dashboard.service.js](../services/dashboard.service.js), [services/leaderboard.service.js](../services/leaderboard.service.js), [models/Counter.js](../models/Counter.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Product.js](../models/Product.js), [utils/pricing.js](../utils/pricing.js), [utils/formFields.js](../utils/formFields.js), [utils/publicError.js](../utils/publicError.js), [services/agentApplication.service.js](../services/agentApplication.service.js).
+Local imports: [models/Agent.js](../models/Agent.js), [utils/email.js](../utils/email.js), [config/cloudinary.js](../config/cloudinary.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [services/dashboard.service.js](../services/dashboard.service.js), [services/leaderboard.service.js](../services/leaderboard.service.js), [models/Counter.js](../models/Counter.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Product.js](../models/Product.js), [utils/pricing.js](../utils/pricing.js), [utils/formFields.js](../utils/formFields.js), [utils/publicError.js](../utils/publicError.js), [services/agentApplication.service.js](../services/agentApplication.service.js), [utils/salesLocation.js](../utils/salesLocation.js).
 
 Package/built-in imports: `mongoose`.
 
@@ -198,11 +198,11 @@ Local imports: [services/salesTarget.service.js](../services/salesTarget.service
 
 ### controllers/store.controller.js
 
-[controllers/store.controller.js](../controllers/store.controller.js), 377 lines. SHA-256: `ed1fb39d886270701e3cf7b44673f71280c9f6e51323d3302a3c21a2f6291769`.
+[controllers/store.controller.js](../controllers/store.controller.js), 381 lines. SHA-256: `1b8231da648f5c19c17def4006910a98612f265e00a400a86e1f5b0fbe95b5e5`.
 
-Exports: [getStoreCatalog](../controllers/store.controller.js#L31), [createStore](../controllers/store.controller.js#L96), [getMyStores](../controllers/store.controller.js#L316), [getAllStores](../controllers/store.controller.js#L354).
+Exports: [getStoreCatalog](../controllers/store.controller.js#L32), [createStore](../controllers/store.controller.js#L97), [getMyStores](../controllers/store.controller.js#L320), [getAllStores](../controllers/store.controller.js#L358).
 
-Local imports: [models/store.js](../models/store.js), [config/cloudinary.js](../config/cloudinary.js), [models/AgentTargetProgress.js](../models/AgentTargetProgress.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [models/Counter.js](../models/Counter.js), [models/Product.js](../models/Product.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/target.service.js](../services/target.service.js), [utils/publicError.js](../utils/publicError.js), [utils/pricing.js](../utils/pricing.js).
+Local imports: [models/store.js](../models/store.js), [config/cloudinary.js](../config/cloudinary.js), [models/AgentTargetProgress.js](../models/AgentTargetProgress.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [models/Counter.js](../models/Counter.js), [models/Product.js](../models/Product.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/target.service.js](../services/target.service.js), [utils/publicError.js](../utils/publicError.js), [utils/salesLocation.js](../utils/salesLocation.js), [utils/pricing.js](../utils/pricing.js).
 
 Package/built-in imports: `crypto`.
 
@@ -852,11 +852,11 @@ Package/built-in imports: `node:test`, `node:assert/strict`, `node:fs/promises`,
 
 ### tests/production-enhancements.test.js
 
-[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 461 lines. SHA-256: `8547a6cc9b3ae97f2bccea7b88023bba8e047380fa2ff6b06acf7713dcf8bbf1`.
+[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 548 lines. SHA-256: `6c3a8f8fdcfd336619517bd884105686b09609d6f65cf1abecf581ea6167744b`.
 
 Exports: none.
 
-Local imports: [models/Agent.js](../models/Agent.js), [models/store.js](../models/store.js), [models/Order.js](../models/Order.js), [models/Payment.js](../models/Payment.js), [models/Return.js](../models/Return.js), [models/Invoice.js](../models/Invoice.js), [models/AdminAudit.js](../models/AdminAudit.js), [models/Employee.js](../models/Employee.js), [models/Product.js](../models/Product.js), [models/Counter.js](../models/Counter.js), [models/GatewayPayment.js](../models/GatewayPayment.js), [models/Notification.js](../models/Notification.js), [config/razorpay.js](../config/razorpay.js), [services/cashVerification.service.js](../services/cashVerification.service.js), [services/storeOperation.service.js](../services/storeOperation.service.js), [routes/admin.routes.js](../routes/admin.routes.js), [routes/order.routes.js](../routes/order.routes.js), [routes/store.routes.js](../routes/store.routes.js), [routes/return.routes.js](../routes/return.routes.js), [routes/invoice.routes.js](../routes/invoice.routes.js), [routes/agent.routes.js](../routes/agent.routes.js), [controllers/agent.controller.js](../controllers/agent.controller.js), [controllers/auth.controller.js](../controllers/auth.controller.js), [services/payment.service.js](../services/payment.service.js), [services/dashboardSales.service.js](../services/dashboardSales.service.js), [services/sales.service.js](../services/sales.service.js), [services/agentApplication.service.js](../services/agentApplication.service.js), [config/cloudinary.js](../config/cloudinary.js), [services/mediaCleanup.service.js](../services/mediaCleanup.service.js).
+Local imports: [models/Agent.js](../models/Agent.js), [models/store.js](../models/store.js), [models/Order.js](../models/Order.js), [models/Payment.js](../models/Payment.js), [models/Return.js](../models/Return.js), [models/Invoice.js](../models/Invoice.js), [models/AdminAudit.js](../models/AdminAudit.js), [models/Employee.js](../models/Employee.js), [models/Product.js](../models/Product.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [models/Counter.js](../models/Counter.js), [models/GatewayPayment.js](../models/GatewayPayment.js), [models/Notification.js](../models/Notification.js), [config/razorpay.js](../config/razorpay.js), [services/cashVerification.service.js](../services/cashVerification.service.js), [services/storeOperation.service.js](../services/storeOperation.service.js), [routes/admin.routes.js](../routes/admin.routes.js), [routes/order.routes.js](../routes/order.routes.js), [routes/store.routes.js](../routes/store.routes.js), [routes/return.routes.js](../routes/return.routes.js), [routes/invoice.routes.js](../routes/invoice.routes.js), [routes/agent.routes.js](../routes/agent.routes.js), [controllers/agent.controller.js](../controllers/agent.controller.js), [controllers/auth.controller.js](../controllers/auth.controller.js), [services/payment.service.js](../services/payment.service.js), [services/dashboardSales.service.js](../services/dashboardSales.service.js), [services/sales.service.js](../services/sales.service.js), [services/agentApplication.service.js](../services/agentApplication.service.js), [config/cloudinary.js](../config/cloudinary.js), [services/mediaCleanup.service.js](../services/mediaCleanup.service.js), [controllers/store.controller.js](../controllers/store.controller.js), [utils/pricing.js](../utils/pricing.js).
 
 Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `mongoose`, `express`, `jsonwebtoken`, `bcryptjs`, `mongodb-memory-server`.
 
@@ -932,17 +932,23 @@ Exports: [PENDING](../utils/paymentVerification.js#L23), [APPROVED](../utils/pay
 
 ### utils/pricing.js
 
-[utils/pricing.js](../utils/pricing.js), 81 lines. SHA-256: `19e826a95a17ea3980fa8d51aed3b8298fec4cb33bb170699c5b763e0506bfd3`.
+[utils/pricing.js](../utils/pricing.js), 83 lines. SHA-256: `64fac87e930002032a7f5afa1dc678f149aa6fd769afd592333ebebfc5efc03d`.
 
-Exports: [TIER_FIELDS](../utils/pricing.js#L15), [STORE_TYPES](../utils/pricing.js#L22), [getLocationOverrides](../utils/pricing.js#L30), [applyLocationPrices](../utils/pricing.js#L51), [effectivePrice](../utils/pricing.js#L68).
+Exports: [TIER_FIELDS](../utils/pricing.js#L16), [STORE_TYPES](../utils/pricing.js#L23), [getLocationOverrides](../utils/pricing.js#L31), [applyLocationPrices](../utils/pricing.js#L53), [effectivePrice](../utils/pricing.js#L70).
 
-Local imports: [models/AgentSalesLocation.js](../models/AgentSalesLocation.js).
+Local imports: [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [utils/salesLocation.js](../utils/salesLocation.js).
 
 ### utils/publicError.js
 
 [utils/publicError.js](../utils/publicError.js), 38 lines. SHA-256: `29a1a9c632bc3cfe0cec749c40f64b2d128456666a4c5f56a0a2f3a04299dd73`.
 
 Exports: [publicMessage](../utils/publicError.js#L19).
+
+### utils/salesLocation.js
+
+[utils/salesLocation.js](../utils/salesLocation.js), 16 lines. SHA-256: `dc5de220f9d61c56a029722017c0fceae2d2777283e5ff2e89eee03d185927ea`.
+
+Exports: [normalizeSalesState](../utils/salesLocation.js#L4), [normalizePincode](../utils/salesLocation.js#L11), [coverageForState](../utils/salesLocation.js#L13).
 
 ### utils/salesTarget.js
 

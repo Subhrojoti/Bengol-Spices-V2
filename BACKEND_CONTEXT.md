@@ -45,6 +45,32 @@ snapshot. A new session can recover context from these files while this checkout
 is retained; chat memory itself is not guaranteed to survive deletion. These
 notes are ordinary repository files, not an off-machine backup.
 
+## Store registration coverage fix: 26 October 2026
+
+The production refusal in the owner's screenshot was reproduced: assigned state
+`WEST BENGAL` and pincode `743503` did not match the app's free-text state
+`WEST BANGAL`. Read-only production inspection confirmed that agent's assignment.
+Shared `utils/salesLocation.js` now canonicalizes the observed spelling, WB/W.B.,
+joined West Bengal names, case and whitespace. Store authorization still requires
+the authenticated agent's own pincode in the matching state. It does not guess
+arbitrary spellings, infer a state from an unassigned pin or use another agent's
+coverage. New store addresses and assignment writes use canonical state names;
+legacy territory reads and location pricing use the same normalization. Assignment
+pins are trimmed/deduplicated. Refusals identify missing coverage, state mismatch,
+unassigned pin or invalid pin format. No mobile rebuild or UI changes are needed.
+See [STORE_COVERAGE_FIX.md](BackEnd/docs/STORE_COVERAGE_FIX.md) for test evidence
+and deployment status. Existing mobile and ProductSales edits remain unrelated.
+
+## Dashboard product sales follow-up: 26 October 2026
+
+The owner cancelled the duplicate dashboard product-sales addition because the
+existing Admin **Product Sales** tab already provides product-wise period reports.
+The local dashboard UI/API/test addition was fully reverted before deployment;
+the existing Product Sales tab and its unrelated local edits were preserved.
+For future feature requests, first inspect the existing UI and backend. If the
+feature already exists, tell the owner its section and how to access it rather
+than adding a duplicate. Implement it only when it is missing.
+
 ## Current enhancements: 25 October 2026
 
 These changes supersede the corresponding original-review descriptions below:
