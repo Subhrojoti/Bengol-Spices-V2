@@ -47,6 +47,11 @@ notes are ordinary repository files, not an off-machine backup.
 
 ## Store registration coverage fix: 26 October 2026
 
+**Deployed and verified:** backend application commit `f4a5e09` is pushed to
+GitHub main and live on the VPS. Public API health/database connectivity and
+read-only checks against the affected production coverage passed. The website
+and mobile binaries were not redeployed for this backend-only fix.
+
 The production refusal in the owner's screenshot was reproduced: assigned state
 `WEST BENGAL` and pincode `743503` did not match the app's free-text state
 `WEST BANGAL`. Read-only production inspection confirmed that agent's assignment.

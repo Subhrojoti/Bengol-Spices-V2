@@ -1,7 +1,7 @@
 # Store registration coverage fix
 
-26 October 2026 (Asia/Calcutta). Implementation complete; production deployment
-verification will be recorded below after release.
+26 October 2026 (Asia/Calcutta). Deployed backend application commit `f4a5e09`
+is pushed to GitHub main and verified on production.
 
 ## Confirmed cause
 
@@ -49,3 +49,24 @@ location price preservation, and assignment replacement without price loss.
 
 Production inspection was read-only. No fake store or real payment was created
 to test the production fix.
+
+## Production release verification
+
+Deployed from an isolated archive of the committed backend using
+`deploy/push.sh backend`. Private settings matched the VPS before upload; all
+119 prior runtime file contents matched the known release after normalizing
+Windows/Linux line endings. Service credential checks passed. Deployment saved
+API snapshot `/root/bengol-backups/api-20261026-064016.tgz` and database backup
+`/var/backups/bengol-spices/2026-10-26_0640` before reloading only `bengol-api`.
+Existing backup retention applies; check availability before any rollback.
+
+All 130 deployed backend files matched release SHA-256 fingerprints. Read-only
+checks using the affected agent's actual production assignments accepted
+`WEST BANGAL`/`743503`, whitespace variants, and `W.B.`/`743377`; different-state
+and unassigned-pin cases remained denied. API health reported HTTP 200/database
+connected, public products HTTP 200, protected management HTTP 401 without login.
+Public/admin/employee pages passed existing deployment smoke checks; API HTTPS
+negotiates HTTP/2. Unrelated `bengol-hr-api` stayed online with zero restarts.
+
+No website/mobile redeployment, historical data migration or production test
+registration was performed. Existing installed apps use the fixed backend.
