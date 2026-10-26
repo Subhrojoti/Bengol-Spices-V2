@@ -5,11 +5,15 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Latest verified release:** `ea08a37` (26 October 2026), backend and Admin
+**Latest verified website release:** `9d4754e` (26 October 2026), Admin store-photo
+preview. See [release evidence](deploy/releases/2026-10-26-store-photo-preview.md).
+This was frontend-only; the API was not reloaded.
+
+**Previous backend/Admin release:** `ea08a37` (26 October 2026), backend and Admin
 frontend audit/session hardening. See [current release record](deploy/releases/2026-10-26-admin-audit.md).
 The release entries below retain the earlier deployment history.
 
-**Local Admin follow-up (not deployed):** store photos now open a responsive
+**Admin follow-up pushed/deployed and verified:** store photos now open a responsive
 modal in Orders, Returns, Payment Info and Delivery. This uses existing image
 URLs; no backend behavior changed. See [preview notes](FrontEnd/docs/admin-audit/STORE_PHOTO_PREVIEW.md).
 

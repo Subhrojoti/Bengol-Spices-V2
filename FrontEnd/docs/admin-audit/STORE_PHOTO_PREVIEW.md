@@ -1,7 +1,8 @@
 # Admin store-photo preview — 26 October 2026
 
-Status: local implementation, not pushed or deployed. The current production
-release remains `ea08a37`; see its separate release record.
+Status: pushed, deployed and verified on 26 October 2026, application commit
+`9d4754e`. See [production evidence](../../../deploy/releases/2026-10-26-store-photo-preview.md).
+The backend remains on its previous release; this deployment did not reload it.
 
 The existing UI had static store avatars and no photo preview. Clicking a store
 photo now opens its original URL in a responsive modal in Admin Orders, Returns,
@@ -29,7 +30,7 @@ isolation, keyboard/focus, phone bounds, missing photos, failure/retry, and no
 business mutations. Existing order/return/dispatch workflows exercise the separate
 card-selection control. Validation results are recorded after execution below.
 
-Validation: Admin lint and the production SPA build (`npm run build:spa`) pass.
+Initial local validation: Admin lint and the production SPA build (`npm run build:spa`) pass.
 All 64 existing Admin browser cases pass. Six new photo cases passed on the first
 run; the missing-photo case initially had an ambiguous text locator (the same
 store name appears in navigation). Its locator was scoped to the selection button,
@@ -37,4 +38,11 @@ and all seven photo cases then passed in the focused Chrome run, including the
 added phone backdrop-close check. No application code changed for that test fix.
 All APIs/images were intercepted; no production session or record was touched.
 The existing shared-entry bundle-size warning remains. Prerendering, live-host
-smoke checks and deployment were not performed for this local UI-only follow-up.
+smoke checks and deployment were not performed during that initial local phase.
+
+Release verification subsequently passed the complete build/prerender and all
+71 Chrome cases against an isolated release without the owner's unrelated local
+Product Sales/mobile edits. All 205 website file hashes matched deployment.
+Real Admin sign-in, existing store-image loading, selection isolation, Escape,
+phone sizing/Close and logout passed on the production host. No business records
+were changed. The release report records rollback files and process/page health.

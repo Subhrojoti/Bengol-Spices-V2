@@ -313,7 +313,7 @@
   },
   "storePhotoPreview": {
     "date": "2026-10-26",
-    "status": "local, not pushed/deployed",
+    "status": "pushed, deployed and verified",
     "scope": "Admin Orders, Returns, Payment Info and Delivery; no backend/API changes",
     "adminLint": "passed",
     "spaProductionBuild": "passed",
@@ -335,6 +335,28 @@
       "frontendModules": 155,
       "reachableModules": 96
     },
-    "productionMutations": false
+    "productionMutations": false,
+    "release": {
+      "date": "2026-10-26",
+      "timezone": "Asia/Calcutta",
+      "applicationCommit": "9d4754eedb023ac4123edf1af8f35b73887ae0ec",
+      "pushed": true,
+      "deployed": true,
+      "frontendOnly": true,
+      "backendRestarted": false,
+      "isolatedChrome": {
+        "passed": 71,
+        "failed": 0,
+        "durationMs": 126228.562
+      },
+      "fullBuildAndPrerender": "passed",
+      "adminLint": "passed",
+      "websiteFilesVerified": 205,
+      "liveChromeImagePreview": true,
+      "livePhoneSizingAndEscapeClose": true,
+      "liveStoreSelectionUnchanged": true,
+      "liveBusinessMutations": false,
+      "record": "../../../deploy/releases/2026-10-26-store-photo-preview.md"
+    }
   }
 }
