@@ -2,8 +2,9 @@
 
 Scope: backend only, against application release `f4a5e09` and repository notes.
 This records a source/dependency review and isolated regression checks, not a
-claim that all possible vulnerabilities have been excluded. Production release
-verification is recorded at the end when complete.
+claim that all possible vulnerabilities have been excluded. Application commit
+`841e663` is pushed to GitHub main and deployed; production release verification
+is recorded below.
 
 ## Confirmed issues corrected
 
@@ -69,7 +70,7 @@ record was created/modified by that compatibility check.
 
 All **36 backend tests passed**. Offline validation parsed 118 modules, resolved
 435 relative imports/static exports and extracted 141 unchanged route entries.
-Production deployment evidence is recorded after release.
+Production deployment evidence is recorded below.
 
 ## Review limits and retained architectural concerns
 
@@ -90,3 +91,32 @@ Production deployment evidence is recorded after release.
   separate fault-injection validation before replacing live financial workflows.
 - Throttles and event connections remain in memory, matching the single API process.
   Multi-instance deployment would require shared rate-limit/session-event handling.
+
+## Production release verification
+
+Released on 26 October 2026 from an isolated archive of commit `841e663`, using
+`deploy/push.sh backend`. Before upload, all 120 previous runtime source files
+matched release `7a952b3` after Windows/Linux line-ending normalization; private
+settings were unchanged and the configured JWT secret met the existing minimum
+length. Service credential checks passed before and after upload.
+
+Recovery snapshots taken before reload:
+
+- API: `/root/bengol-backups/api-20261026-071224.tgz`.
+- Database: `/var/backups/bengol-spices/2026-10-26_0712`.
+
+Existing retention rules rotate these; verify availability before relying on a
+listed backup. Only PM2 `bengol-api` was reloaded. Unrelated `bengol-hr-api`
+remained online with zero restarts. No frontend/mobile/nginx deployment occurred.
+
+Verification after reload:
+
+- All **133 deployed backend files** matched release SHA-256 fingerprints.
+- Installed Cloudinary **2.11.0**, Multer **2.5.0**, body-parser **2.4.0**.
+- HTTPS health HTTP 200/database connected and public catalogue HTTP 200.
+- Protected admin/agent endpoints returned HTTP 401 without a token.
+- Configured admin login returned HTTP 200; its token passed read-only dashboard
+  and coverage reads and opened an HTTP 200 event stream, which was then closed.
+  No credentials, tokens or customer response bodies were printed/stored.
+- Existing public/admin/employee page, expected redirect/404, and API HTTP/2 checks
+  passed. Production tests created no stores, orders, payments or password changes.

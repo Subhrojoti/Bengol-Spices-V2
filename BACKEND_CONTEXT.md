@@ -47,6 +47,13 @@ notes are ordinary repository files, not an off-machine backup.
 
 ## Backend security review: 26 October 2026
 
+**Deployed and verified:** application commit `841e663` is pushed to GitHub main
+and live on the VPS. All 36 backend tests passed; production/full dependency
+audits reported zero known vulnerabilities. Deployment file hashes, patched
+versions, API/database health, login and authenticated read/stream smoke checks
+passed. Frontend/mobile were not redeployed. See the report's release section
+for backups and remaining concerns, including public identity-document URLs.
+
 Backend-only follow-up; see
 [SECURITY_REVIEW_2026-10-26.md](BackEnd/docs/SECURITY_REVIEW_2026-10-26.md) for
 confirmed issues, compatibility evidence, deployment status and remaining limits.
