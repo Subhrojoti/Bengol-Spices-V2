@@ -1,28 +1,29 @@
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import { cloudinaryStorage } from "../utils/cloudinaryStorage.js";
 import crypto from "crypto";
 import cloudinary from "../config/cloudinary.js";
 
-const storage = new CloudinaryStorage({
+const storage = cloudinaryStorage({
   cloudinary,
   params: (req, file) => {
     let folder = "bengol_spices/others";
+    const routePath = req.originalUrl.split("?")[0];
 
     // Delivery partner documents
-    if (req.originalUrl.includes("/delivery-partner")) {
+    if (routePath.includes("/delivery-partner")) {
       folder = "bengol_spices/delivery_partners";
     }
 
     // Agent documents
-    if (req.originalUrl.includes("/agent")) {
+    if (routePath.includes("/agent")) {
       folder = "bengol_spices/agents";
     }
     // Products documents
-    if (req.originalUrl.includes("/products")) {
+    if (routePath.includes("/products")) {
       folder = "bengol_spices/products";
     }
     // Employee documents
-    if (req.originalUrl.includes("/employee")) {
+    if (routePath.includes("/employee")) {
       folder = "bengol_spices/employees";
     }
 

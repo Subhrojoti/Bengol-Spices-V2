@@ -196,11 +196,19 @@ export const reserveStock = async (lines) => {
   const taken = [];
 
   for (const line of lines) {
-    const updated = await Product.findOneAndUpdate(
-      { _id: line.productId, stock: { $gte: line.quantity } },
-      { $inc: { stock: -line.quantity } },
-      { new: true },
-    );
+    let updated;
+    try {
+      updated = await Product.findOneAndUpdate(
+        { _id: line.productId, stock: { $gte: line.quantity } },
+        { $inc: { stock: -line.quantity } },
+        { new: true },
+      );
+    } catch (error) {
+      // The caller cannot see reservations until this function returns.
+      // Restore earlier successful lines if a later database operation fails.
+      await releaseStock(taken);
+      throw error;
+    }
 
     if (!updated) {
       // Put back whatever this order already took, so a partial failure

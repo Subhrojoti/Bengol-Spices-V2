@@ -247,6 +247,7 @@ export const loginDeliveryPartner = async (req, res) => {
         id: partner._id,
         role: partner.role,
         name: partner.name,
+        sessionVersion: partner.sessionVersion || 0,
       },
       process.env.JWT_SECRET,
       { expiresIn: "30d" },
@@ -717,23 +718,24 @@ export const changeDeliveryPartnerPassword = async (req, res) => {
       });
     }
 
-    /* Only these two fields are written, so an older record missing some
-       other required detail cannot block a password change.
-       Tokens issued before passwordChangedAt stop working. It is set a
-       moment early so the token issued just below (whose "issued at" is in
-       whole seconds) is not caught by it. */
-    await DeliveryPartner.updateOne(
-      { _id: partner._id },
+    // Compare credential fields atomically; revoke even sessions issued in
+    // the same second and cancel outstanding reset links.
+    const changed = await DeliveryPartner.findOneAndUpdate(
+      { _id: partner._id, password: partner.password, ...((partner.sessionVersion || 0) === 0 ? { sessionVersion: { $in: [null, 0] } } : { sessionVersion: partner.sessionVersion }) },
       {
         $set: {
           password: await bcrypt.hash(newPassword, 10),
-          passwordChangedAt: new Date(Date.now() - 2000),
+          passwordChangedAt: new Date(),
         },
+        $unset: { passwordResetToken: "", passwordResetExpires: "" },
+        $inc: { sessionVersion: 1 },
       },
+      { new: true },
     );
+    if (!changed) return res.status(409).json({ success: false, message: "Your account changed. Please sign in again before changing your password." });
 
     const token = jwt.sign(
-      { id: partner._id, role: partner.role, name: partner.name },
+      { id: changed._id, role: changed.role, name: changed.name, sessionVersion: changed.sessionVersion },
       process.env.JWT_SECRET,
       { expiresIn: "30d" },
     );

@@ -3,6 +3,7 @@ import Product from "../models/Product.js";
 import cloudinary from "../config/cloudinary.js";
 import { UNITS, isKnownUnit, normalizeUnit } from "../utils/uom.js";
 import { sanitizeDescription } from "../utils/sanitizeHtml.js";
+import { publicMessage } from "../utils/publicError.js";
 
 /* What the catalogue shows.
 
@@ -168,7 +169,7 @@ export const createProduct = async (req, res) => {
 
     return res.status(400).json({
       success: false,
-      message: error.message,
+      message: error.code === 11000 ? "Product with this SKU already exists" : publicMessage(error, "The product could not be created. Check the details and try again."),
     });
   }
 };
@@ -221,8 +222,9 @@ export const getProductById = async (req, res) => {
 };
 
 export const updateProduct = async (req, res) => {
-  let newFrontId = null;
-  let newBackId = null;
+  let newFrontId = req.files?.frontImage?.[0]?.filename || null;
+  let newBackId = req.files?.backImage?.[0]?.filename || null;
+  let imagesCommitted = false;
   // 🔥 FIX: these track the OLD images so they can be destroyed only
   // after product.save() succeeds — previously the old images were
   // destroyed immediately, before save() ran. If save() then threw (e.g.
@@ -320,6 +322,7 @@ export const updateProduct = async (req, res) => {
     }
 
     await product.save();
+    imagesCommitted = true;
 
     if (stockAdjustment) {
       await Product.updateOne(
@@ -346,8 +349,10 @@ export const updateProduct = async (req, res) => {
   } catch (error) {
     // Cleanup newly uploaded images on error (old images were never
     // touched in this path, so the product's existing data stays valid)
-    await destroyImage(newFrontId);
-    await destroyImage(newBackId);
+    if (!imagesCommitted) {
+      await destroyImage(newFrontId);
+      await destroyImage(newBackId);
+    }
 
     return res.status(400).json({
       success: false,
@@ -356,7 +361,7 @@ export const updateProduct = async (req, res) => {
       message:
         error.code === 11000
           ? "Product with this SKU already exists"
-          : error.message,
+          : publicMessage(error, "The product could not be updated. Refresh and try again."),
     });
   }
 };

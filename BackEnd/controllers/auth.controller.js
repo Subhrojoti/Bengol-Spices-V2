@@ -52,12 +52,13 @@ export const setPassword = async (req, res) => {
       });
     }
 
-    agent.password = await bcrypt.hash(password, 10);
-    agent.passwordResetToken = undefined;
-    agent.passwordResetExpires = undefined;
-    agent.passwordChangedAt = new Date();
-
-    await agent.save();
+    const changed = await Agent.findOneAndUpdate(
+      { _id: agent._id, passwordResetToken: hashResetToken(token), passwordResetExpires: { $gt: Date.now() } },
+      { $set: { password: await bcrypt.hash(password, 10), passwordChangedAt: new Date() },
+        $unset: { passwordResetToken: "", passwordResetExpires: "" }, $inc: { sessionVersion: 1 } },
+      { new: true },
+    );
+    if (!changed) return res.status(400).json({ success: false, message: "Invalid or expired token" });
     res.json({
       success: true,
       message: "Password set successfully",
@@ -231,23 +232,24 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    /* 6️⃣ Hash and save the new password. Only these two fields are
-       written, so an older record missing some other required detail cannot
-       block a password change. Tokens issued before passwordChangedAt stop
-       working; it is set a moment early so the token issued just below
-       (whose "issued at" is in whole seconds) is not caught by it. */
-    await Agent.updateOne(
-      { _id: agent._id },
+    // Compare credential fields atomically; revoke even sessions issued in
+    // the same second and cancel outstanding reset links.
+    const changed = await Agent.findOneAndUpdate(
+      { _id: agent._id, password: agent.password, ...((agent.sessionVersion || 0) === 0 ? { sessionVersion: { $in: [null, 0] } } : { sessionVersion: agent.sessionVersion }) },
       {
         $set: {
           password: await bcrypt.hash(newPassword, 10),
-          passwordChangedAt: new Date(Date.now() - 2000),
+          passwordChangedAt: new Date(),
         },
+        $unset: { passwordResetToken: "", passwordResetExpires: "" },
+        $inc: { sessionVersion: 1 },
       },
+      { new: true },
     );
+    if (!changed) return res.status(409).json({ success: false, message: "Your account changed. Please sign in again before changing your password." });
 
     const token = jwt.sign(
-      { id: agent._id, agentId: agent.agentId, role: agent.role, sessionVersion: agent.sessionVersion || 0 },
+      { id: changed._id, agentId: changed.agentId, role: changed.role, sessionVersion: changed.sessionVersion },
       process.env.JWT_SECRET,
       { expiresIn: "30d" },
     );
@@ -477,7 +479,7 @@ const issuePasswordReset = async ({ user, roleLabel, resetPath }, res) => {
 const applyPasswordReset = async (Model, req, res) => {
   const { token, password, confirmPassword } = req.body;
 
-  if (!token || typeof password !== "string" || !password) {
+  if (typeof token !== "string" || !token || typeof password !== "string" || !password) {
     return res.status(400).json({
       success: false,
       message: "Token and new password are required",
@@ -518,12 +520,14 @@ const applyPasswordReset = async (Model, req, res) => {
     });
   }
 
-  user.password = await bcrypt.hash(password, 10);
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  // Anyone still logged in with the old password is signed out
-  user.passwordChangedAt = new Date();
-  await user.save();
+  // Consume the token and change credentials in one conditional write.
+  const changed = await Model.findOneAndUpdate(
+    { _id: user._id, passwordResetToken: hashResetToken(token), passwordResetExpires: { $gt: Date.now() } },
+    { $set: { password: await bcrypt.hash(password, 10), passwordChangedAt: new Date() },
+      $unset: { passwordResetToken: "", passwordResetExpires: "" }, $inc: { sessionVersion: 1 } },
+    { new: true },
+  );
+  if (!changed) return res.status(400).json({ success: false, message: "Invalid or expired reset link. Please request a new one." });
 
   return res.json({
     success: true,

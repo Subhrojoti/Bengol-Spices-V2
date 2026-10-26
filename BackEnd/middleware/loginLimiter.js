@@ -25,7 +25,7 @@ const attempts = new Map();
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of attempts) {
-    if (entry.lockedUntil < now && entry.windowStart + WINDOW_MS < now) {
+    if (!entry.pending && entry.lockedUntil < now && entry.windowStart + WINDOW_MS < now) {
       attempts.delete(key);
     }
   }
@@ -57,7 +57,26 @@ export const limitLoginAttempts = (field) => (req, res, next) => {
     });
   }
 
-  res.on("finish", () => {
+  const current = entry || { failures: 0, windowStart: now, lockedUntil: 0, pending: 0 };
+  if (current.windowStart + WINDOW_MS < now) {
+    current.failures = 0;
+    current.windowStart = now;
+    current.lockedUntil = 0;
+  }
+  // Count in-flight checks too: a burst of guesses must not all pass the
+  // gate before the first bcrypt comparison has finished.
+  if (current.failures + (current.pending || 0) >= MAX_FAILURES) {
+    return res.status(429).json({ success: false, message: "Too many login attempts in progress. Please wait a moment and try again." });
+  }
+  current.pending = (current.pending || 0) + 1;
+  attempts.set(key, current);
+  let completed = false;
+  const finish = (countResponse) => {
+    if (completed) return;
+    completed = true;
+    current.pending -= 1;
+    if (attempts.get(key) !== current) return;
+    if (!countResponse) return;
     if (res.statusCode < 400) {
       attempts.delete(key);
       return;
@@ -65,11 +84,12 @@ export const limitLoginAttempts = (field) => (req, res, next) => {
 
     if (!FAILURE_STATUSES.has(res.statusCode)) return;
 
-    const current = attempts.get(key);
-    const fresh =
-      !current || current.windowStart + WINDOW_MS < Date.now()
-        ? { failures: 0, windowStart: Date.now(), lockedUntil: 0 }
-        : current;
+    const fresh = current;
+    if (fresh.windowStart + WINDOW_MS < Date.now()) {
+      fresh.failures = 0;
+      fresh.windowStart = Date.now();
+      fresh.lockedUntil = 0;
+    }
 
     fresh.failures += 1;
     if (fresh.failures >= MAX_FAILURES) {
@@ -79,7 +99,9 @@ export const limitLoginAttempts = (field) => (req, res, next) => {
     }
 
     attempts.set(key, fresh);
-  });
+  };
+  res.once("finish", () => finish(true));
+  res.once("close", () => finish(false));
 
   next();
 };

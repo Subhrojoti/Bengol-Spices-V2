@@ -27,7 +27,7 @@ const ACCOUNTS = {
   DELIVERY_PARTNER: {
     model: DeliveryPartner,
     activeStatus: "ACTIVE",
-    fields: "status passwordChangedAt",
+    fields: "status passwordChangedAt sessionVersion",
   },
 };
 
@@ -45,77 +45,51 @@ export const optionalAuth = (req, res, next) => {
 const unauthorized = (res, message) =>
   res.status(401).json({ success: false, message });
 
-export const protect = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return unauthorized(res, "No token provided");
-  }
-
-  const token = authHeader.slice(7).trim();
-
+// Shared with live-event delivery: long-lived connections must recheck the
+// same account, expiry and permission rules as an ordinary API request.
+export const authenticatedUser = async (token) => {
   let decoded;
   try {
-    // Every token this server issues is HS256; refuse any other algorithm
-    decoded = jwt.verify(token, process.env.JWT_SECRET, {
-      algorithms: ["HS256"],
-    });
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
   } catch (error) {
-    return unauthorized(
-      res,
-      error.name === "TokenExpiredError"
-        ? "Session expired. Please log in again."
-        : "Invalid token",
-    );
+    throw Object.assign(new Error(error.name === "TokenExpiredError"
+      ? "Session expired. Please log in again." : "Invalid token"), { status: 401 });
   }
-
-  req.user = {
-    _id: decoded.id, // 🔥 FIX
-    role: decoded.role,
-    ...decoded,
-  };
-
+  const reject = (message) => { throw Object.assign(new Error(message), { status: 401 }); };
+  if (!decoded || typeof decoded !== "object" ||
+      (decoded.role !== "ADMIN" && !Object.hasOwn(ACCOUNTS, decoded.role))) reject("Invalid token");
+  const user = { ...decoded, _id: decoded.id };
+  if (decoded.role === "ADMIN") return user;
+  if (typeof decoded.id !== "string" || !/^[a-f0-9]{24}$/i.test(decoded.id)) reject("Invalid token");
   const account = ACCOUNTS[decoded.role];
-  if (!account) return next();
+  const record = await account.model.findById(decoded.id).select(account.fields).lean();
+  if (!record) reject("Account not found. Please log in again.");
+  if (record.status !== account.activeStatus) reject("Your account is no longer active.");
+  if (decoded.role === "AGENT" && !agentSessionMatches(record, decoded)) {
+    reject("Your access has changed. Please contact the office or sign in again.");
+  }
+  if (decoded.role === "DELIVERY_PARTNER" && (record.sessionVersion || 0) !== (decoded.sessionVersion || 0)) {
+    reject("Your password was changed. Please log in again.");
+  }
+  if (record.passwordChangedAt && decoded.iat * 1000 + 1000 < new Date(record.passwordChangedAt).getTime()) {
+    reject("Your password was changed. Please log in again.");
+  }
+  if (decoded.role === "EMPLOYEE") {
+    user.permissions = record.permissions || {};
+    user.name = record.name;
+  }
+  return user;
+};
 
+export const protect = async (req, res, next) => {
+  const header = req.headers.authorization;
+  if (typeof header !== "string" || !header.startsWith("Bearer ")) return unauthorized(res, "No token provided");
   try {
-    const record = decoded.id
-      ? await account.model.findById(decoded.id).select(account.fields).lean()
-      : null;
-
-    if (!record) {
-      return unauthorized(res, "Account not found. Please log in again.");
-    }
-
-    if (record.status !== account.activeStatus) {
-      return unauthorized(res, "Your account is no longer active.");
-    }
-    if (decoded.role === "AGENT" && !agentSessionMatches(record, decoded)) {
-      return unauthorized(res, "Your access has changed. Please contact the office or sign in again.");
-    }
-
-    // A second of slack for a login made in the same instant as the reset
-    if (
-      record.passwordChangedAt &&
-      decoded.iat * 1000 + 1000 < new Date(record.passwordChangedAt).getTime()
-    ) {
-      return unauthorized(
-        res,
-        "Your password was changed. Please log in again.",
-      );
-    }
-
-    if (decoded.role === "EMPLOYEE") {
-      req.user.permissions = record.permissions || {};
-      req.user.name = record.name;
-    }
-
-    next();
+    req.user = await authenticatedUser(header.slice(7).trim());
+    return next();
   } catch (error) {
+    if (error.status === 401) return unauthorized(res, error.message);
     console.error("AUTH CHECK ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Could not verify your session. Please try again.",
-    });
+    return res.status(500).json({ success: false, message: "Could not verify your session. Please try again." });
   }
 };

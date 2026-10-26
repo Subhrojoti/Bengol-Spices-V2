@@ -5,8 +5,8 @@ See [backend context](../../BACKEND_CONTEXT.md) and [implementation report](PROD
 
 ## Offline validation
 
-- Parsed **116** first-party JS/MJS files, including test and documentation scripts.
-- Checked **415** relative imports: all files and static named/default exports resolve.
+- Parsed **118** first-party JS/MJS files, including test and documentation scripts.
+- Checked **435** relative imports: all files and static named/default exports resolve.
 - Extracted **141** registered method/path entries, including health.
 - This script imports no application code and connects to no services.
 - Runtime tests/build results and remaining live checks are recorded in the implementation report.
@@ -80,9 +80,9 @@ Package/built-in imports: `mongoose`.
 
 ### controllers/auth.controller.js
 
-[controllers/auth.controller.js](../controllers/auth.controller.js), 646 lines. SHA-256: `8128fb7827cf24150494b1d4b80fd2b25fe9e647ee5d9f399f80f220d984e7a0`.
+[controllers/auth.controller.js](../controllers/auth.controller.js), 650 lines. SHA-256: `23451870f74a657009eb6864829a55879541c0f205327088b9a96b87a0af21d5`.
 
-Exports: [setPassword](../controllers/auth.controller.js#L13), [agentLogin](../controllers/auth.controller.js#L72), [changePassword](../controllers/auth.controller.js#L152), [logout](../controllers/auth.controller.js#L270), [employeeLogin](../controllers/auth.controller.js#L285), [employeeLogout](../controllers/auth.controller.js#L366), [agentForgotPassword](../controllers/auth.controller.js#L535), [agentResetPassword](../controllers/auth.controller.js#L581), [deliveryPartnerForgotPassword](../controllers/auth.controller.js#L594), [deliveryPartnerResetPassword](../controllers/auth.controller.js#L635).
+Exports: [setPassword](../controllers/auth.controller.js#L13), [agentLogin](../controllers/auth.controller.js#L73), [changePassword](../controllers/auth.controller.js#L153), [logout](../controllers/auth.controller.js#L272), [employeeLogin](../controllers/auth.controller.js#L287), [employeeLogout](../controllers/auth.controller.js#L368), [agentForgotPassword](../controllers/auth.controller.js#L539), [agentResetPassword](../controllers/auth.controller.js#L585), [deliveryPartnerForgotPassword](../controllers/auth.controller.js#L598), [deliveryPartnerResetPassword](../controllers/auth.controller.js#L639).
 
 Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [utils/email.js](../utils/email.js), [utils/frontendUrl.js](../utils/frontendUrl.js), [utils/agentAccess.js](../utils/agentAccess.js).
 
@@ -106,9 +106,9 @@ Local imports: [models/Order.js](../models/Order.js), [services/deliveryTrail.se
 
 ### controllers/deliveryPartner.controller.js
 
-[controllers/deliveryPartner.controller.js](../controllers/deliveryPartner.controller.js), 754 lines. SHA-256: `8a297632f4b208198feaaee255bfd21644a91123dde5acdf0cbbb0e26ef8e91b`.
+[controllers/deliveryPartner.controller.js](../controllers/deliveryPartner.controller.js), 756 lines. SHA-256: `eaccdc4bdfa9b8d86dad404a76de564886794dce61d93aea83e0058f9b299232`.
 
-Exports: [registerDeliveryPartner](../controllers/deliveryPartner.controller.js#L16), [loginDeliveryPartner](../controllers/deliveryPartner.controller.js#L173), [logoutDeliveryPartner](../controllers/deliveryPartner.controller.js#L269), [getAllDeliveryPartners](../controllers/deliveryPartner.controller.js#L301), [getMyAssignedOrders](../controllers/deliveryPartner.controller.js#L346), [getDeliveryPartnerDashboard](../controllers/deliveryPartner.controller.js#L387), [getProfile](../controllers/deliveryPartner.controller.js#L559), [getMyDeliveryHistory](../controllers/deliveryPartner.controller.js#L623), [getDeliveryPartnerHistory](../controllers/deliveryPartner.controller.js#L636), [changeDeliveryPartnerPassword](../controllers/deliveryPartner.controller.js#L665).
+Exports: [registerDeliveryPartner](../controllers/deliveryPartner.controller.js#L16), [loginDeliveryPartner](../controllers/deliveryPartner.controller.js#L173), [logoutDeliveryPartner](../controllers/deliveryPartner.controller.js#L270), [getAllDeliveryPartners](../controllers/deliveryPartner.controller.js#L302), [getMyAssignedOrders](../controllers/deliveryPartner.controller.js#L347), [getDeliveryPartnerDashboard](../controllers/deliveryPartner.controller.js#L388), [getProfile](../controllers/deliveryPartner.controller.js#L560), [getMyDeliveryHistory](../controllers/deliveryPartner.controller.js#L624), [getDeliveryPartnerHistory](../controllers/deliveryPartner.controller.js#L637), [changeDeliveryPartnerPassword](../controllers/deliveryPartner.controller.js#L666).
 
 Local imports: [models/DeliveryPartner.js](../models/DeliveryPartner.js), [config/cloudinary.js](../config/cloudinary.js), [models/Order.js](../models/Order.js), [models/Return.js](../models/Return.js), [models/Agent.js](../models/Agent.js), [utils/formFields.js](../utils/formFields.js), [utils/publicError.js](../utils/publicError.js), [services/deliveryTrail.service.js](../services/deliveryTrail.service.js).
 
@@ -160,9 +160,9 @@ Package/built-in imports: `crypto`, `mongoose`.
 
 ### controllers/order.controller.js
 
-[controllers/order.controller.js](../controllers/order.controller.js), 3086 lines. SHA-256: `b27e3d1324574ec4c0be99d2924d6db6f0b3edac65727f1457cef97ee7e71cf4`.
+[controllers/order.controller.js](../controllers/order.controller.js), 3094 lines. SHA-256: `8f58f32701b6f0302900d8d4e6f303f604191c9e62275f4e60cdc0bccfd52e86`.
 
-Exports: [releaseStock](../controllers/order.controller.js#L182), [reserveStock](../controllers/order.controller.js#L195), [placeOrder](../controllers/order.controller.js#L229), [getOrdersByStoreConsumerId](../controllers/order.controller.js#L824), [getMyOrder](../controllers/order.controller.js#L898), [getMyOrders](../controllers/order.controller.js#L933), [getAllOrders](../controllers/order.controller.js#L963), [getActiveOrders](../controllers/order.controller.js#L1015), [confirmOrder](../controllers/order.controller.js#L1041), [cancelOrder](../controllers/order.controller.js#L1106), [assignDeliveryPartner](../controllers/order.controller.js#L1250), [updateDeliveryStatus](../controllers/order.controller.js#L1427), [collectPayment](../controllers/order.controller.js#L1741), [getOrderPayments](../controllers/order.controller.js#L1812), [getAgentDueOrders](../controllers/order.controller.js#L1832), [getCompletePaymentSummary](../controllers/order.controller.js#L1859), [getAgentCollectionPerformance](../controllers/order.controller.js#L2012), [createShipment](../controllers/order.controller.js#L2064), [createRazorpayOrder](../controllers/order.controller.js#L2109), [verifyRazorpayPayment](../controllers/order.controller.js#L2175), [createOrderPayment](../controllers/order.controller.js#L2277), [verifyPaymentAndPlaceOrder](../controllers/order.controller.js#L2328), [createInitialPaymentQr](../controllers/order.controller.js#L2490), [createDuePaymentQr](../controllers/order.controller.js#L2541), [checkQrPaymentStatus](../controllers/order.controller.js#L2608), [verifyQrAndPlaceOrder](../controllers/order.controller.js#L2658), [verifyDueQrPayment](../controllers/order.controller.js#L2786), [getPaymentIssues](../controllers/order.controller.js#L2929), [refundPaymentIssue](../controllers/order.controller.js#L3023), [resolvePaymentIssue](../controllers/order.controller.js#L3054).
+Exports: [releaseStock](../controllers/order.controller.js#L182), [reserveStock](../controllers/order.controller.js#L195), [placeOrder](../controllers/order.controller.js#L237), [getOrdersByStoreConsumerId](../controllers/order.controller.js#L832), [getMyOrder](../controllers/order.controller.js#L906), [getMyOrders](../controllers/order.controller.js#L941), [getAllOrders](../controllers/order.controller.js#L971), [getActiveOrders](../controllers/order.controller.js#L1023), [confirmOrder](../controllers/order.controller.js#L1049), [cancelOrder](../controllers/order.controller.js#L1114), [assignDeliveryPartner](../controllers/order.controller.js#L1258), [updateDeliveryStatus](../controllers/order.controller.js#L1435), [collectPayment](../controllers/order.controller.js#L1749), [getOrderPayments](../controllers/order.controller.js#L1820), [getAgentDueOrders](../controllers/order.controller.js#L1840), [getCompletePaymentSummary](../controllers/order.controller.js#L1867), [getAgentCollectionPerformance](../controllers/order.controller.js#L2020), [createShipment](../controllers/order.controller.js#L2072), [createRazorpayOrder](../controllers/order.controller.js#L2117), [verifyRazorpayPayment](../controllers/order.controller.js#L2183), [createOrderPayment](../controllers/order.controller.js#L2285), [verifyPaymentAndPlaceOrder](../controllers/order.controller.js#L2336), [createInitialPaymentQr](../controllers/order.controller.js#L2498), [createDuePaymentQr](../controllers/order.controller.js#L2549), [checkQrPaymentStatus](../controllers/order.controller.js#L2616), [verifyQrAndPlaceOrder](../controllers/order.controller.js#L2666), [verifyDueQrPayment](../controllers/order.controller.js#L2794), [getPaymentIssues](../controllers/order.controller.js#L2937), [refundPaymentIssue](../controllers/order.controller.js#L3031), [resolvePaymentIssue](../controllers/order.controller.js#L3062).
 
 Local imports: [models/Counter.js](../models/Counter.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Employee.js](../models/Employee.js), [models/Admin.js](../models/Admin.js), [models/Order.js](../models/Order.js), [models/store.js](../models/store.js), [models/Product.js](../models/Product.js), [models/Invoice.js](../models/Invoice.js), [services/invoice.service.js](../services/invoice.service.js), [services/shiprocket.service.js](../services/shiprocket.service.js), [models/Payment.js](../models/Payment.js), [services/notification.service.js](../services/notification.service.js), [config/razorpay.js](../config/razorpay.js), [models/Agent.js](../models/Agent.js), [services/target.service.js](../services/target.service.js), [services/salesTarget.service.js](../services/salesTarget.service.js), [services/cashVerification.service.js](../services/cashVerification.service.js), [utils/pricing.js](../utils/pricing.js), [utils/paymentVerification.js](../utils/paymentVerification.js), [utils/uom.js](../utils/uom.js), [services/liveEvents.js](../services/liveEvents.js), [services/deliveryTrail.service.js](../services/deliveryTrail.service.js), [utils/geo.js](../utils/geo.js), [models/GatewayPayment.js](../models/GatewayPayment.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/payment.service.js](../services/payment.service.js).
 
@@ -170,11 +170,11 @@ Package/built-in imports: `crypto`, `mongoose`.
 
 ### controllers/product.controller.js
 
-[controllers/product.controller.js](../controllers/product.controller.js), 455 lines. SHA-256: `69c6be571fdf168c66d3835b5678a7296b3ea79ccfc30a6fefa424a7dbb3adad`.
+[controllers/product.controller.js](../controllers/product.controller.js), 460 lines. SHA-256: `dadcf3f5daee85d54f68362e0a5ca3edeb059a38be447552fcec494af637ed1d`.
 
-Exports: [createProduct](../controllers/product.controller.js#L77), [getAllProductsInternal](../controllers/product.controller.js#L177), [getProductById](../controllers/product.controller.js#L195), [updateProduct](../controllers/product.controller.js#L223), [deleteProduct](../controllers/product.controller.js#L365), [getAllPublicProducts](../controllers/product.controller.js#L405), [getSinglePublicProduct](../controllers/product.controller.js#L425).
+Exports: [createProduct](../controllers/product.controller.js#L78), [getAllProductsInternal](../controllers/product.controller.js#L178), [getProductById](../controllers/product.controller.js#L196), [updateProduct](../controllers/product.controller.js#L224), [deleteProduct](../controllers/product.controller.js#L370), [getAllPublicProducts](../controllers/product.controller.js#L410), [getSinglePublicProduct](../controllers/product.controller.js#L430).
 
-Local imports: [models/Product.js](../models/Product.js), [config/cloudinary.js](../config/cloudinary.js), [utils/uom.js](../utils/uom.js), [utils/sanitizeHtml.js](../utils/sanitizeHtml.js).
+Local imports: [models/Product.js](../models/Product.js), [config/cloudinary.js](../config/cloudinary.js), [utils/uom.js](../utils/uom.js), [utils/sanitizeHtml.js](../utils/sanitizeHtml.js), [utils/publicError.js](../utils/publicError.js).
 
 Package/built-in imports: `mongoose`.
 
@@ -198,9 +198,9 @@ Local imports: [services/salesTarget.service.js](../services/salesTarget.service
 
 ### controllers/store.controller.js
 
-[controllers/store.controller.js](../controllers/store.controller.js), 381 lines. SHA-256: `1b8231da648f5c19c17def4006910a98612f265e00a400a86e1f5b0fbe95b5e5`.
+[controllers/store.controller.js](../controllers/store.controller.js), 384 lines. SHA-256: `11138bc5116a56c8f45c72d1b367c3f888beb96eef7d2bf2e418ec41bba97f3a`.
 
-Exports: [getStoreCatalog](../controllers/store.controller.js#L32), [createStore](../controllers/store.controller.js#L97), [getMyStores](../controllers/store.controller.js#L320), [getAllStores](../controllers/store.controller.js#L358).
+Exports: [getStoreCatalog](../controllers/store.controller.js#L32), [createStore](../controllers/store.controller.js#L97), [getMyStores](../controllers/store.controller.js#L323), [getAllStores](../controllers/store.controller.js#L361).
 
 Local imports: [models/store.js](../models/store.js), [config/cloudinary.js](../config/cloudinary.js), [models/AgentTargetProgress.js](../models/AgentTargetProgress.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [models/Counter.js](../models/Counter.js), [models/Product.js](../models/Product.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/target.service.js](../services/target.service.js), [utils/publicError.js](../utils/publicError.js), [utils/salesLocation.js](../utils/salesLocation.js), [utils/pricing.js](../utils/pricing.js).
 
@@ -226,9 +226,9 @@ Package/built-in imports: `mongoose`.
 
 ### middleware/auth.js
 
-[middleware/auth.js](../middleware/auth.js), 122 lines. SHA-256: `ae4b55b494f7ec1cd384077bdbb6ee3ce6957c8faf41f0287efa21de1dc65b39`.
+[middleware/auth.js](../middleware/auth.js), 96 lines. SHA-256: `bcb0bc47a233e8b455f7d425a8fd8791f2d8cfe43843661e94b6f6f5edb04716`.
 
-Exports: [optionalAuth](../middleware/auth.js#L40), [protect](../middleware/auth.js#L48).
+Exports: [optionalAuth](../middleware/auth.js#L40), [authenticatedUser](../middleware/auth.js#L50), [protect](../middleware/auth.js#L84).
 
 Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [utils/agentAccess.js](../utils/agentAccess.js).
 
@@ -236,7 +236,7 @@ Package/built-in imports: `jsonwebtoken`.
 
 ### middleware/loginLimiter.js
 
-[middleware/loginLimiter.js](../middleware/loginLimiter.js), 86 lines. SHA-256: `b99707ee129ffa77f5b91708aad07593da970e4ba8be14b2d0254c6d29f654db`.
+[middleware/loginLimiter.js](../middleware/loginLimiter.js), 108 lines. SHA-256: `ea1036360a92447a99121231910914d006718327dcd55fa120f2d66e5fc68cf2`.
 
 Exports: [limitLoginAttempts](../middleware/loginLimiter.js#L37).
 
@@ -260,13 +260,13 @@ Exports: [isAdmin](../middleware/role.js#L1), [isAgent](../middleware/role.js#L1
 
 ### middleware/upload.js
 
-[middleware/upload.js](../middleware/upload.js), 71 lines. SHA-256: `920a6708502c1fef81346cc56a489124d9cfdc0e5cc8b964452ce8cdf379720a`.
+[middleware/upload.js](../middleware/upload.js), 72 lines. SHA-256: `aeb6f4c74b9675fd3c8d3597d45267ea7de10504f1ec32e230f39a90abef256d`.
 
-Exports: [upload](../middleware/upload.js#L61).
+Exports: [upload](../middleware/upload.js#L62).
 
-Local imports: [config/cloudinary.js](../config/cloudinary.js).
+Local imports: [utils/cloudinaryStorage.js](../utils/cloudinaryStorage.js), [config/cloudinary.js](../config/cloudinary.js).
 
-Package/built-in imports: `multer`, `multer-storage-cloudinary`, `crypto`.
+Package/built-in imports: `multer`, `crypto`.
 
 ### models/Admin.js
 
@@ -342,9 +342,9 @@ Package/built-in imports: `mongoose`.
 
 ### models/DeliveryPartner.js
 
-[models/DeliveryPartner.js](../models/DeliveryPartner.js), 113 lines. SHA-256: `3bf4e8f03a2ad1f9d1d8040444c8f72a3bb5de788559e157b9734415ab5f88b4`.
+[models/DeliveryPartner.js](../models/DeliveryPartner.js), 114 lines. SHA-256: `d4a386aea9944a4a48ff4a2c7630cec65d315e1bd91706265fc050c099d9d3ba`.
 
-Exports: [default](../models/DeliveryPartner.js#L112).
+Exports: [default](../models/DeliveryPartner.js#L113).
 
 Package/built-in imports: `mongoose`.
 
@@ -760,9 +760,11 @@ Local imports: [models/Agent.js](../models/Agent.js), [models/Order.js](../model
 
 ### services/liveEvents.js
 
-[services/liveEvents.js](../services/liveEvents.js), 121 lines. SHA-256: `46395458ea263c2a418dc2a960d3b5fe2072060cba1cc76b5f7287e994918751`.
+[services/liveEvents.js](../services/liveEvents.js), 120 lines. SHA-256: `e78baee591c741c4791a11c550e9a071004498db635b6ab4c3b8817b1898036c`.
 
-Exports: [openEventStream](../services/liveEvents.js#L36), [publish](../services/liveEvents.js#L89), [closeEventStreams](../services/liveEvents.js#L111).
+Exports: [openEventStream](../services/liveEvents.js#L29), [publish](../services/liveEvents.js#L83), [closeEventStreams](../services/liveEvents.js#L110).
+
+Local imports: [middleware/auth.js](../middleware/auth.js).
 
 ### services/mediaCleanup.service.js
 
@@ -860,6 +862,16 @@ Local imports: [models/Agent.js](../models/Agent.js), [models/store.js](../model
 
 Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `mongoose`, `express`, `jsonwebtoken`, `bcryptjs`, `mongodb-memory-server`.
 
+### tests/security-regressions.test.js
+
+[tests/security-regressions.test.js](../tests/security-regressions.test.js), 238 lines. SHA-256: `745d9f666b59bc13a4aaa37ea3161b2ec0a9272f1fd3711805d6b15bdbff7e3a`.
+
+Exports: none.
+
+Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Product.js](../models/Product.js), [routes/auth.routes.js](../routes/auth.routes.js), [routes/agent.routes.js](../routes/agent.routes.js), [routes/deliveryPartner.routes.js](../routes/deliveryPartner.routes.js), [routes/events.routes.js](../routes/events.routes.js), [middleware/auth.js](../middleware/auth.js), [middleware/upload.js](../middleware/upload.js), [services/liveEvents.js](../services/liveEvents.js), [controllers/order.controller.js](../controllers/order.controller.js), [config/cloudinary.js](../config/cloudinary.js), [utils/cloudinaryStorage.js](../utils/cloudinaryStorage.js), [middleware/loginLimiter.js](../middleware/loginLimiter.js), [controllers/store.controller.js](../controllers/store.controller.js), [controllers/product.controller.js](../controllers/product.controller.js).
+
+Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `node:stream`, `node:events`, `node:zlib`, `mongoose`, `express`, `jsonwebtoken`, `bcryptjs`, `mongodb-memory-server`.
+
 ### utils/agentAccess.js
 
 [utils/agentAccess.js](../utils/agentAccess.js), 9 lines. SHA-256: `9499d6ca1011df53f636206738965778b080aa459c6f0361ceb2d9a6a0a0413e`.
@@ -871,6 +883,14 @@ Exports: [ACCESS_STATUSES](../utils/agentAccess.js#L1), [agentMaySignIn](../util
 [utils/checkConfig.js](../utils/checkConfig.js), 44 lines. SHA-256: `530018667c57de926d894b3b9e32fef0163678966a7b3f66387162b22bfd9a6f`.
 
 Exports: [missingConfig](../utils/checkConfig.js#L32), [reportMissingConfig](../utils/checkConfig.js#L35).
+
+### utils/cloudinaryStorage.js
+
+[utils/cloudinaryStorage.js](../utils/cloudinaryStorage.js), 37 lines. SHA-256: `f95bee4a48a8d09772c26ffd70f4b184d6ecd978dc481a53a30f7261714938c3`.
+
+Exports: [cloudinaryStorage](../utils/cloudinaryStorage.js#L5).
+
+Package/built-in imports: `node:stream`.
 
 ### utils/email.js
 

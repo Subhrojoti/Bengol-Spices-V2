@@ -9,23 +9,16 @@
    everything. Clients live in memory — right for one server process.
    ===================================================================== */
 
+import { authenticatedUser } from "../middleware/auth.js";
+
 const clients = new Set();
 
 // nginx closes an idle proxied connection after 60s; a comment line every
 // 25s keeps the stream open and is ignored by the browser
 const HEARTBEAT_MS = 25 * 1000;
 
-/* 🔒 Who is listening is checked when a stream opens, and a stream then
-   stays open for as long as the panel does: all day, or for as long as
-   anything else cares to hold the connection. Nothing looked again. An
-   employee who was deactivated, or whose permission was taken away, went on
-   being sent every new order and every cash payment for as long as they
-   kept the connection, and so did a sign-in that had since run out.
-
-   So no stream lives longer than this. The panel reconnects by itself
-   within a second (hooks/useLiveOrders.jsx), and reconnecting goes through
-   the same sign-in check as any other request: the account must still be
-   active, the sign-in still valid, and the permissions are read afresh. */
+// Recycle idle connections periodically. Every published business event also
+// revalidates the token and reads current employee permissions before sending.
 const MAX_STREAM_MS = Number(process.env.EVENT_STREAM_MAX_MS) || 30 * 60 * 1000;
 
 const mayReceive = (user, permission) =>
@@ -42,7 +35,7 @@ export const openEventStream = (req, res) => {
   });
   res.write("event: ready\ndata: {}\n\n");
 
-  const client = { res, user: req.user };
+  const client = { res, user: req.user, token: req.headers.authorization.slice(7).trim(), pending: Promise.resolve() };
   clients.add(client);
 
   /* Everything that ends a stream goes through here, and takes it off the
@@ -56,6 +49,7 @@ export const openEventStream = (req, res) => {
     clearTimeout(recycle);
     clients.delete(client);
   };
+  client.close = () => { drop(); res.end(); };
 
   const heartbeat = setInterval(() => {
     try {
@@ -86,21 +80,26 @@ export const openEventStream = (req, res) => {
  * @param {object} payload     data for the panel
  * @param {string} permission  employee permission that unlocks this event
  */
-export const publish = (type, payload, permission) => {
-  const message = `event: ${type}\ndata: ${JSON.stringify({
-    type,
-    at: new Date().toISOString(),
-    ...payload,
-  })}\n\n`;
-
-  for (const client of clients) {
-    if (!mayReceive(client.user, permission)) continue;
-    try {
-      client.res.write(message);
-    } catch {
-      clients.delete(client);
-    }
+export const publish = async (type, payload, permission) => {
+  let message;
+  try {
+    message = `event: ${type}\ndata: ${JSON.stringify({ type, at: new Date().toISOString(), ...payload })}\n\n`;
+  } catch {
+    // Notification formatting must never reject an already-completed action.
+    return;
   }
+
+  await Promise.all([...clients].map((client) => {
+    client.pending = client.pending.then(async () => {
+      if (!clients.has(client)) return;
+      client.user = await authenticatedUser(client.token);
+      if (clients.has(client) && mayReceive(client.user, permission)) client.res.write(message);
+    }).catch(() => {
+      // Fail closed on revoked/expired sessions or a failed authorization read.
+      try { client.close(); } catch { clients.delete(client); }
+    });
+    return client.pending;
+  }));
 };
 
 /**
@@ -111,7 +110,7 @@ export const publish = (type, payload, permission) => {
 export const closeEventStreams = () => {
   for (const client of clients) {
     try {
-      client.res.end();
+      client.close();
     } catch {
       /* already gone */
     }

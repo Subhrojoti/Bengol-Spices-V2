@@ -31,6 +31,7 @@ const deliveryPartnerSchema = new mongoose.Schema(
     passwordResetExpires: Date,
     // Logins issued before this moment are no longer accepted
     passwordChangedAt: Date,
+    sessionVersion: { type: Number, default: 0 },
 
     address: {
       state: {

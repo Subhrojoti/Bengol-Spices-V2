@@ -45,6 +45,23 @@ snapshot. A new session can recover context from these files while this checkout
 is retained; chat memory itself is not guaranteed to survive deletion. These
 notes are ordinary repository files, not an off-machine backup.
 
+## Backend security review: 26 October 2026
+
+Backend-only follow-up; see
+[SECURITY_REVIEW_2026-10-26.md](BackEnd/docs/SECURITY_REVIEW_2026-10-26.md) for
+confirmed issues, compatibility evidence, deployment status and remaining limits.
+Reset/setup links are consumed atomically; agent/partner password changes
+increment session versions and cancel reset links. Legacy version-zero sessions
+remain accepted until credentials/access change. DeliveryPartner now has optional
+default-zero sessionVersion. Shared authenticatedUser() validates both requests
+and each published live event, so revoked employee permissions do not persist on
+open streams. Concurrent login checks count toward the existing account throttle.
+Partial failed stock reservations compensate earlier successful decrements.
+Early upload cleanup/committed-image retention and product error handling are fixed.
+Cloudinary/Multer/body-parser are patched; the old Cloudinary-1.x-only Multer
+adapter is replaced with utils/cloudinaryStorage.js while retaining file metadata.
+There is no frontend/mobile change or bulk customer-data migration.
+
 ## Store registration coverage fix: 26 October 2026
 
 **Deployed and verified:** backend application commit `f4a5e09` is pushed to

@@ -115,7 +115,8 @@ export const createStore = async (req, res) => {
     return code;
   };
 
-  let uploadedImageId = null;
+  // Multer has already uploaded the photo, even if address/type validation fails.
+  let uploadedImageId = req.file?.filename || null;
 
   try {
     const {
@@ -282,6 +283,8 @@ export const createStore = async (req, res) => {
       },
       status: "ACTIVE",
     });
+    // A persisted store now owns this photo; later failures must not delete it.
+    uploadedImageId = null;
 
     await updateTargetProgress({
       agentId: req.user.agentId,
