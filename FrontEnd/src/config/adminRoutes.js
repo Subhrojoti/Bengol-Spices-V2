@@ -1,10 +1,6 @@
+import { lazy } from "react";
 // import AdminSettings from "../pages/Admin/AdminSettings";
 // import AdminProfile from "../pages/Admin/AdminProfile";
-import AdminDashboard from "../pages/Admin/Tabs/AdminDashboard/AdminDashboard";
-import Agent from "../pages/Admin/Tabs/Agent/Agent";
-import EmpCreation from "../pages/Admin/Tabs/EmpCreation/EmpCreation";
-import ProductCreation from "../pages/Admin/Tabs/ProductCreation/ProductCreation";
-import AllProducts from "../pages/Admin/Tabs/AllProducts/AllProducts";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import Groups3Icon from "@mui/icons-material/Groups3";
@@ -17,15 +13,21 @@ import AdsClickIcon from "@mui/icons-material/AdsClick";
 import QueryStatsIcon from "@mui/icons-material/QueryStats";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import { AllInbox, LocalShipping, OutboxOutlined } from "@mui/icons-material";
-import Delivery from "../pages/Admin/Tabs/Delivery/Delivery";
-import OrderManagement from "../pages/Admin/Tabs/Orders/OrderManagement";
-import ReturnManagement from "../pages/Admin/Tabs/Returns/ReturnManagement";
-import PaymentInfo from "../pages/Admin/Tabs/PaymentInfo/PaymentInfo";
-import Targets from "../pages/Admin/Tabs/Targets/Targets";
-import ProductSales from "../pages/Admin/Tabs/ProductSales/ProductSales";
-import CashVerification from "../pages/Admin/Tabs/CashVerification/CashVerification";
-import CustomNotification from "../pages/Admin/Tabs/CustomNotification/CustomNotification";
-import AssignLocation from "../pages/Admin/Tabs/AssignLocation/AssignLocation";
+
+const AdminDashboard = lazy(() => import("../pages/Admin/Tabs/AdminDashboard/AdminDashboard"));
+const Agent = lazy(() => import("../pages/Admin/Tabs/Agent/Agent"));
+const EmpCreation = lazy(() => import("../pages/Admin/Tabs/EmpCreation/EmpCreation"));
+const ProductCreation = lazy(() => import("../pages/Admin/Tabs/ProductCreation/ProductCreation"));
+const AllProducts = lazy(() => import("../pages/Admin/Tabs/AllProducts/AllProducts"));
+const Delivery = lazy(() => import("../pages/Admin/Tabs/Delivery/Delivery"));
+const OrderManagement = lazy(() => import("../pages/Admin/Tabs/Orders/OrderManagement"));
+const ReturnManagement = lazy(() => import("../pages/Admin/Tabs/Returns/ReturnManagement"));
+const PaymentInfo = lazy(() => import("../pages/Admin/Tabs/PaymentInfo/PaymentInfo"));
+const Targets = lazy(() => import("../pages/Admin/Tabs/Targets/Targets"));
+const ProductSales = lazy(() => import("../pages/Admin/Tabs/ProductSales/ProductSales"));
+const CashVerification = lazy(() => import("../pages/Admin/Tabs/CashVerification/CashVerification"));
+const CustomNotification = lazy(() => import("../pages/Admin/Tabs/CustomNotification/CustomNotification"));
+const AssignLocation = lazy(() => import("../pages/Admin/Tabs/AssignLocation/AssignLocation"));
 
 export const adminRoutes = [
   {

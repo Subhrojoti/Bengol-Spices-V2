@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { lazy, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BellRing, Truck, UserCheck } from "lucide-react";
 
-import DeliveryManagement from "./tabs/DeliveryManagement";
-import DeliveryApproval from "./tabs/DeliveryApproval";
-import DeliveryAlerts from "./tabs/DeliveryAlerts";
+const DeliveryManagement = lazy(() => import("./tabs/DeliveryManagement"));
+const DeliveryApproval = lazy(() => import("./tabs/DeliveryApproval"));
+const DeliveryAlerts = lazy(() => import("./tabs/DeliveryAlerts"));
+import AdminSectionBoundary from "../../../../components/common/AdminSectionBoundary";
 
 const TABS = [
   { key: "dispatch", label: "Dispatch", icon: Truck, Component: DeliveryManagement },

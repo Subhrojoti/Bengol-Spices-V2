@@ -1,13 +1,13 @@
 # Backend source map and review snapshot
 
-Updated 25 October 2026 after production enhancements. Original baseline HEAD: `59354fc6f86731fd74f9099e4d6036690b8b2a2e`.
+Updated 26 October 2026 including the local Admin session follow-up. Original baseline HEAD: `59354fc6f86731fd74f9099e4d6036690b8b2a2e`.
 See [backend context](../../BACKEND_CONTEXT.md) and [implementation report](PRODUCTION_ENHANCEMENTS.md).
 
 ## Offline validation
 
-- Parsed **118** first-party JS/MJS files, including test and documentation scripts.
-- Checked **435** relative imports: all files and static named/default exports resolve.
-- Extracted **141** registered method/path entries, including health.
+- Parsed **121** first-party JS/MJS files, including test and documentation scripts.
+- Checked **446** relative imports: all files and static named/default exports resolve.
+- Extracted **143** registered method/path entries, including health.
 - This script imports no application code and connects to no services.
 - Runtime tests/build results and remaining live checks are recorded in the implementation report.
 - Regenerate with `node BackEnd/scripts/review-source.mjs` after backend edits; frontend development dependencies must be installed.
@@ -34,9 +34,11 @@ Package/built-in imports: `razorpay`.
 
 ### controllers/admin.auth.js
 
-[controllers/admin.auth.js](../controllers/admin.auth.js), 59 lines. SHA-256: `4385d32b6a9a971ec425781bad78ad11a9089c078db44aae8fbf8e37df635a3a`.
+[controllers/admin.auth.js](../controllers/admin.auth.js), 85 lines. SHA-256: `1fbb3f16f6a6e5173cf2b1b135e6dac5b1f97be8eb731fe78be15caebeb17b0c`.
 
-Exports: [adminLogin](../controllers/admin.auth.js#L12).
+Exports: [adminLogin](../controllers/admin.auth.js#L14), [adminSessionInfo](../controllers/admin.auth.js#L73), [adminLogout](../controllers/admin.auth.js#L79).
+
+Local imports: [utils/adminSession.js](../utils/adminSession.js), [services/liveEvents.js](../services/liveEvents.js).
 
 Package/built-in imports: `crypto`, `jsonwebtoken`.
 
@@ -226,11 +228,11 @@ Package/built-in imports: `mongoose`.
 
 ### middleware/auth.js
 
-[middleware/auth.js](../middleware/auth.js), 96 lines. SHA-256: `bcb0bc47a233e8b455f7d425a8fd8791f2d8cfe43843661e94b6f6f5edb04716`.
+[middleware/auth.js](../middleware/auth.js), 108 lines. SHA-256: `ff6512dee16c196581c487de47dfcff77f6724a4db6d1470687967a03e4613e1`.
 
-Exports: [optionalAuth](../middleware/auth.js#L40), [authenticatedUser](../middleware/auth.js#L50), [protect](../middleware/auth.js#L84).
+Exports: [optionalAuth](../middleware/auth.js#L42), [authenticatedUser](../middleware/auth.js#L52), [protect](../middleware/auth.js#L86).
 
-Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [utils/agentAccess.js](../utils/agentAccess.js).
+Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [utils/agentAccess.js](../utils/agentAccess.js), [utils/adminSession.js](../utils/adminSession.js).
 
 Package/built-in imports: `jsonwebtoken`.
 
@@ -281,6 +283,14 @@ Package/built-in imports: `mongoose`.
 [models/AdminAudit.js](../models/AdminAudit.js), 18 lines. SHA-256: `447418b6d9f47e29665018b23f33df5f2ffdd596705c684d3e0eb4db079bfd70`.
 
 Exports: [default](../models/AdminAudit.js#L17).
+
+Package/built-in imports: `mongoose`.
+
+### models/AdminSession.js
+
+[models/AdminSession.js](../models/AdminSession.js), 12 lines. SHA-256: `5f5eefbe33bcb1b0f4b44cee3d7e87fe2de1bb50c4a3be94a669269258cd7feb`.
+
+Exports: [default](../models/AdminSession.js#L11).
 
 Package/built-in imports: `mongoose`.
 
@@ -500,9 +510,9 @@ Package/built-in imports: `express`.
 
 ### routes/auth.routes.js
 
-[routes/auth.routes.js](../routes/auth.routes.js), 48 lines. SHA-256: `fcf19849720d3f190057d701038569f3b5f7295805cd9609b488660e99dca973`.
+[routes/auth.routes.js](../routes/auth.routes.js), 50 lines. SHA-256: `4dd35aa9208960a70ea05950f15b0b0fdbaaf9d71742b34bafe8c6db39d93408`.
 
-Exports: [default](../routes/auth.routes.js#L47).
+Exports: [default](../routes/auth.routes.js#L49).
 
 Local imports: [controllers/auth.controller.js](../controllers/auth.controller.js), [controllers/admin.auth.js](../controllers/admin.auth.js), [middleware/auth.js](../middleware/auth.js), [middleware/loginLimiter.js](../middleware/loginLimiter.js), [middleware/rateLimit.js](../middleware/rateLimit.js).
 
@@ -654,7 +664,7 @@ Package/built-in imports: `node:fs`, `node:path`, `node:zlib`, `node:readline`, 
 
 ### scripts/review-source.mjs
 
-[scripts/review-source.mjs](../scripts/review-source.mjs), 84 lines. SHA-256: `67367317ada31e4f14f32074da4eea73938a7fd3f7339f29c269cdb07750200f`.
+[scripts/review-source.mjs](../scripts/review-source.mjs), 84 lines. SHA-256: `7dcff7d8fb01c9daed2513e99287a6b3021d0cd0a8de215e89a5ad90305ee45e`.
 
 Exports: none.
 
@@ -760,11 +770,11 @@ Local imports: [models/Agent.js](../models/Agent.js), [models/Order.js](../model
 
 ### services/liveEvents.js
 
-[services/liveEvents.js](../services/liveEvents.js), 120 lines. SHA-256: `e78baee591c741c4791a11c550e9a071004498db635b6ab4c3b8817b1898036c`.
+[services/liveEvents.js](../services/liveEvents.js), 128 lines. SHA-256: `716fc0012809b3b6945db120e6ed81b51668e05891c99bdf544cde7bd585a7fc`.
 
-Exports: [openEventStream](../services/liveEvents.js#L29), [publish](../services/liveEvents.js#L83), [closeEventStreams](../services/liveEvents.js#L110).
+Exports: [openEventStream](../services/liveEvents.js#L30), [publish](../services/liveEvents.js#L84), [closeAdminSessionStreams](../services/liveEvents.js#L112), [closeEventStreams](../services/liveEvents.js#L118).
 
-Local imports: [middleware/auth.js](../middleware/auth.js).
+Local imports: [middleware/auth.js](../middleware/auth.js), [utils/adminSession.js](../utils/adminSession.js).
 
 ### services/mediaCleanup.service.js
 
@@ -842,6 +852,16 @@ Exports: [settleCompletion](../services/target.service.js#L41), [settleTarget](.
 
 Local imports: [models/Target.js](../models/Target.js), [models/AgentTargetProgress.js](../models/AgentTargetProgress.js), [models/AgentIncentiveLedger.js](../models/AgentIncentiveLedger.js), [utils/targets.js](../utils/targets.js).
 
+### tests/admin-cookie-session.test.js
+
+[tests/admin-cookie-session.test.js](../tests/admin-cookie-session.test.js), 108 lines. SHA-256: `e366ef0466341f94180dad365bdd82870f85e843df7c42c97f8bb7d228e89c80`.
+
+Exports: none.
+
+Local imports: [routes/auth.routes.js](../routes/auth.routes.js), [routes/events.routes.js](../routes/events.routes.js), [middleware/auth.js](../middleware/auth.js), [models/AdminSession.js](../models/AdminSession.js), [services/liveEvents.js](../services/liveEvents.js).
+
+Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `express`, `mongoose`, `mongodb-memory-server`.
+
 ### tests/invoice-pdf.test.js
 
 [tests/invoice-pdf.test.js](../tests/invoice-pdf.test.js), 51 lines. SHA-256: `00b7d27c1bda75611d6e6dd839fd1b62cf3dfbeae88169f21229d3e0ca93e16e`.
@@ -871,6 +891,16 @@ Exports: none.
 Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Product.js](../models/Product.js), [routes/auth.routes.js](../routes/auth.routes.js), [routes/agent.routes.js](../routes/agent.routes.js), [routes/deliveryPartner.routes.js](../routes/deliveryPartner.routes.js), [routes/events.routes.js](../routes/events.routes.js), [middleware/auth.js](../middleware/auth.js), [middleware/upload.js](../middleware/upload.js), [services/liveEvents.js](../services/liveEvents.js), [controllers/order.controller.js](../controllers/order.controller.js), [config/cloudinary.js](../config/cloudinary.js), [utils/cloudinaryStorage.js](../utils/cloudinaryStorage.js), [middleware/loginLimiter.js](../middleware/loginLimiter.js), [controllers/store.controller.js](../controllers/store.controller.js), [controllers/product.controller.js](../controllers/product.controller.js).
 
 Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `node:stream`, `node:events`, `node:zlib`, `mongoose`, `express`, `jsonwebtoken`, `bcryptjs`, `mongodb-memory-server`.
+
+### utils/adminSession.js
+
+[utils/adminSession.js](../utils/adminSession.js), 73 lines. SHA-256: `a9ecb2ec3127ef34806951c4c5b9b24d48422d625ef25c0413f0826355dfefad`.
+
+Exports: [requireAdminOrigin](../utils/adminSession.js#L18), [publicAdminSession](../utils/adminSession.js#L38), [createAdminSession](../utils/adminSession.js#L40), [authenticatedAdminSession](../utils/adminSession.js#L51), [authenticateAdminCookie](../utils/adminSession.js#L58), [revokeAdminSession](../utils/adminSession.js#L67).
+
+Local imports: [models/AdminSession.js](../models/AdminSession.js), [utils/frontendUrl.js](../utils/frontendUrl.js).
+
+Package/built-in imports: `node:crypto`.
 
 ### utils/agentAccess.js
 

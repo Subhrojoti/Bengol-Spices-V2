@@ -23,7 +23,12 @@ const CommandPalette = ({
 }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [cursor, setCursor] = useState(0);
+  const [rawCursor, setCursor] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) { setQuery(""); setCursor(0); }
+  }
   const listRef = useRef(null);
 
   const entries = useMemo(() => {
@@ -60,16 +65,7 @@ const CommandPalette = ({
   }, [entries, query]);
 
   /* Reset whenever it opens, and keep the cursor inside the result list */
-  useEffect(() => {
-    if (open) {
-      setQuery("");
-      setCursor(0);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    setCursor((c) => (c >= results.length ? 0 : c));
-  }, [results.length]);
+  const cursor = rawCursor < results.length ? rawCursor : 0;
 
   const go = (entry) => {
     if (!entry) return;
@@ -80,12 +76,10 @@ const CommandPalette = ({
   const onKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setCursor((c) => (results.length ? (c + 1) % results.length : 0));
+      setCursor(results.length ? (cursor + 1) % results.length : 0);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setCursor((c) =>
-        results.length ? (c - 1 + results.length) % results.length : 0,
-      );
+      setCursor(results.length ? (cursor - 1 + results.length) % results.length : 0);
     } else if (e.key === "Enter") {
       e.preventDefault();
       go(results[cursor]);
@@ -96,7 +90,7 @@ const CommandPalette = ({
   useEffect(() => {
     const node = listRef.current?.querySelector(`[data-index="${cursor}"]`);
     node?.scrollIntoView({ block: "nearest" });
-  }, [cursor]);
+  }, [cursor, results]);
 
   let renderedGroup = null;
 
@@ -122,7 +116,7 @@ const CommandPalette = ({
         <input
           autoFocus
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setCursor(0); }}
           onKeyDown={onKeyDown}
           placeholder="Jump to a section…"
           className="flex-1 bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-400"

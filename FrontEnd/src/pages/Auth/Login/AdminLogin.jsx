@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { adminClaims, cookieSessionClaims, storeAdminCookieSession, storeLegacyAdminToken } from "../../../utils/adminSession";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Eye, EyeOff, KeyRound, Loader2, Mail, ShieldCheck } from "lucide-react";
 import AuthShell, { AuthField } from "./AuthShell";
-import { adminLogin } from "../../../api/services";
+import { adminLogin, verifyAdminCookieSession } from "../../../api/services";
 import useSignedOutNotice from "../../../hooks/useSignedOutNotice";
 
 const THEME = {
@@ -27,6 +28,7 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
+  const submitting = useRef(false);
 
   const errors = {
     email: form.email.trim() ? "" : "Email is required",
@@ -37,29 +39,38 @@ export default function AdminLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting.current) return;
     setTouched(true);
 
     if (invalid) return;
 
+    submitting.current = true;
     try {
       setLoading(true);
       const data = await adminLogin(form.email.trim(), form.password);
 
-      if (!data?.success || !data?.token) {
+      if (!data?.success || (!cookieSessionClaims(data?.session) && !adminClaims(data?.token))) {
         /* The old page checked success and then did nothing when it was
            false — the button simply stopped, with no explanation. */
         toast.error(data?.message || "Those credentials were not accepted");
         return;
       }
 
-      localStorage.setItem("adminToken", data.token);
+      if (cookieSessionClaims(data.session)) {
+        // Confirm the browser accepted the HttpOnly cookie before entering the
+        // panel; blocked cookies must not look like a successful sign-in.
+        const verified = await verifyAdminCookieSession(data.session.id);
+        if (!cookieSessionClaims(verified?.session) || verified.session.id !== data.session.id) throw new Error("Admin cookie unavailable");
+        storeAdminCookieSession(verified.session);
+      } else storeLegacyAdminToken(data.token);
       localStorage.setItem("role", "ADMIN");
       navigate("/admin/dashboard", { replace: true });
     } catch (error) {
       toast.error(
-        error?.response?.data?.message || "Invalid email or password",
+        error?.response?.data?.message || "Could not sign in. Check your credentials and that browser cookies are enabled.",
       );
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -94,6 +105,7 @@ export default function AdminLogin() {
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <AuthField
           label="Email address"
+          aria-label="Email address"
           type="email"
           name="email"
           autoComplete="username"
@@ -106,6 +118,7 @@ export default function AdminLogin() {
 
         <AuthField
           label="Password"
+          aria-label="Password"
           type={showPassword ? "text" : "password"}
           name="password"
           autoComplete="current-password"

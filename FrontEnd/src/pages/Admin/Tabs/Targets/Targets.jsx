@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { lazy, useState } from "react";
 import { Crosshair, IndianRupee, TrendingUp } from "lucide-react";
 
-import CreateTarget from "./tabs/CreateTarget";
-import TargetPerformance from "./tabs/TargetPerformance";
-import SalesTargets from "./tabs/SalesTargets";
+const CreateTarget = lazy(() => import("./tabs/CreateTarget"));
+const TargetPerformance = lazy(() => import("./tabs/TargetPerformance"));
+const SalesTargets = lazy(() => import("./tabs/SalesTargets"));
+import AdminSectionBoundary from "../../../../components/common/AdminSectionBoundary";
 
 /* Two kinds of target live here. "Targets" and "Performance" are the
    activity targets (so many stores, orders or collections in a day, week
@@ -65,7 +66,7 @@ export default function Targets() {
       </div>
 
       <div className="px-5 pb-10 lg:px-8">
-        <Current />
+        <AdminSectionBoundary key={active}><Current /></AdminSectionBoundary>
       </div>
     </div>
   );

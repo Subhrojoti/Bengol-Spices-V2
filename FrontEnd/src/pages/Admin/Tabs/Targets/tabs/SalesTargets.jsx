@@ -1,4 +1,6 @@
+import reportAdminError from "../../../../../utils/reportAdminError";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import {
   AlertCircle,
   CalendarDays,
@@ -151,6 +153,7 @@ const Skeleton = () => (
 /* ------------------------------------------------------------------ */
 
 export default function SalesTargets() {
+  const beginRequest = useLatestRequest();
   const [data, setData] = useState(null);
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
@@ -164,21 +167,24 @@ export default function SalesTargets() {
 
   const load = useCallback(
     async (isRefresh = false) => {
+      const request = beginRequest();
       if (isRefresh) setRefreshing(true);
       else setStatus("loading");
 
       try {
-        const res = await getSalesTargets(month || undefined);
+        const res = await getSalesTargets(month || undefined, { signal: request.signal });
+        if (!request.current()) return;
         setData(res?.data || null);
         setStatus("ready");
       } catch (error) {
-        console.error("Failed to load sales targets", error);
+        if (!request.current()) return;
+        reportAdminError("Failed to load sales targets", error);
         setStatus("error");
       } finally {
-        setRefreshing(false);
+        if (request.current()) setRefreshing(false);
       }
     },
-    [month],
+    [month, beginRequest],
   );
 
   useEffect(() => {

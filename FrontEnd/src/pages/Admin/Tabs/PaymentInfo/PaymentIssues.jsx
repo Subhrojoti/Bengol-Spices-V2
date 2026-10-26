@@ -1,3 +1,5 @@
+import useLatestRequest from "../../../../hooks/useLatestRequest";
+import reportAdminError from "../../../../utils/reportAdminError";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, RotateCcw, TriangleAlert } from "lucide-react";
@@ -41,16 +43,20 @@ export default function PaymentIssues() {
 
   const [pager, pagerTop] = usePagination(issues, { pageSize: 5 });
 
+  const beginLoad = useLatestRequest();
   const load = useCallback(async () => {
+    const request = beginLoad();
     try {
-      const res = await getPaymentIssues();
+      const res = await getPaymentIssues({ signal: request.signal });
+      if (!request.current()) return;
       setIssues(res?.data || []);
     } catch (error) {
+      if (!request.current()) return;
       // Not having the permission, or a failed request, just hides the panel
-      console.error("Failed to load payment issues", error);
+      reportAdminError("Failed to load payment issues", error);
       setIssues([]);
     }
-  }, []);
+  }, [beginLoad]);
 
   useEffect(() => {
     load();

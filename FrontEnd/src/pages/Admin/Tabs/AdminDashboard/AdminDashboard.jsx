@@ -1,3 +1,4 @@
+import reportAdminError from "../../../../utils/reportAdminError";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ResponsiveContainer,
@@ -30,6 +31,7 @@ import {
 } from "lucide-react";
 import { getDashboardSummary } from "../../../../api/services";
 import NeedsAttention from "./NeedsAttention";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { useChartChrome } from "../../../../theme/useChartChrome";
 
 /* ------------------------------------------------------------------ *
@@ -218,6 +220,7 @@ const Skeleton = () => (
 /* ------------------------------------------------------------------ */
 
 export default function AdminDashboard() {
+  const beginRequest = useLatestRequest();
   const [data, setData] = useState(null);
   const [meta, setMeta] = useState(null);
   const [status, setStatus] = useState("loading"); // loading | ready | error
@@ -229,13 +232,15 @@ export default function AdminDashboard() {
   const CHROME = useChartChrome();
 
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) {
       setRefreshing(true);
       setRefreshKey((key) => key + 1);
     } else setStatus("loading");
 
     try {
-      const res = await getDashboardSummary();
+      const res = await getDashboardSummary({ signal: request.signal });
+      if (!request.current()) return;
 
       if (res?.success && res.data) {
         setData(res.data);
@@ -245,12 +250,13 @@ export default function AdminDashboard() {
         setStatus("error");
       }
     } catch (error) {
-      console.error("Dashboard load failed:", error);
+      if (!request.current()) return;
+      reportAdminError("Dashboard load failed:", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import {
   Bar,
   BarChart,
@@ -259,6 +260,7 @@ const TrendTooltip = ({ active, payload, label }) => {
  * came back as returns are left out of all three.
  */
 export default function ProductSales() {
+  const beginRequest = useLatestRequest();
   const chrome = useChartChrome();
 
   const initial = PRESETS[2].range();
@@ -274,20 +276,26 @@ export default function ProductSales() {
   const [report, setReport] = useState(null);
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
+  const [loadedQuery, setLoadedQuery] = useState("");
+  const reportQuery = `${from}|${to}|${groupBy}|${agentId}|${productId}`;
+  const staleReport = loadedQuery !== reportQuery;
 
   useEffect(() => {
+    const controller = new AbortController();
     // Staff who may see this report but not set targets simply get no list
-    getTargetAgents()
-      .then((res) => setAgents(res?.data || []))
-      .catch(() => setAgents([]));
+    getTargetAgents({ signal: controller.signal })
+      .then((res) => { if (!controller.signal.aborted) setAgents(res?.data || []); })
+      .catch(() => { if (!controller.signal.aborted) setAgents([]); });
+    return () => controller.abort();
   }, []);
 
   const load = useCallback(
     async (isRefresh = false) => {
-      if (!from || !to) return;
+      const request = beginRequest();
+      if (!from || !to) { setRefreshing(false); return; }
 
-      if (isRefresh) setRefreshing(true);
-      else setStatus((prev) => (prev === "ready" ? "ready" : "loading"));
+      setRefreshing(true);
+      if (!isRefresh) setStatus((prev) => (prev === "ready" ? "ready" : "loading"));
 
       try {
         const res = await getProductSales({
@@ -296,18 +304,21 @@ export default function ProductSales() {
           groupBy,
           ...(agentId ? { agentId } : {}),
           ...(productId ? { productId } : {}),
-        });
+        }, { signal: request.signal });
+        if (!request.current()) return;
         setReport(res);
+        setLoadedQuery(`${from}|${to}|${groupBy}|${agentId}|${productId}`);
         setStatus("ready");
       } catch (error) {
+        if (!request.current()) return;
         const message = error?.response?.data?.message;
         if (message && error.response.status === 400) toast.error(message);
         else setStatus("error");
       } finally {
-        setRefreshing(false);
+        if (request.current()) setRefreshing(false);
       }
     },
-    [from, to, groupBy, agentId, productId],
+    [from, to, groupBy, agentId, productId, beginRequest],
   );
 
   useEffect(() => {
@@ -378,6 +389,7 @@ export default function ProductSales() {
   const productName = products.find((p) => p.productId === productId)?.name;
 
   const exportCsv = () => {
+    if (refreshing || staleReport) return;
     const count = downloadCsv(
       `product-sales-${from}-to-${to}${agentId ? `-${agentId}` : ""}.csv`,
       [
@@ -487,7 +499,7 @@ export default function ProductSales() {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={exportCsv}
-              disabled={products.length === 0}
+              disabled={products.length === 0 || refreshing || staleReport}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">
               <Download size={14} />
               Export

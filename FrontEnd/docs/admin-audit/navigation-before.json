@@ -1,0 +1,174 @@
+{
+  "methodology": {
+    "cpuThrottle": 4,
+    "latencyMs": 60,
+    "downloadBytesPerSecond": 200000,
+    "syntheticApiLatencyMs": 40,
+    "runs": 3,
+    "note": "First in-app visits after dashboard, then the same sequence with code cached. Ctrl+K avoids the pre-existing baseline hover navigation defect. Lab interaction-to-ready time, not field INP."
+  },
+  "results": [
+    {
+      "run": 1,
+      "phase": "first",
+      "from": "/admin/dashboard",
+      "to": "/admin/order-management",
+      "readyMs": 1053.4237000000003,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 1,
+      "phase": "first",
+      "from": "/admin/order-management",
+      "to": "/admin/payment-summary",
+      "readyMs": 1036.6381000000001,
+      "jsBytes": 0,
+      "apiCalls": 3
+    },
+    {
+      "run": 1,
+      "phase": "first",
+      "from": "/admin/payment-summary",
+      "to": "/admin/product-sales",
+      "readyMs": 612.2721999999994,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 1,
+      "phase": "cached",
+      "from": "/admin/product-sales",
+      "to": "/admin/order-management",
+      "readyMs": 506.3011999999999,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 1,
+      "phase": "cached",
+      "from": "/admin/order-management",
+      "to": "/admin/payment-summary",
+      "readyMs": 528.5303999999996,
+      "jsBytes": 0,
+      "apiCalls": 3
+    },
+    {
+      "run": 1,
+      "phase": "cached",
+      "from": "/admin/payment-summary",
+      "to": "/admin/product-sales",
+      "readyMs": 375.1733000000004,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 2,
+      "phase": "first",
+      "from": "/admin/dashboard",
+      "to": "/admin/order-management",
+      "readyMs": 1119.1086000000014,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 2,
+      "phase": "first",
+      "from": "/admin/order-management",
+      "to": "/admin/payment-summary",
+      "readyMs": 1020.5623999999989,
+      "jsBytes": 0,
+      "apiCalls": 3
+    },
+    {
+      "run": 2,
+      "phase": "first",
+      "from": "/admin/payment-summary",
+      "to": "/admin/product-sales",
+      "readyMs": 605.983400000001,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 2,
+      "phase": "cached",
+      "from": "/admin/product-sales",
+      "to": "/admin/order-management",
+      "readyMs": 607.4053000000022,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 2,
+      "phase": "cached",
+      "from": "/admin/order-management",
+      "to": "/admin/payment-summary",
+      "readyMs": 550.4561999999969,
+      "jsBytes": 0,
+      "apiCalls": 3
+    },
+    {
+      "run": 2,
+      "phase": "cached",
+      "from": "/admin/payment-summary",
+      "to": "/admin/product-sales",
+      "readyMs": 415.1360999999997,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 3,
+      "phase": "first",
+      "from": "/admin/dashboard",
+      "to": "/admin/order-management",
+      "readyMs": 1086.828999999998,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 3,
+      "phase": "first",
+      "from": "/admin/order-management",
+      "to": "/admin/payment-summary",
+      "readyMs": 635.2674000000006,
+      "jsBytes": 0,
+      "apiCalls": 3
+    },
+    {
+      "run": 3,
+      "phase": "first",
+      "from": "/admin/payment-summary",
+      "to": "/admin/product-sales",
+      "readyMs": 594.3076999999976,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 3,
+      "phase": "cached",
+      "from": "/admin/product-sales",
+      "to": "/admin/order-management",
+      "readyMs": 619.0306999999993,
+      "jsBytes": 0,
+      "apiCalls": 2
+    },
+    {
+      "run": 3,
+      "phase": "cached",
+      "from": "/admin/order-management",
+      "to": "/admin/payment-summary",
+      "readyMs": 554.7354999999989,
+      "jsBytes": 0,
+      "apiCalls": 3
+    },
+    {
+      "run": 3,
+      "phase": "cached",
+      "from": "/admin/payment-summary",
+      "to": "/admin/product-sales",
+      "readyMs": 402.34790000000066,
+      "jsBytes": 0,
+      "apiCalls": 2
+    }
+  ]
+}

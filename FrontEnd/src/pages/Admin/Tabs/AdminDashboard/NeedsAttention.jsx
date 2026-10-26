@@ -1,3 +1,4 @@
+import reportAdminError from "../../../../utils/reportAdminError";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -253,6 +254,8 @@ export default function NeedsAttention({ refreshKey = 0 }) {
   const [liveTick, setLiveTick] = useState(0);
 
   useEffect(() => {
+    // The Admin dashboard already refreshes this block through refreshKey.
+    if (panel === "admin") return undefined;
     const onLiveOrder = () => setLiveTick((tick) => tick + 1);
     window.addEventListener("live:order-placed", onLiveOrder);
     // Cash recorded, approved or rejected: the cash row changes too
@@ -264,7 +267,7 @@ export default function NeedsAttention({ refreshKey = 0 }) {
       window.removeEventListener("live:cash-verification", onLiveOrder);
       window.removeEventListener("live:delivery-alert", onLiveOrder);
     };
-  }, []);
+  }, [panel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,8 +283,9 @@ export default function NeedsAttention({ refreshKey = 0 }) {
         }
       })
       .catch((error) => {
+        if (cancelled) return;
         // The dashboard itself still loads; this block simply stays away
-        console.error("Could not load what needs attention:", error);
+        reportAdminError("Could not load what needs attention:", error);
         if (!cancelled) setFailed(true);
       });
 

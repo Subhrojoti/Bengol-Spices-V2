@@ -1,5 +1,18 @@
 import axios from "axios";
 import axiosInstance from "./axiosInstance";
+import { reuseAdminRead } from "../utils/adminReads";
+import { adminRequestSession } from "../utils/adminSession";
+import reportAdminError from "../utils/reportAdminError";
+
+const get = (url, config = {}) => {
+  if (typeof window === "undefined" || !/^\/admin(?:\/|$)/.test(window.location.pathname)) return axiosInstance.get(url, config);
+  const session = adminRequestSession();
+  const requestConfig = { ...config, ...session };
+  // Independently cancellable requests must not share another caller's signal.
+  if (config.signal) return axiosInstance.get(url, requestConfig);
+  const key = `${session._adminCookieId || session._adminSessionToken}|${config.responseType || "json"}|${axiosInstance.getUri({ url, params: config.params })}`;
+  return reuseAdminRead(key, () => axiosInstance.get(url, requestConfig));
+};
 
 const API_BASE_URL = "http://localhost:8000";
 
@@ -17,10 +30,13 @@ export const adminLogin = async (email, password) => {
   const response = await axiosInstance.post("/auth/admin/login", {
     email,
     password,
-  });
+  }, { headers: { "X-Admin-Auth": "cookie" }, withCredentials: true });
 
   return response.data;
 };
+
+export const verifyAdminCookieSession = async (id) => (await axiosInstance.get("/auth/admin/session", { _adminSessionToken: "", _adminCookieId: id })).data;
+export const logoutAdminCookieSession = async (id) => (await axiosInstance.post("/auth/admin/logout", {}, { _adminSessionToken: "", _adminCookieId: id, timeout: 10000 })).data;
 
 export const agentLogin = async (agentId, password) => {
   const response = await axiosInstance.post("/auth/agent/login", {
@@ -40,8 +56,8 @@ export const employeeLogin = async (employeeId, password) => {
   return response.data;
 };
 
-export const agentList = async () => {
-  const response = await axiosInstance.get("/admin/agents");
+export const agentList = async (options) => {
+  const response = await get("/admin/agents", options);
   return response.data;
 };
 
@@ -54,19 +70,19 @@ export const rejectAgent = (agentId, reason) => {
 };
 
 // Admin-only lifecycle/assignment operations. Mutations require an explicit UI confirmation.
-export const getManagedStores = async (params) => (await axiosInstance.get("/admin/store-management", { params })).data;
+export const getManagedStores = async (params, options) => (await get("/admin/store-management", { ...options, params })).data;
 export const previewStoreTransfer = async (body) => (await axiosInstance.post("/admin/store-transfers/preview", body)).data;
 export const transferStores = async (body) => (await axiosInstance.post("/admin/store-transfers", body)).data;
-export const previewStoreRemoval = async (consumerId) => (await axiosInstance.get(`/admin/store-management/${encodeURIComponent(consumerId)}/removal-preview`)).data;
+export const previewStoreRemoval = async (consumerId) => (await get(`/admin/store-management/${encodeURIComponent(consumerId)}/removal-preview`)).data;
 export const removeManagedStore = async (consumerId, body) => (await axiosInstance.post(`/admin/store-management/${encodeURIComponent(consumerId)}/remove`, body)).data;
 export const changeAgentAccess = async (agentId, body) => (await axiosInstance.post(`/admin/agents/${encodeURIComponent(agentId)}/access`, body)).data;
-export const previewAgentDeletion = async (agentId) => (await axiosInstance.get(`/admin/agents/${encodeURIComponent(agentId)}/purge-preview`)).data;
+export const previewAgentDeletion = async (agentId) => (await get(`/admin/agents/${encodeURIComponent(agentId)}/purge-preview`)).data;
 export const permanentlyDeleteAgent = async (agentId, body) => (await axiosInstance.post(`/admin/agents/${encodeURIComponent(agentId)}/purge`, body)).data;
 export const retryAgentFileCleanup = async (requestId) => (await axiosInstance.post(`/admin/data-cleanups/${encodeURIComponent(requestId)}/retry-media`)).data;
-export const getManagementAudit = async (agentId) => (await axiosInstance.get("/admin/management-audit", { params: agentId ? { agentId } : undefined })).data;
+export const getManagementAudit = async (agentId, options) => (await get("/admin/management-audit", { ...options, params: agentId ? { agentId } : undefined })).data;
 
 export const getAgentProfile = async () => {
-  const response = await axiosInstance.get("/agent/profile");
+  const response = await get("/agent/profile");
   return response.data;
 };
 
@@ -140,12 +156,12 @@ export const createStore = async ({
 };
 
 export const myStores = async () => {
-  const response = await axiosInstance.get("/agent/store/my-stores");
+  const response = await get("/agent/store/my-stores");
   return response.data;
 };
 
-export const fetchProducts = async () => {
-  const response = await axiosInstance.get("/products/public/allProduct");
+export const fetchProducts = async (options) => {
+  const response = await get("/products/public/allProduct", options);
   return response.data;
 };
 
@@ -153,7 +169,7 @@ export const fetchProducts = async () => {
    admin set for that territory, defaults everywhere else. This is what the
    server charges, so the cart and the order always agree. */
 export const fetchStoreProducts = async (consumerId) => {
-  const response = await axiosInstance.get(
+  const response = await get(
     `/agent/store/${consumerId}/products`,
   );
   return response.data;
@@ -169,7 +185,7 @@ export const getStoreOrders = async (consumerId) => {
     throw new Error("consumerId is required to fetch store orders");
   }
 
-  const response = await axiosInstance.get(`/agent/orders/store/${consumerId}`);
+  const response = await get(`/agent/orders/store/${consumerId}`);
 
   return response.data;
 };
@@ -179,8 +195,8 @@ export const createProduct = async (formData) => {
   return response.data;
 };
 
-export const getAllProducts = async () => {
-  const response = await axiosInstance.get("/products/all");
+export const getAllProducts = async (options) => {
+  const response = await get("/products/all", options);
   return response.data;
 };
 
@@ -232,8 +248,8 @@ export const createEmployee = async ({ name, email, password, profilePic }) => {
 
 // Get all Employees
 
-export const getAllEmployees = async () => {
-  const response = await axiosInstance.get("/employee/all");
+export const getAllEmployees = async (options) => {
+  const response = await get("/employee/all", options);
   return response.data;
 };
 
@@ -250,22 +266,22 @@ export const updateProductPermission = async (employeeId, payload) => {
 
 // Product details
 
-export const getSingleProduct = async (productId) => {
-  const response = await axiosInstance.get(`/products/single/${productId}`);
+export const getSingleProduct = async (productId, options) => {
+  const response = await get(`/products/single/${productId}`, options);
   return response.data;
 };
 
 // Dashboard summary
 
-export const getDashboardSummary = async () => {
-  const response = await axiosInstance.get("/admin/dashboard-summary/");
+export const getDashboardSummary = async (options) => {
+  const response = await get("/admin/dashboard-summary/", options);
   return response.data;
 };
 
 /** What is waiting on the office: orders to confirm, overdue dues,
  *  applications to review. Only the parts the caller may act on. */
 export const getAttention = async () => {
-  const response = await axiosInstance.get("/admin/attention");
+  const response = await get("/admin/attention");
   return response.data;
 };
 
@@ -304,8 +320,8 @@ export const deliveryLogout = async () => {
 
 // All Orders
 
-export const getAllAgentOrders = async () => {
-  const response = await axiosInstance.get("/agent/orders/all");
+export const getAllAgentOrders = async (options) => {
+  const response = await get("/agent/orders/all", options);
   return response.data;
 };
 
@@ -325,8 +341,8 @@ export const cancelOrder = async (orderId, reason) => {
 
 // All Delivery Partners
 
-export const getAllDeliveryPartners = async () => {
-  const response = await axiosInstance.get("/delivery-partner/all");
+export const getAllDeliveryPartners = async (options) => {
+  const response = await get("/delivery-partner/all", options);
   return response.data;
 };
 
@@ -352,14 +368,14 @@ export const assignReturnToPartner = async (returnId, partnerId) => {
 // Get assigned Delivery Orders
 
 export const getDeliveryPartnerOrders = async () => {
-  const response = await axiosInstance.get("/delivery-partner/orders");
+  const response = await get("/delivery-partner/orders");
   return response.data;
 };
 
 // Get assigned Delivery Returns
 
 export const getDeliveryPartnerReturns = async () => {
-  const response = await axiosInstance.get("/returns/delivery/assigned");
+  const response = await get("/returns/delivery/assigned");
   return response.data;
 };
 
@@ -386,7 +402,7 @@ export const updateReturnStatus = async (returnId, status) => {
 
 // Delivered orders and completed returns of the signed-in delivery partner
 export const getMyDeliveryHistory = async () => {
-  const response = await axiosInstance.get("/delivery-partner/history");
+  const response = await get("/delivery-partner/history");
   return response.data;
 };
 
@@ -411,12 +427,12 @@ export const initiateReturn = async (orderId, reason) => {
 // Get My Returns
 
 export const getMyReturns = async () => {
-  const response = await axiosInstance.get("/returns/my-returns");
+  const response = await get("/returns/my-returns");
   return response.data;
 };
 
-export const getAllReturns = async () => {
-  const response = await axiosInstance.get("/returns/all");
+export const getAllReturns = async (options) => {
+  const response = await get("/returns/all", options);
   return response.data;
 };
 
@@ -441,32 +457,32 @@ export const updateEmployeePermissions = async (employeeId, permissions) => {
 // Delivery Dashboard
 
 export const getDeliveryPartnerDashboard = async () => {
-  const response = await axiosInstance.get("/delivery-partner/dashboard");
+  const response = await get("/delivery-partner/dashboard");
   return response.data;
 };
 
 // Employee Profile
 
 export const getEmployeeProfile = async () => {
-  const response = await axiosInstance.get("/employee/profile");
+  const response = await get("/employee/profile");
   return response.data;
 };
 
 // Get active orders
 
-export const getActiveOrders = async () => {
-  const response = await axiosInstance.get("/agent/orders/active");
+export const getActiveOrders = async (options) => {
+  const response = await get("/agent/orders/active", options);
   return response.data;
 };
 
 // Get active returns
 
-export const getActiveReturns = async () => {
+export const getActiveReturns = async (options) => {
   /* This pointed at "/agent/orders/active" — the active *orders* endpoint.
      It returns { orders }, never { returns }, so the Assign Returns tab read
      an empty list and always said "No return requests found", however many
      returns were actually waiting for a pickup. */
-  const response = await axiosInstance.get("/returns/active");
+  const response = await get("/returns/active", options);
   return response.data;
 };
 
@@ -483,29 +499,30 @@ export const collectOrderPayment = async (orderId, payload) => {
 // Payment history
 
 export const getOrderPayments = async (orderId) => {
-  const response = await axiosInstance.get(`/agent/orders/${orderId}/payments`);
+  const response = await get(`/agent/orders/${orderId}/payments`);
   return response.data;
 };
 
 // Get Due Orders
 
 export const getDueOrders = async () => {
-  const response = await axiosInstance.get("/agent/orders/due-orders");
+  const response = await get("/agent/orders/due-orders");
   return response.data;
 };
 
 // Payment Summary
 
-export const getPaymentSummary = async () => {
-  const response = await axiosInstance.get(
+export const getPaymentSummary = async (options) => {
+  const response = await get(
     "/agent/orders/complete-payment-summary",
+    options,
   );
   return response.data;
 };
 
 // Razorpay / QR payments taken but not applied or refunded automatically
-export const getPaymentIssues = async () => {
-  const response = await axiosInstance.get("/agent/orders/payment-issues");
+export const getPaymentIssues = async (options) => {
+  const response = await get("/agent/orders/payment-issues", options);
   return response.data;
 };
 
@@ -526,10 +543,8 @@ export const resolvePaymentIssue = async (id, note) => {
 
 // Agent Performance based on collection
 
-export const getAgentPerformance = async () => {
-  const response = await axiosInstance.get(
-    "/agent/orders/agent-collection-performance",
-  );
+export const getAgentPerformance = async (options) => {
+  const response = await get("/agent/orders/agent-collection-performance", options);
   return response.data;
 };
 
@@ -542,28 +557,28 @@ export const createTarget = async (payload) => {
 
 // Get target performance
 
-export const getTargetPerformance = async () => {
-  const response = await axiosInstance.get("/targets/admin/performance");
+export const getTargetPerformance = async (options) => {
+  const response = await get("/targets/admin/performance", options);
   return response.data;
 };
 
 // Get daily target
 
 export const getDailyTarget = async () => {
-  const res = await axiosInstance.get("/targets/agent/today-target");
+  const res = await get("/targets/agent/today-target");
   return res.data;
 };
 
 // Get Delivery Partner Profile
 
 export const getDeliveryPartnerProfile = async () => {
-  const response = await axiosInstance.get("/delivery-partner/profile");
+  const response = await get("/delivery-partner/profile");
   return response.data;
 };
 
 // Get Notifications
 export const getNotifications = async () => {
-  const res = await axiosInstance.get("/api/notifications");
+  const res = await get("/api/notifications");
   return res.data;
 };
 
@@ -595,7 +610,7 @@ export const assignLocation = async (payload) => {
 
 export const getAgentDashboard = async () => {
   try {
-    const res = await axiosInstance.get("/agent/dashboard");
+    const res = await get("/agent/dashboard");
     return res.data;
   } catch (error) {
     console.error("Dashboard API error:", error);
@@ -607,7 +622,7 @@ export const getAgentDashboard = async () => {
 
 export const getLeaderboard = async () => {
   try {
-    const res = await axiosInstance.get("/agent/leaderboard");
+    const res = await get("/agent/leaderboard");
     return res.data;
   } catch (error) {
     console.error("Leaderboard API error:", error);
@@ -646,7 +661,7 @@ export const verifyRazorpayInitialPayment = async (payload) => {
 
 export const getFaqs = async () => {
   try {
-    const response = await axiosInstance.get("/api/faqs");
+    const response = await get("/api/faqs");
     return response.data;
   } catch (error) {
     console.error("Error fetching FAQs:", error);
@@ -658,7 +673,7 @@ export const getFaqs = async () => {
 
 export const downloadInvoice = async (orderNo) => {
   try {
-    const response = await axiosInstance.get(
+    const response = await get(
       `/api/invoice/download/${orderNo}`,
       {
         responseType: "blob",
@@ -667,15 +682,16 @@ export const downloadInvoice = async (orderNo) => {
 
     return response;
   } catch (error) {
-    console.error("Download invoice failed:", error);
+    if (typeof window !== "undefined" && /^\/admin(?:\/|$)/.test(window.location.pathname)) reportAdminError("Download invoice failed", error);
+    else console.error("Download invoice failed:", error);
     throw error;
   }
 };
 
 // Incentive List API
-export const getIncentiveList = async () => {
+export const getIncentiveList = async (options) => {
   try {
-    const response = await axiosInstance.get("/api/incentives/list");
+    const response = await get("/api/incentives/list", options);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -697,13 +713,13 @@ export const payoutIncentive = async (payload) => {
 
 // Incentive Summary
 export const getIncentiveSummary = async () => {
-  const res = await axiosInstance.get("/api/incentives/summary");
+  const res = await get("/api/incentives/summary");
   return res.data;
 };
 
 // Incentive History
 export const getIncentiveHistory = async () => {
-  const res = await axiosInstance.get("/api/incentives/history");
+  const res = await get("/api/incentives/history");
   return res.data;
 };
 
@@ -721,8 +737,8 @@ export const deleteEmployee = async (employeeId) => {
 };
 
 // DELIVERY PARTNER LIST
-export const deliveryPartnerList = async () => {
-  const res = await axiosInstance.get("/delivery-partner/all");
+export const deliveryPartnerList = async (options) => {
+  const res = await get("/delivery-partner/all", options);
   return res.data;
 };
 
@@ -830,28 +846,29 @@ export const fetchEmployeeAccessState = async () => {
  * Current sales-location coverage. Assigning upserts on (agentId, state), so
  * the panel reads this first to show what a save would replace.
  */
-export const getSalesLocations = async (agentId) => {
-  const response = await axiosInstance.get("/agent/store/locations", {
+export const getSalesLocations = async (agentId, options) => {
+  const response = await get("/agent/store/locations", {
+    ...options,
     params: agentId ? { agentId } : undefined,
   });
   return response.data;
 };
 
 /** All stores, used to show a store's photo and details beside its orders. */
-export const getAllStores = async () => {
-  const response = await axiosInstance.get("/agent/store/all");
+export const getAllStores = async (options) => {
+  const response = await get("/agent/store/all", options);
   return response.data;
 };
 
 /** Every target that has been created, newest window first. */
-export const getAllTargets = async () => {
-  const response = await axiosInstance.get("/targets/admin/all");
+export const getAllTargets = async (options) => {
+  const response = await get("/targets/admin/all", options);
   return response.data;
 };
 
 /** The approved agents a target can be set for (names and IDs only). */
-export const getTargetAgents = async () => {
-  const response = await axiosInstance.get("/targets/admin/agents");
+export const getTargetAgents = async (options) => {
+  const response = await get("/targets/admin/agents", options);
   return response.data;
 };
 
@@ -871,14 +888,14 @@ export const endTarget = async (targetId) => {
 };
 
 /** How many people each role would receive a broadcast. */
-export const getNotificationAudience = async () => {
-  const response = await axiosInstance.get("/api/notifications/audience");
+export const getNotificationAudience = async (options) => {
+  const response = await get("/api/notifications/audience", options);
   return response.data;
 };
 
 /** Previously sent broadcasts, with recipient and read counts. */
-export const getSentNotifications = async () => {
-  const response = await axiosInstance.get("/api/notifications/sent");
+export const getSentNotifications = async (options) => {
+  const response = await get("/api/notifications/sent", options);
   return response.data;
 };
 
@@ -887,8 +904,9 @@ export const getSentNotifications = async () => {
    ===================================================================== */
 
 /** Every agent's month side by side. `month` ("2026-10") for an earlier one. */
-export const getSalesTargets = async (month) => {
-  const response = await axiosInstance.get("/targets/admin/sales-target", {
+export const getSalesTargets = async (month, options) => {
+  const response = await get("/targets/admin/sales-target", {
+    ...options,
     params: month ? { month } : undefined,
   });
   return response.data;
@@ -896,7 +914,7 @@ export const getSalesTargets = async (month) => {
 
 /** One agent in full: own settings, this month, history, change log. */
 export const getAgentSalesTarget = async (agentId) => {
-  const response = await axiosInstance.get(
+  const response = await get(
     `/targets/admin/sales-target/agents/${encodeURIComponent(agentId)}`,
   );
   return response.data;
@@ -922,7 +940,7 @@ export const saveAgentSalesTarget = async (agentId, payload) => {
 
 /** Who changed which target, from what to what, and from when. */
 export const getSalesTargetChanges = async (agentId) => {
-  const response = await axiosInstance.get("/targets/admin/sales-target/changes", {
+  const response = await get("/targets/admin/sales-target/changes", {
     params: agentId ? { agentId } : undefined,
   });
   return response.data;
@@ -933,8 +951,9 @@ export const getSalesTargetChanges = async (agentId) => {
    ===================================================================== */
 
 /** { from, to, agentId, productId, groupBy } — dates as YYYY-MM-DD. */
-export const getProductSales = async (params) => {
-  const response = await axiosInstance.get("/admin/analytics/product-sales", {
+export const getProductSales = async (params, options) => {
+  const response = await get("/admin/analytics/product-sales", {
+    ...options,
     params,
   });
   return response.data;
@@ -943,8 +962,8 @@ export const getProductSales = async (params) => {
 /* Cash verification: the cash agents record, approved or rejected by the
    office before it counts toward their sales.
    params: { status: PENDING|APPROVED|REJECTED|ALL, from, to, agentId } */
-export const getCashPayments = async (params) => {
-  const response = await axiosInstance.get("/admin/cash-payments", { params });
+export const getCashPayments = async (params, options) => {
+  const response = await get("/admin/cash-payments", { ...options, params });
   return response.data;
 };
 
@@ -975,13 +994,13 @@ export const rejectCashPayment = async (paymentId, reason) => {
 /* Deliveries: what the office should look at (a failed delivery, one
    confirmed away from the store, one out for too long), each order's trail
    of who did what, when and where, and the few things the office can do */
-export const getDeliveryAlerts = async () => {
-  const response = await axiosInstance.get("/admin/delivery/alerts");
+export const getDeliveryAlerts = async (options) => {
+  const response = await get("/admin/delivery/alerts", options);
   return response.data;
 };
 
 export const getDeliveryTrail = async (orderId) => {
-  const response = await axiosInstance.get(
+  const response = await get(
     `/admin/delivery/orders/${encodeURIComponent(orderId)}/trail`,
   );
   return response.data;

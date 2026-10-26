@@ -1,6 +1,8 @@
+import reportAdminError from "../../../../utils/reportAdminError";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@mui/material";
 import { toast } from "sonner";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import {
   AlertCircle,
   Banknote,
@@ -75,12 +77,15 @@ const monthOf = (value) =>
     ...IN_INDIA,
   });
 
-const daysSince = (value) =>
-  Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
+const daysSince = (value) => {
+  const timestamp = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(timestamp) ? Math.max(0, Math.floor((Date.now() - timestamp) / 86400000)) : null;
+};
 
 // "Recorded today", "Waiting 4 days"
 const waiting = (value) => {
   const days = daysSince(value);
+  if (days === null) return "Recorded date unavailable";
   return days === 0 ? "Recorded today" : `Waiting ${plural(days, "day", "days")}`;
 };
 
@@ -156,6 +161,8 @@ const whoDecided = (row) =>
 /* ------------------------------------------------------------------ */
 
 export default function CashVerification() {
+  const beginRequest = useLatestRequest();
+  const [loadedQuery, setLoadedQuery] = useState(null);
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState(null);
   const [truncated, setTruncated] = useState(false);
@@ -178,33 +185,38 @@ export default function CashVerification() {
 
   const load = useCallback(
     async (isRefresh = false) => {
-      if (isRefresh) setRefreshing(true);
-      else setPhase("loading");
+      const request = beginRequest();
+      setRefreshing(true);
+      if (!isRefresh) setPhase((current) => current === "ready" ? "ready" : "loading");
 
       try {
         const res = await getCashPayments({
           status,
           ...(from ? { from } : {}),
           ...(to ? { to } : {}),
-        });
+        }, { signal: request.signal });
+        if (!request.current()) return;
         setRows(res?.data || []);
+        setLoadedQuery(`${status}|${from}|${to}`);
         setSummary(res?.summary || null);
         setTruncated(Boolean(res?.truncated));
         setPhase("ready");
       } catch (error) {
+        if (!request.current()) return;
         if (error?.response?.status === 400) {
           toast.error(error.response.data?.message || "Check the dates");
           setPhase("ready");
         } else {
-          console.error("Failed to load cash payments", error);
+          reportAdminError("Failed to load cash payments", error);
           setPhase("error");
         }
       } finally {
-        setRefreshing(false);
+        if (request.current()) setRefreshing(false);
       }
     },
-    [status, from, to],
+    [status, from, to, beginRequest],
   );
+  const staleRows = loadedQuery !== `${status}|${from}|${to}`;
 
   useEffect(() => {
     load();
@@ -515,6 +527,7 @@ export default function CashVerification() {
               <button
                 type="button"
                 onClick={() => open("bulk")}
+                disabled={refreshing || staleRows}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700">
                 <CheckCircle2 size={14} />
                 Approve selected
@@ -524,7 +537,8 @@ export default function CashVerification() {
         )}
 
         {/* ===== THE PAYMENTS ===== */}
-        <div ref={pagerTop} className="scroll-mt-24 overflow-x-auto">
+        {(refreshing || staleRows) && <p role="status" className="px-5 py-2 text-xs text-slate-500">{refreshing ? "Updating payments…" : "Showing last loaded results. Check the selected dates and retry."}</p>}
+        <div ref={pagerTop} aria-busy={refreshing || staleRows} inert={refreshing || staleRows ? true : undefined} className={`scroll-mt-24 overflow-x-auto ${refreshing || staleRows ? "opacity-50" : ""}`}>
           <table className="w-full min-w-[70rem] text-[13px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11.5px] font-bold uppercase tracking-wide text-slate-400">

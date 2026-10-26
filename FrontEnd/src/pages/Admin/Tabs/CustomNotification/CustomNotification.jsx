@@ -1,3 +1,5 @@
+import useLatestRequest from "../../../../hooks/useLatestRequest";
+import reportAdminError from "../../../../utils/reportAdminError";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -102,26 +104,34 @@ export default function CustomNotification() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const beginLoadAudience = useLatestRequest();
   const loadAudience = useCallback(async () => {
+    const request = beginLoadAudience();
     try {
-      const res = await getNotificationAudience();
+      const res = await getNotificationAudience({ signal: request.signal });
+      if (!request.current()) return;
       setAudience(res?.audience || null);
     } catch {
+      if (!request.current()) return;
       /* Counts are guidance; sending still works without them */
     }
-  }, []);
+  }, [beginLoadAudience]);
 
+  const beginLoadHistory = useLatestRequest();
   const loadHistory = useCallback(async () => {
+    const request = beginLoadHistory();
     setHistoryStatus("loading");
     try {
-      const res = await getSentNotifications();
+      const res = await getSentNotifications({ signal: request.signal });
+      if (!request.current()) return;
       setSent(res?.data || []);
       setHistoryStatus("ready");
     } catch (error) {
-      console.error("Failed to load sent notifications", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to load sent notifications", error);
       setHistoryStatus("error");
     }
-  }, []);
+  }, [beginLoadHistory]);
 
   useEffect(() => {
     loadAudience();
@@ -262,6 +272,7 @@ export default function CustomNotification() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Price revision from Monday"
+                  aria-label="Title"
                   className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[14px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
@@ -275,6 +286,7 @@ export default function CustomNotification() {
                   <Counter value={messageLength} max={MESSAGE_MAX} />
                 </div>
                 <textarea
+                  aria-label="Message"
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}

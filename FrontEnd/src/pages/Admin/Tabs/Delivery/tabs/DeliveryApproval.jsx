@@ -1,3 +1,6 @@
+import reportAdminError from "../../../../../utils/reportAdminError";
+import { safeExternalUrl } from "../../../../../utils/safeExternalUrl";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -122,21 +125,25 @@ export default function DeliveryApproval() {
   const [pendingAction, setPendingAction] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const res = await deliveryPartnerList();
+      const res = await deliveryPartnerList({ signal: request.signal });
+      if (!request.current()) return;
       setPartners(res?.data || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to fetch delivery partners", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch delivery partners", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();
@@ -200,7 +207,7 @@ export default function DeliveryApproval() {
       }
       setPendingAction(null);
     } catch (error) {
-      console.error(error);
+      reportAdminError("Admin action failed", error);
       toast.error(
         error?.response?.data?.message ||
           `Failed to ${approving ? "approve" : "reject"} this partner`,
@@ -456,7 +463,7 @@ export default function DeliveryApproval() {
 
                                     {doc.documentUrl ? (
                                       <a
-                                        href={doc.documentUrl}
+                                        href={safeExternalUrl(doc.documentUrl)}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-[14px] text-slate-700 transition hover:border-blue-300 hover:bg-blue-50/50">

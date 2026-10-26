@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -65,21 +67,25 @@ export default function AgentIncentives() {
   const [confirming, setConfirming] = useState(null); // agent awaiting confirmation
   const [payingId, setPayingId] = useState(null);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const res = await getIncentiveList();
+      const res = await getIncentiveList({ signal: request.signal });
+      if (!request.current()) return;
       setData(Array.isArray(res?.data) ? res.data : []);
       setStatus("ready");
     } catch (err) {
-      console.error("Error fetching incentives:", err);
+      if (!request.current()) return;
+      reportAdminError("Error fetching incentives:", err);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();
@@ -117,7 +123,7 @@ export default function AgentIncentives() {
       setConfirming(null);
       await load(true);
     } catch (err) {
-      console.error(err);
+      reportAdminError("Admin action failed", err);
       toast.error(err?.message || "Payout failed");
     } finally {
       setPayingId(null);

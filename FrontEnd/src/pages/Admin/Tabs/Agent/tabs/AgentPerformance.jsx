@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -101,21 +103,25 @@ export default function AgentPerformance() {
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const res = await getAgentPerformance();
+      const res = await getAgentPerformance({ signal: request.signal });
+      if (!request.current()) return;
       setData(Array.isArray(res?.data) ? res.data : []);
       setStatus("ready");
     } catch (err) {
-      console.error("Failed to fetch performance", err);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch performance", err);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

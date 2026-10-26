@@ -1,3 +1,6 @@
+import reportAdminError from "../../../../../utils/reportAdminError";
+import { safeExternalUrl } from "../../../../../utils/safeExternalUrl";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -146,21 +149,25 @@ export default function AgentManagement() {
   const [rejectionReason, setRejectionReason] = useState("");
   const isAdminPanel = window.location.pathname.startsWith("/admin");
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const data = await agentList();
+      const data = await agentList({ signal: request.signal });
+      if (!request.current()) return;
       setAgents(data?.agents || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to fetch agents", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch agents", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();
@@ -230,7 +237,7 @@ export default function AgentManagement() {
       setPendingAction(null);
       setRejectionReason("");
     } catch (error) {
-      console.error(error);
+      reportAdminError("Admin action failed", error);
       toast.error(
         error?.response?.data?.message ||
           `Failed to ${approving ? "approve" : "reject"} the agent`,
@@ -485,7 +492,7 @@ export default function AgentManagement() {
                                       {docs.map((doc) => (
                                         <a
                                           key={doc.label}
-                                          href={doc.url}
+                                          href={safeExternalUrl(doc.url)}
                                           target="_blank"
                                           rel="noreferrer"
                                           className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-[14px] text-slate-700 transition hover:border-blue-300 hover:bg-blue-50/50">

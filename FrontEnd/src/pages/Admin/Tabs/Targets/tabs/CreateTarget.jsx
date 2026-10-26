@@ -1,3 +1,5 @@
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
+import reportAdminError from "../../../../../utils/reportAdminError";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@mui/material";
 import { toast } from "sonner";
@@ -274,7 +276,7 @@ const EditTargetDialog = ({ open, target, onClose, onSaved }) => {
           </div>
 
           <Field label="Target Name" required>
-            <input
+            <input aria-label="Target Name"
               value={draft.name}
               onChange={(e) => set("name", e.target.value)}
               className={inputClass}
@@ -283,7 +285,7 @@ const EditTargetDialog = ({ open, target, onClose, onSaved }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Target Value" required hint={unitOf(target)}>
-              <input
+              <input aria-label="Target Value"
                 type="number"
                 min="1"
                 value={draft.targetValue}
@@ -293,7 +295,7 @@ const EditTargetDialog = ({ open, target, onClose, onSaved }) => {
             </Field>
 
             <Field label="Reward (₹)" hint="0 for none">
-              <input
+              <input aria-label="Reward (₹)"
                 type="number"
                 min="0"
                 value={draft.rewardAmount}
@@ -358,27 +360,32 @@ export default function CreateTarget() {
 
   const [targetPager, targetPagerTop] = usePagination(targets);
 
+  const beginLoadTargets = useLatestRequest();
   const loadTargets = useCallback(async () => {
+    const request = beginLoadTargets();
     setListStatus("loading");
     try {
-      const res = await getAllTargets();
+      const res = await getAllTargets({ signal: request.signal });
+      if (!request.current()) return;
       setTargets(res?.data || []);
       setListStatus("ready");
     } catch (error) {
-      console.error("Failed to load targets", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to load targets", error);
       setListStatus("error");
     }
-  }, []);
+  }, [beginLoadTargets]);
 
   useEffect(() => {
     loadTargets();
   }, [loadTargets]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const loadProducts = async () => {
       try {
-        const res = await getAllProducts();
-        setProducts(res?.products || []);
+        const res = await getAllProducts({ signal: controller.signal });
+        if (!controller.signal.aborted) setProducts(res?.products || []);
       } catch {
         /* Commission rules simply stay unavailable */
       }
@@ -386,8 +393,8 @@ export default function CreateTarget() {
 
     const loadAgents = async () => {
       try {
-        const res = await getTargetAgents();
-        setAgents(res?.data || []);
+        const res = await getTargetAgents({ signal: controller.signal });
+        if (!controller.signal.aborted) setAgents(res?.data || []);
       } catch {
         /* A target can still be set for everyone */
       }
@@ -395,6 +402,7 @@ export default function CreateTarget() {
 
     loadProducts();
     loadAgents();
+    return () => controller.abort();
   }, []);
 
   const period = PERIODS.find((p) => p.key === form.period) || PERIODS[0];
@@ -572,7 +580,7 @@ export default function CreateTarget() {
 
           <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5" noValidate>
             <Field label="Target Name" required>
-              <input
+              <input aria-label="Target Name"
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="Create 5 stores today"
@@ -659,7 +667,7 @@ export default function CreateTarget() {
               </Field>
 
               <Field label="Reward Amount (₹)" hint="0 for no reward">
-                <input
+                <input aria-label="Reward Amount (₹)"
                   type="number"
                   min="0"
                   value={form.rewardAmount}
@@ -701,7 +709,7 @@ export default function CreateTarget() {
                 </div>
 
                 <Field label="Starts At" required>
-                  <input
+                  <input aria-label="Starts At"
                     type="datetime-local"
                     value={form.startDate}
                     onChange={(e) => set("startDate", e.target.value)}

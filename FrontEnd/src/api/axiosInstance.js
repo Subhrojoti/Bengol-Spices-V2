@@ -1,4 +1,6 @@
 import axios from "axios";
+import { storedAdminToken, adminRequestSession, storedAdminCookieSession, clearAdminSession } from "../utils/adminSession";
+import { invalidateAdminReads } from "../utils/adminReads";
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
@@ -26,7 +28,21 @@ const getTokenByPath = () => {
 /* 🔹 REQUEST INTERCEPTOR */
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = getTokenByPath();
+    const admin = /^\/admin(?:\/|$)/.test(window.location.pathname);
+    const adminRequest = admin || Object.hasOwn(config, "_adminSessionToken");
+    const session = adminRequest ? (Object.hasOwn(config, "_adminSessionToken") ? config : adminRequestSession()) : null;
+    const token = adminRequest ? session._adminSessionToken : getTokenByPath();
+    if (adminRequest) {
+      config._adminSessionToken = token;
+      config._adminCookieId = session._adminCookieId || "";
+      if (config._adminCookieId) {
+        config.withCredentials = true;
+        config.headers["X-Admin-Session"] = config._adminCookieId;
+        delete config.headers.Authorization;
+      }
+      if ((config.method || "get").toLowerCase() !== "get") invalidateAdminReads();
+      else if (!config.timeout) config.timeout = 30000;
+    }
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -68,6 +84,22 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+    if (error.config && Object.hasOwn(error.config, "_adminSessionToken")) {
+      // An old request must not sign out a newer admin session or a different
+      // panel the person has opened while its response was in flight.
+      const token = error.config._adminSessionToken;
+      const cookieId = error.config._adminCookieId;
+      const matching = cookieId ? cookieId === storedAdminCookieSession()?.id : token && token === storedAdminToken() && !storedAdminCookieSession();
+      if (status === 401 && matching &&
+          /^\/admin(?:\/|$)/.test(window.location.pathname) && window.location.pathname !== "/admin/login" && !leavingForSignIn) {
+        leavingForSignIn = true;
+        clearAdminSession();
+        invalidateAdminReads();
+        try { sessionStorage.setItem(SIGNED_OUT_NOTICE, "Your session has ended. Please sign in again."); } catch { /* unavailable storage */ }
+        window.location.replace("/admin/login");
+      }
+      return Promise.reject(error);
+    }
 
     /* ── the admin and employee panels ──────────────────────────────────
 

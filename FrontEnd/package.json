@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "test:admin": "npm run build:spa && playwright test",
+    "lint:admin": "eslint src/pages/Admin src/pages/Auth/Login/AdminLogin.jsx src/components/layout src/components/common/AdminSectionBoundary.jsx src/components/common/ConfirmDialog.jsx src/api src/config/adminRoutes.js src/routes/ProtectedRoute.jsx src/routes/PublicRoute.jsx src/routes/areas/AdminArea.jsx src/hooks/useAdminSession.js src/hooks/useLatestRequest.js src/hooks/useObjectUrl.js src/hooks/useLiveOrders.jsx src/utils/adminReads.js src/utils/adminSession.js src/utils/reportAdminError.js src/utils/safeExternalUrl.js tests scripts/admin-audit-server.mjs scripts/inventory-admin.mjs scripts/measure-admin.mjs scripts/measure-admin-navigation.mjs scripts/summarize-admin.mjs playwright.config.js --max-warnings 0",
     "dev": "vite",
     "build": "vite build && node scripts/prerender.mjs",
     "build:spa": "vite build",
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.64.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
@@ -42,5 +45,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
     "vite": "^7.2.4"
+  },
+  "overrides": {
+    "postcss-selector-parser": "7.1.6"
   }
 }

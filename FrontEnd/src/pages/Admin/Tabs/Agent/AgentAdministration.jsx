@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog } from "@mui/material";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { toast } from "sonner";
 import { changeAgentAccess, getManagedStores, getManagementAudit, previewStoreRemoval, previewStoreTransfer, removeManagedStore, transferStores, previewAgentDeletion, permanentlyDeleteAgent, retryAgentFileCleanup } from "../../../../api/services";
 
@@ -38,18 +39,27 @@ export default function AgentAdministration({ agents, agent, onClose, onChanged 
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const operationId = useRef(null), running = useRef(false), generation = useRef(0);
+  const operationId = useRef(null), running = useRef(false);
+  const beginDirectory = useLatestRequest(), beginAudit = useLatestRequest();
   const activeAgent = agents.find((a) => a.agentId === source);
   useEffect(() => { const timer = setTimeout(() => { setQuery(search.trim()); setPage(1); }, 300); return () => clearTimeout(timer); }, [search]);
   const load = useCallback(async () => {
-    const current = ++generation.current; setLoading(true);
+    const request = beginDirectory(); setLoading(true); setError("");
     try {
-      const [stores, history] = await Promise.all([getManagedStores({ agentId: source || undefined, page, search: query || undefined, status: status || undefined }), getManagementAudit(source || undefined)]);
-      if (current === generation.current) { setDirectory(stores); setAudit(history.data || []); }
-    } catch (e) { if (current === generation.current) setError(e.response?.data?.message || "Could not load management data. Refresh and try again."); }
-    finally { if (current === generation.current) setLoading(false); }
-  }, [source, page, query, status]);
+      const stores = await getManagedStores({ agentId: source || undefined, page, search: query || undefined, status: status || undefined }, { signal: request.signal });
+      if (request.current()) setDirectory(stores);
+    } catch (e) { if (request.current()) setError(e.response?.data?.message || "Could not load management data. Refresh and try again."); }
+    finally { if (request.current()) setLoading(false); }
+  }, [source, page, query, status, beginDirectory]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (tab !== "history") return undefined;
+    const request = beginAudit();
+    getManagementAudit(source || undefined, { signal: request.signal })
+      .then((history) => { if (request.current()) setAudit(history.data || []); })
+      .catch(() => { if (request.current()) setError("Could not load administrative history. Reopen History to try again."); });
+    return () => beginAudit();
+  }, [source, tab, beginAudit]);
   const execute = async (work, done) => {
     if (running.current) return;
     running.current = true; setBusy(true); setError("");

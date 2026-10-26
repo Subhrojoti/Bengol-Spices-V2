@@ -1,3 +1,4 @@
+import useObjectUrl from "../../../../hooks/useObjectUrl";
 import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@mui/material";
 import { toast } from "sonner";
@@ -89,22 +90,7 @@ const inputClass = (invalid) =>
 
 /* One object URL per file, released when it changes. The old modal called
    createObjectURL inline during render, minting a new URL every pass. */
-const useObjectUrl = (file) => {
-  const [url, setUrl] = useState("");
 
-  useEffect(() => {
-    if (!file) {
-      setUrl("");
-      return undefined;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    setUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
-
-  return url;
-};
 
 const ImageSlot = ({ label, existing, file, onSelect, onClear }) => {
   const preview = useObjectUrl(file);
@@ -394,7 +380,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
             icon={<Package size={17} />}>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Product Name" required error={show("name")}>
-                <input
+                <input aria-label="Product Name"
                   value={form.name}
                   onChange={set("name")}
                   className={inputClass(show("name"))}
@@ -402,7 +388,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
               </Field>
 
               <Field label="Title" required error={show("title")}>
-                <input
+                <input aria-label="Title"
                   value={form.title}
                   onChange={set("title")}
                   className={inputClass(show("title"))}
@@ -451,7 +437,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
             icon={<Tag size={17} />}>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Field label="Category" required error={show("category")}>
-                <input
+                <input aria-label="Category"
                   value={form.category}
                   onChange={set("category")}
                   className={inputClass(show("category"))}
@@ -459,7 +445,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
               </Field>
 
               <Field label="SKU" required error={show("sku")} hint="must be unique">
-                <input
+                <input aria-label="SKU"
                   value={form.sku}
                   onChange={set("sku")}
                   className={`${inputClass(show("sku"))} font-mono`}
@@ -497,7 +483,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
             icon={<Box size={17} />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Price" required error={show("price")}>
-                <input
+                <input aria-label="Price"
                   type="number"
                   min="0"
                   step="0.01"
@@ -508,7 +494,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
               </Field>
 
               <Field label="Discount Price" hint="optional" error={show("discountPrice")}>
-                <input
+                <input aria-label="Discount Price"
                   type="number"
                   min="0"
                   step="0.01"
@@ -519,7 +505,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
               </Field>
 
               <Field label="GST %" error={show("gstPercentage")}>
-                <input
+                <input aria-label="GST %"
                   type="number"
                   min="0"
                   max="100"
@@ -530,7 +516,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
               </Field>
 
               <Field label="Stock" required error={show("stock")}>
-                <input
+                <input aria-label="Stock"
                   type="number"
                   min="0"
                   value={form.stock}
@@ -542,7 +528,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Min Order Qty" error={show("minOrderQty")}>
-                <input
+                <input aria-label="Min Order Qty"
                   type="number"
                   min="1"
                   value={form.minOrderQty}

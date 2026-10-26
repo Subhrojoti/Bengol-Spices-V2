@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -202,21 +204,25 @@ export default function AllProducts() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const data = await getAllProducts();
+      const data = await getAllProducts({ signal: request.signal });
+      if (!request.current()) return;
       setProducts(data?.products || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to fetch products", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch products", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

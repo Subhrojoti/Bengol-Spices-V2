@@ -1,6 +1,6 @@
 # Backend API reference
 
-Source snapshot: 25 October 2026, after production enhancements. Full paths include server.js mounts.
+Source snapshot: 26 October 2026, including the local Admin session follow-up. Full paths include server.js mounts.
 Generated offline by `node BackEnd/scripts/review-source.mjs`; no API or production state is inferred.
 See [PRODUCTION_ENHANCEMENTS.md](PRODUCTION_ENHANCEMENTS.md) for request bodies, behavior and deployment requirements.
 
@@ -83,14 +83,16 @@ Router: [auth.routes.js](../routes/auth.routes.js).
 |---|---|---|---|
 | POST | `/auth/agent/login` | `limitLoginAttempts("agentId") -> agentLogin` | 20 |
 | POST | `/auth/admin/login` | `limitLoginAttempts("email") -> adminLogin` | 21 |
-| POST | `/auth/employee/login` | `limitLoginAttempts("employeeId") -> employeeLogin` | 22 |
-| POST | `/auth/agent/forgot-password` | `limitPasswordRequests -> agentForgotPassword` | 25 |
-| POST | `/auth/agent/reset-password` | `limitPasswordRequests -> agentResetPassword` | 26 |
-| POST | `/auth/delivery-partner/forgot-password` | `limitPasswordRequests -> deliveryPartnerForgotPassword` | 27 |
-| POST | `/auth/delivery-partner/reset-password` | `limitPasswordRequests -> deliveryPartnerResetPassword` | 32 |
-| POST | `/auth/logout` | `protect -> logout` | 39 |
-| POST | `/auth/employee/logout` | `protect -> employeeLogout` | 42 |
-| POST | `/auth/change-password` | `protect -> changePassword` | 45 |
+| GET | `/auth/admin/session` | `protect -> adminSessionInfo` | 22 |
+| POST | `/auth/admin/logout` | `protect -> adminLogout` | 23 |
+| POST | `/auth/employee/login` | `limitLoginAttempts("employeeId") -> employeeLogin` | 24 |
+| POST | `/auth/agent/forgot-password` | `limitPasswordRequests -> agentForgotPassword` | 27 |
+| POST | `/auth/agent/reset-password` | `limitPasswordRequests -> agentResetPassword` | 28 |
+| POST | `/auth/delivery-partner/forgot-password` | `limitPasswordRequests -> deliveryPartnerForgotPassword` | 29 |
+| POST | `/auth/delivery-partner/reset-password` | `limitPasswordRequests -> deliveryPartnerResetPassword` | 34 |
+| POST | `/auth/logout` | `protect -> logout` | 41 |
+| POST | `/auth/employee/logout` | `protect -> employeeLogout` | 44 |
+| POST | `/auth/change-password` | `protect -> changePassword` | 47 |
 
 ## /agent/store
 
@@ -256,4 +258,4 @@ Router: [events.routes.js](../routes/events.routes.js).
 |---|---|---|---|
 | GET | `/api/events/stream` | `protect -> isAdminOrEmployee -> openEventStream` | 10 |
 
-Registered method/path entries: **141**, including health. Commented routes are excluded.
+Registered method/path entries: **143**, including health. Commented routes are excluded.

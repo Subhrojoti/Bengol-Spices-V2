@@ -1,0 +1,196 @@
+{
+  "methodology": {
+    "browser": "installed Chrome headless",
+    "viewport": "1440x1000",
+    "cpuThrottle": 4,
+    "latencyMs": 60,
+    "downloadBytesPerSecond": 200000,
+    "syntheticApiLatencyMs": 40,
+    "stores": 1000,
+    "orders": 2000,
+    "coldContexts": true,
+    "runs": 3,
+    "note": "Laboratory LCP/CLS and Event Timing entries, not field Core Web Vitals or field INP. All API calls intercepted."
+  },
+  "cold": [
+    {
+      "path": "/admin/login",
+      "before": {
+        "readyMs": 2028.22,
+        "lcpMs": 2028,
+        "cls": 0,
+        "jsBytes": 179631,
+        "apiCalls": 0,
+        "longTasks": 2,
+        "longTaskMs": 310,
+        "maxEventMs": null,
+        "searchWallMs": null,
+        "domNodes": 107
+      },
+      "after": {
+        "readyMs": 2041.77,
+        "lcpMs": 2028,
+        "cls": 0,
+        "jsBytes": 181532,
+        "apiCalls": 0,
+        "longTasks": 2,
+        "longTaskMs": 310,
+        "maxEventMs": null,
+        "searchWallMs": null,
+        "domNodes": 107
+      }
+    },
+    {
+      "path": "/admin/dashboard",
+      "before": {
+        "readyMs": 4218.96,
+        "lcpMs": 4192,
+        "cls": 0,
+        "jsBytes": 469860,
+        "apiCalls": 2,
+        "longTasks": 6,
+        "longTaskMs": 958,
+        "maxEventMs": null,
+        "searchWallMs": null,
+        "domNodes": 624
+      },
+      "after": {
+        "readyMs": 3853.4,
+        "lcpMs": 3528,
+        "cls": 0,
+        "jsBytes": 352488,
+        "apiCalls": 2,
+        "longTasks": 6,
+        "longTaskMs": 978,
+        "maxEventMs": null,
+        "searchWallMs": null,
+        "domNodes": 643
+      }
+    },
+    {
+      "path": "/admin/order-management",
+      "before": {
+        "readyMs": 4583.55,
+        "lcpMs": 4408,
+        "cls": 0.07945712962962963,
+        "jsBytes": 469860,
+        "apiCalls": 2,
+        "longTasks": 7,
+        "longTaskMs": 781,
+        "maxEventMs": 40,
+        "searchWallMs": 585.59,
+        "domNodes": 386
+      },
+      "after": {
+        "readyMs": 3395.02,
+        "lcpMs": 3408,
+        "cls": 0.07945712962962963,
+        "jsBytes": 254780,
+        "apiCalls": 2,
+        "longTasks": 6,
+        "longTaskMs": 694,
+        "maxEventMs": 48,
+        "searchWallMs": 612.81,
+        "domNodes": 398
+      }
+    },
+    {
+      "path": "/admin/payment-summary",
+      "before": {
+        "readyMs": 4672.83,
+        "lcpMs": 4036,
+        "cls": 0.00017937364366319445,
+        "jsBytes": 469860,
+        "apiCalls": 3,
+        "longTasks": 7,
+        "longTaskMs": 785,
+        "maxEventMs": 72,
+        "searchWallMs": 920.85,
+        "domNodes": 322
+      },
+      "after": {
+        "readyMs": 3217.1,
+        "lcpMs": 2736,
+        "cls": 0.00017937364366319445,
+        "jsBytes": 247947,
+        "apiCalls": 3,
+        "longTasks": 7,
+        "longTaskMs": 746,
+        "maxEventMs": 80,
+        "searchWallMs": 942.13,
+        "domNodes": 328
+      }
+    },
+    {
+      "path": "/admin/product-sales",
+      "before": {
+        "readyMs": 4668.51,
+        "lcpMs": 4656,
+        "cls": 0,
+        "jsBytes": 469860,
+        "apiCalls": 2,
+        "longTasks": 5,
+        "longTaskMs": 1268,
+        "maxEventMs": null,
+        "searchWallMs": null,
+        "domNodes": 882
+      },
+      "after": {
+        "readyMs": 3954.6,
+        "lcpMs": 3932,
+        "cls": 0,
+        "jsBytes": 345410,
+        "apiCalls": 2,
+        "longTasks": 4,
+        "longTaskMs": 1161,
+        "maxEventMs": null,
+        "searchWallMs": null,
+        "domNodes": 888
+      }
+    }
+  ],
+  "navigation": [
+    {
+      "phase": "first",
+      "path": "/admin/order-management",
+      "beforeMs": 1086.83,
+      "afterMs": 1235.14,
+      "addedJsBytes": 16939
+    },
+    {
+      "phase": "first",
+      "path": "/admin/payment-summary",
+      "beforeMs": 1020.56,
+      "afterMs": 972.24,
+      "addedJsBytes": 6074
+    },
+    {
+      "phase": "first",
+      "path": "/admin/product-sales",
+      "beforeMs": 605.98,
+      "afterMs": 926.93,
+      "addedJsBytes": 7190
+    },
+    {
+      "phase": "cached",
+      "path": "/admin/order-management",
+      "beforeMs": 607.41,
+      "afterMs": 578.82,
+      "addedJsBytes": 0
+    },
+    {
+      "phase": "cached",
+      "path": "/admin/payment-summary",
+      "beforeMs": 550.46,
+      "afterMs": 573.07,
+      "addedJsBytes": 0
+    },
+    {
+      "phase": "cached",
+      "path": "/admin/product-sales",
+      "beforeMs": 402.35,
+      "afterMs": 448.18,
+      "addedJsBytes": 0
+    }
+  ]
+}

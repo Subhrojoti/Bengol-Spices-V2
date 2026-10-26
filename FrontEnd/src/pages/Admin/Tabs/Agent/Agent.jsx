@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { lazy, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Users, TrendingUp, Wallet } from "lucide-react";
 
-import AgentManagement from "./tabs/AgentManagement";
-import AgentPerformance from "./tabs/AgentPerformance";
-import AgentIncentives from "./tabs/AgentIncentives";
+const AgentManagement = lazy(() => import("./tabs/AgentManagement"));
+const AgentPerformance = lazy(() => import("./tabs/AgentPerformance"));
+const AgentIncentives = lazy(() => import("./tabs/AgentIncentives"));
+import AdminSectionBoundary from "../../../../components/common/AdminSectionBoundary";
 
 const TABS = [
   { key: "management", label: "Management", icon: Users, Component: AgentManagement },
@@ -55,7 +56,7 @@ export default function Agent() {
       </div>
 
       <div className="px-5 lg:px-8 pb-8">
-        <Current />
+        <AdminSectionBoundary key={active}><Current /></AdminSectionBoundary>
       </div>
     </div>
   );

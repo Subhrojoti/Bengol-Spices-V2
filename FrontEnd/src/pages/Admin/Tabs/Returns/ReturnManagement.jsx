@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -107,7 +109,9 @@ export default function ReturnsManagement() {
   const [storeSearch, setStoreSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
@@ -116,23 +120,26 @@ export default function ReturnsManagement() {
          photo come from the store directory. If that call is refused the
          returns still render, just without the richer store card. */
       const [returnRes, storeRes] = await Promise.all([
-        getAllReturns(),
-        getAllStores().catch((error) => {
-          console.error("Could not load store details:", error);
+        getAllReturns({ signal: request.signal }),
+        getAllStores({ signal: request.signal }).catch((error) => {
+          if (!request.current()) return null;
+          reportAdminError("Could not load store details:", error);
           return null;
         }),
       ]);
+      if (!request.current()) return;
 
       setReturns(returnRes?.data || []);
       setStoreRecords(storeRes?.stores || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to fetch returns:", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch returns:", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

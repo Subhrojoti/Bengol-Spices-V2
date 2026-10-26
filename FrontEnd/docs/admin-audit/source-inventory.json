@@ -1,0 +1,2082 @@
+{
+  "note": "Static import reachability/signals, not proof of runtime coverage. Review includes shared frontend dependencies; changes are restricted to Admin behavior.",
+  "parsedFrontendModules": 154,
+  "reachableModules": 95,
+  "modules": [
+    {
+      "file": "src/App.jsx",
+      "sha256": "90c4cdb3778d07d4fc8524affc51cd78efb3b5092b5ae3256e44bd5546e01621",
+      "lines": 49,
+      "imports": [
+        "react-router-dom",
+        "sonner",
+        "./routes/AppRouter",
+        "./components/common/ErrorBoundary",
+        "./seo/RouteMeta",
+        "./theme/ThemeMode",
+        "./theme/useThemeMode"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/api/axiosInstance.js",
+      "sha256": "7daa2187302eb18fe9023fe12105c1730d47b00c346cfa0cfcb7757a6d026f50",
+      "lines": 197,
+      "imports": [
+        "axios",
+        "../utils/adminSession",
+        "../utils/adminReads"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 6
+      }
+    },
+    {
+      "file": "src/api/services.js",
+      "sha256": "d47a0b8cd09c1a5e53a2b397196dbd3d1808c6e9cdf9d5ebb4076c34c1dd2fd4",
+      "lines": 1038,
+      "imports": [
+        "axios",
+        "./axiosInstance",
+        "../utils/adminReads",
+        "../utils/adminSession",
+        "../utils/reportAdminError"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 2
+      }
+    },
+    {
+      "file": "src/components/common/AdminSectionBoundary.jsx",
+      "sha256": "1aa0ea857428a493ef961f19b8179db8bbf016705a9bab187e38f721bd0f85c2",
+      "lines": 29,
+      "imports": [
+        "react",
+        "react-error-boundary",
+        "react-router-dom"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/ConfirmDialog.jsx",
+      "sha256": "5e4b6fd7ffbe7b604d9408c980ec2114762c06f060b4ce4c30c05f32c04a9c7d",
+      "lines": 110,
+      "imports": [
+        "@mui/material",
+        "react",
+        "lucide-react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/EntityAvatar.jsx",
+      "sha256": "d745764307d049accffaceae5041db0678202dfe8a3f72b757a8c557cc2a4ffb",
+      "lines": 93,
+      "imports": [
+        "react",
+        "lucide-react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/ErrorBoundary.jsx",
+      "sha256": "dbcf6143df29ca69e49196eab4981744c8d2667fb4ced84d1fb566f802e15df7",
+      "lines": 28,
+      "imports": [
+        "react-error-boundary",
+        "react-router-dom",
+        "../../components/common/ErrorPage"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/ErrorPage.jsx",
+      "sha256": "e69efd09095151554f480eb7b6587989220866dd5efd3b7c16f41d3e06d27123",
+      "lines": 91,
+      "imports": [
+        "react",
+        "../../assets/logo/Error_Logo.webp"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/Pagination.jsx",
+      "sha256": "71fdb0209111ced0c32bc579a57fb8b2398617b44b986660024d76efe6d5b79d",
+      "lines": 171,
+      "imports": [
+        "lucide-react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/StatusPill.jsx",
+      "sha256": "4ede8ebdba547949ae2649e313fba33777b0c39a3785d9ed3fb344405412fad6",
+      "lines": 66,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/ThemeToggle.jsx",
+      "sha256": "bd9b83f72b342a38fea5120d6666652f4f109db57ccb0949cc8527fa319805ea",
+      "lines": 27,
+      "imports": [
+        "lucide-react",
+        "../../theme/useThemeMode"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/footer/Footer.jsx",
+      "sha256": "e37721ab95b98926f1e28d0ed3c4ec37305589f945789e77ea96086aa9a45647",
+      "lines": 142,
+      "imports": [
+        "react-router-dom",
+        "lucide-react",
+        "../../assets/logo/Logo_Final.webp",
+        "../../assets/logo/FSSAI_Logo.webp"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/header/HomeHeader.jsx",
+      "sha256": "91cfb54ad9b71ca53cd188d64eb6d255b528e49744927a5a66f5bda87471b75a",
+      "lines": 210,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "lucide-react",
+        "../../config/footerRoutes",
+        "../../assets/logo/Logo_Final.webp"
+      ],
+      "signals": {
+        "useEffect": 3,
+        "useMemo": 2,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/layout/CommandPalette.jsx",
+      "sha256": "7b7e2f748cc28d38ae9d429c7fc492e22831cd3f6d9e8f4c3e3fe45e084818a6",
+      "lines": 198,
+      "imports": [
+        "react",
+        "@mui/material",
+        "lucide-react",
+        "react-router-dom"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 3,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/layout/PanelHeader.jsx",
+      "sha256": "1ff53af96f02690a624cbae935999789c4c28ee7a25ab684d0a67fa920a323d5",
+      "lines": 188,
+      "imports": [
+        "react",
+        "@mui/material",
+        "lucide-react",
+        "react-router-dom",
+        "../common/EntityAvatar",
+        "../common/ThemeToggle"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/layout/PanelLayout.jsx",
+      "sha256": "7913a66f06f6b09f3166a6093c6af848b2ba16a02e94a909785b61077f1d5c55",
+      "lines": 225,
+      "imports": [
+        "react",
+        "@mui/material",
+        "@mui/material/styles",
+        "react-router-dom",
+        "./PanelNav",
+        "./PanelHeader",
+        "./CommandPalette",
+        "../../theme/useThemeMode",
+        "../../theme"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 2
+      }
+    },
+    {
+      "file": "src/components/layout/PanelNav.jsx",
+      "sha256": "607a1cd04148c5a4085927f8cec1d565a1d08f04485e6dd635e3d8625ed7778e",
+      "lines": 351,
+      "imports": [
+        "@mui/material",
+        "@mui/icons-material/Logout",
+        "@mui/icons-material/Person",
+        "react-router-dom",
+        "../../assets/logo/Logo_Final.webp",
+        "../../theme/useThemeMode",
+        "../../theme"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/config/adminRoutes.js",
+      "sha256": "a209e67edff233bd57bc300ffc0f4f3cf77515f6d00683c2af64ad0741412e9e",
+      "lines": 133,
+      "imports": [
+        "react",
+        "@mui/icons-material/Dashboard",
+        "@mui/icons-material/PeopleAlt",
+        "@mui/icons-material/Groups3",
+        "@mui/icons-material/Inventory2",
+        "@mui/icons-material/ListAlt",
+        "@mui/icons-material/NotificationsActive",
+        "@mui/icons-material/AddLocation",
+        "@mui/icons-material/Payment",
+        "@mui/icons-material/AdsClick",
+        "@mui/icons-material/QueryStats",
+        "@mui/icons-material/FactCheck",
+        "@mui/icons-material"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/config/footerRoutes.js",
+      "sha256": "afc414ddc848be372839b5f662af3fb92050202718782f6e19abf5211ed71187",
+      "lines": 29,
+      "imports": [
+        "../pages/common/Company/AboutUs",
+        "../pages/common/Company/Careers",
+        "../pages/common/Contact/HelpAndSupport",
+        "../pages/common/Legal/TermsAndConditions",
+        "../pages/common/Legal/PrivacyPolicy",
+        "../pages/common/Home/Home"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/config/mapRoutes.jsx",
+      "sha256": "b644d4591fe996ac5f92b54ae2188f1e99b2b8972d9d42116c0f22b572e19716",
+      "lines": 9,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/config/marketingRoutes.js",
+      "sha256": "38c16fa4b841225e2a45ae47af4681796165802f84e7f8bff673b9a95d6e145f",
+      "lines": 60,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/config/permissions.js",
+      "sha256": "d0010ead2118b5ab430873aef75fda9828fe2ed5cc3faacb39c7c22d00628a36",
+      "lines": 49,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/hooks/useAdminSession.js",
+      "sha256": "b178c90134a09900a4e1d498aba6069c8d0ab844ae9c7d310c05e5f1e60ee4ed",
+      "lines": 19,
+      "imports": [
+        "react",
+        "../utils/adminSession"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 2,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/hooks/useLatestRequest.js",
+      "sha256": "b00b33d99bb318e4850beeae5e51ecf4f4168c4e5da0566c8585b4c876c7df3d",
+      "lines": 15,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/hooks/useLiveOrders.jsx",
+      "sha256": "bc6d7382142d5478ad20fb31b3e31b0ad45e165ce85874aef454e1665584aad2",
+      "lines": 286,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "sonner",
+        "lucide-react",
+        "../utils/adminSession"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 4,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
+      }
+    },
+    {
+      "file": "src/hooks/useObjectUrl.js",
+      "sha256": "446b94f75dc22c54b761e4ac05e9e7c519729dea9e7f37794fa971400d225df5",
+      "lines": 21,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 2,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 1,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/hooks/usePagination.js",
+      "sha256": "8324e8287e1f9cf5326b83b0f79820d0ca52a414da5942b48ccc8cc250cf039f",
+      "lines": 125,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 2,
+        "useCallback": 5,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/hooks/usePanelBasePath.js",
+      "sha256": "0911dd60bf7407dd422a23df82cc6227a49bb8a0b6feb18ffaa07c047fd56159",
+      "lines": 18,
+      "imports": [
+        "react-router-dom"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/hooks/useReveal.js",
+      "sha256": "d18a38d12870363c4b01a57cebb23fde2a58c15e6bda06492534fb16b8f37378",
+      "lines": 53,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/hooks/useSignedOutNotice.js",
+      "sha256": "96aec050bb00507cc41784bc05a878a87a5524527d142423c2015489e08ec25d",
+      "lines": 25,
+      "imports": [
+        "react",
+        "sonner",
+        "../api/axiosInstance"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/AdminBase.jsx",
+      "sha256": "6330bef0bf477bcbd0cc18d2f03a5b98f55b2dd298da8245c572a936d2855285",
+      "lines": 63,
+      "imports": [
+        "react-router-dom",
+        "../../components/layout/PanelLayout",
+        "../../config/adminRoutes",
+        "../../hooks/useLiveOrders",
+        "../../hooks/useAdminSession",
+        "react",
+        "sonner",
+        "../../api/services",
+        "../../utils/adminSession"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/AdminDashboard/AdminDashboard.jsx",
+      "sha256": "c43f95d4f4c3a6d0c9e5e69d39642b22183058c98d22dbf1ed6b5403873345de",
+      "lines": 663,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "react",
+        "recharts",
+        "lucide-react",
+        "../../../../api/services",
+        "./NeedsAttention",
+        "../../../../hooks/useLatestRequest",
+        "../../../../theme/useChartChrome"
+      ],
+      "signals": {
+        "useEffect": 3,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 1,
+        "addEventListener": 2,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/AdminDashboard/NeedsAttention.jsx",
+      "sha256": "6d0daf25d6b05912a34feea88e85504b54bca532d711b939e20595cb5447644c",
+      "lines": 398,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "react",
+        "react-router-dom",
+        "lucide-react",
+        "../../../../api/services",
+        "../../../../utils/permissionUtils",
+        "../../../../utils/uom"
+      ],
+      "signals": {
+        "useEffect": 3,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 3,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Agent/Agent.jsx",
+      "sha256": "f059e38b8adbb1102e5cd9ad7781e5f5cea096af66915a05079e60612ecf704e",
+      "lines": 64,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "lucide-react",
+        "../../../../components/common/AdminSectionBoundary"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Agent/AgentAdministration.jsx",
+      "sha256": "bc0f1177c6829f41bfe0f15a9bcc65c5a83319f10b431de41f57696011316748",
+      "lines": 137,
+      "imports": [
+        "react",
+        "@mui/material",
+        "../../../../hooks/useLatestRequest",
+        "sonner",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 4,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Agent/tabs/AgentIncentives.jsx",
+      "sha256": "2894404e959caa992067663a3c7d3cfdc8c0e16530d55805905dddc32e6696b5",
+      "lines": 364,
+      "imports": [
+        "../../../../../utils/reportAdminError",
+        "../../../../../hooks/useLatestRequest",
+        "react",
+        "sonner",
+        "lucide-react",
+        "../../../../../components/common/ConfirmDialog",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 2,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Agent/tabs/AgentManagement.jsx",
+      "sha256": "962031b19aac5baa370e632e91b7bbdffc526ba070c804c68130859ad466eed1",
+      "lines": 629,
+      "imports": [
+        "../../../../../utils/reportAdminError",
+        "../../../../../utils/safeExternalUrl",
+        "../../../../../hooks/useLatestRequest",
+        "react",
+        "sonner",
+        "lucide-react",
+        "../../../../../components/common/ConfirmDialog",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../../../../../api/services",
+        "../AgentAdministration"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 3,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Agent/tabs/AgentPerformance.jsx",
+      "sha256": "975c42c494fbd2edee2914670d74958af4d43fecf4287526931f2db94c07e7da",
+      "lines": 348,
+      "imports": [
+        "../../../../../utils/reportAdminError",
+        "../../../../../hooks/useLatestRequest",
+        "react",
+        "recharts",
+        "lucide-react",
+        "../../../../../api/services",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../../../../../theme/useChartChrome"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 3,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/AllProducts/AllProducts.jsx",
+      "sha256": "a715a6e75809b8f52029f4cc265b21c26a4a01e056a4edcc8b79396f37413724",
+      "lines": 515,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "../../../../hooks/useLatestRequest",
+        "react",
+        "react-router-dom",
+        "sonner",
+        "lucide-react",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/EntityAvatar",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "./EditProductDetails",
+        "../../../../api/services",
+        "../../../../hooks/usePanelBasePath"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 4,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/AllProducts/EditProductDetails.jsx",
+      "sha256": "3e77b1e013cabbbc599326ab092bfd3129bc85c2113c2de6305e601f85bc82d1",
+      "lines": 678,
+      "imports": [
+        "../../../../hooks/useObjectUrl",
+        "react",
+        "@mui/material",
+        "sonner",
+        "lucide-react",
+        "react-simple-wysiwyg",
+        "../../../../components/common/EntityAvatar",
+        "../../../../api/services",
+        "../../../../utils/uom",
+        "../../../../utils/sanitizeHtml"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 4,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 1,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/AllProducts/ProductDetails.jsx",
+      "sha256": "e30432b383850ba64c6cdfb689d78c7983c6ee1eedeb6e9c9702a9be370905cf",
+      "lines": 469,
+      "imports": [
+        "react",
+        "../../../../utils/sanitizeHtml",
+        "../../../../hooks/useLatestRequest",
+        "react-router-dom",
+        "sonner",
+        "lucide-react",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/EntityAvatar",
+        "../../../../hooks/usePanelBasePath",
+        "../../../../components/common/StatusPill",
+        "./EditProductDetails",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 3,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 1,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/AssignLocation/AssignLocation.jsx",
+      "sha256": "a21212195c464c005d8e0aa38e07237f1c0aba2f3a1e54c4fd6225a6a31cf110",
+      "lines": 1018,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "react",
+        "axios",
+        "@mui/material",
+        "sonner",
+        "lucide-react",
+        "../../../../components/common/StatusPill",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../hooks/useLatestRequest",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 4,
+        "useMemo": 6,
+        "useCallback": 4,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/CashVerification/CashVerification.jsx",
+      "sha256": "ddce12e6d3436026cef54a9152ed149d89582d7cedc3ab657cef888ed1d3d530",
+      "lines": 919,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "react",
+        "@mui/material",
+        "sonner",
+        "../../../../hooks/useLatestRequest",
+        "lucide-react",
+        "../../../../api/services",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/Pagination",
+        "../../../../components/common/StatusPill",
+        "../../../../hooks/usePagination"
+      ],
+      "signals": {
+        "useEffect": 3,
+        "useMemo": 4,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/CustomNotification/CustomNotification.jsx",
+      "sha256": "5489caa4c1022a4a1954b2ace3c5c804885947f34335b97a52db1f45dd94c822",
+      "lines": 520,
+      "imports": [
+        "../../../../hooks/useLatestRequest",
+        "../../../../utils/reportAdminError",
+        "react",
+        "sonner",
+        "lucide-react",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 2,
+        "useCallback": 3,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/Delivery.jsx",
+      "sha256": "5969a324dd960c1e8de1b47449f1d89272a383bc4c1cab777fec3c3a96f3e50c",
+      "lines": 78,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "lucide-react",
+        "../../../../components/common/AdminSectionBoundary"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/DeliveryTrail.jsx",
+      "sha256": "8b9895a1370c9131bbfb677561fdc08eaf3ac7f7167cc6b75717f0213163d8d8",
+      "lines": 319,
+      "imports": [
+        "react",
+        "@mui/material",
+        "lucide-react",
+        "../../../../components/common/StatusPill",
+        "../../../../api/services",
+        "./deliveryFormat"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/deliveryFormat.js",
+      "sha256": "4c2926d46039217dce00ea81c0f6e5f67f24c8e88251f43b3c974f4ff826a16d",
+      "lines": 28,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryAlerts.jsx",
+      "sha256": "344dd0210ef6ed95f66b01e0573357ea562055f2382de3b76f6f1b5038d1d812",
+      "lines": 594,
+      "imports": [
+        "../../../../../hooks/useLatestRequest",
+        "../../../../../utils/reportAdminError",
+        "react",
+        "react-router-dom",
+        "sonner",
+        "lucide-react",
+        "../../../../../components/common/ConfirmDialog",
+        "../../../../../api/services",
+        "../DeliveryTrail",
+        "../deliveryFormat"
+      ],
+      "signals": {
+        "useEffect": 4,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryApproval.jsx",
+      "sha256": "c9d132f1483f03883846cb07fe9b49f111bfb00ca64f4905ff8cf5d2aec8dead",
+      "lines": 592,
+      "imports": [
+        "../../../../../utils/reportAdminError",
+        "../../../../../utils/safeExternalUrl",
+        "../../../../../hooks/useLatestRequest",
+        "react",
+        "sonner",
+        "lucide-react",
+        "../../../../../components/common/StatusPill",
+        "../../../../../components/common/ConfirmDialog",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 3,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryManagement.jsx",
+      "sha256": "af70960700101540438ab495f9f6d74f8c1611798faaa359c30abbd43e8b3071",
+      "lines": 872,
+      "imports": [
+        "../../../../../utils/reportAdminError",
+        "../../../../../hooks/useLatestRequest",
+        "react",
+        "sonner",
+        "lucide-react",
+        "../../../../../components/common/StatusPill",
+        "../../../../../components/common/EntityAvatar",
+        "../../../../../components/common/ConfirmDialog",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 3,
+        "useMemo": 8,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/EmpCreation/EmpCreation.jsx",
+      "sha256": "d0ecc42aadda15bb3fa588cd814963ee364a66153f83a573fd7fd19eee35679f",
+      "lines": 845,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "../../../../hooks/useLatestRequest",
+        "react",
+        "@mui/material",
+        "sonner",
+        "lucide-react",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../config/permissions",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 3,
+        "useMemo": 4,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 2,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Orders/OrderManagement.jsx",
+      "sha256": "a58a2a94d5b211cfe61989e2fe29332563a52e79f54fd87e93a9447f33b7390a",
+      "lines": 1007,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "../../../../hooks/useLatestRequest",
+        "react",
+        "react-router-dom",
+        "@mui/material",
+        "sonner",
+        "lucide-react",
+        "../../../../components/common/StatusPill",
+        "./OrderStoreSidebar",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../api/services",
+        "../../../../utils/csv",
+        "../../../../utils/uom",
+        "../Delivery/DeliveryTrail"
+      ],
+      "signals": {
+        "useEffect": 5,
+        "useMemo": 8,
+        "useCallback": 5,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 1,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Orders/OrderStoreSidebar.jsx",
+      "sha256": "0463e34afa72de8c654e52313c4aae2c4df721934420e57202bb4edea457a53e",
+      "lines": 92,
+      "imports": [
+        "react",
+        "lucide-react",
+        "../../../../components/common/EntityAvatar",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../utils/image",
+        "./OrderStoreSidebar.css"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 3,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/PaymentInfo/PaymentInfo.jsx",
+      "sha256": "d4a24f4aaaa1af153ccaad7ca726b787a0b425958bf8a54de0ebb87fe7e72f86",
+      "lines": 688,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "../../../../hooks/useLatestRequest",
+        "react",
+        "lucide-react",
+        "../../../../api/services",
+        "sonner",
+        "../../../../components/common/EntityAvatar",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "./PaymentIssues",
+        "../../../../utils/csv"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 7,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/PaymentInfo/PaymentIssues.jsx",
+      "sha256": "4b17999ef1db6913b7f2c84bd22a9530e8e058f8c70f0518c164a587991809cd",
+      "lines": 206,
+      "imports": [
+        "../../../../hooks/useLatestRequest",
+        "../../../../utils/reportAdminError",
+        "react",
+        "sonner",
+        "lucide-react",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/ProductCreation/ProductCreation.jsx",
+      "sha256": "881838ccce7caf74d6153c6e945ba9af4d3a301f70abc61144a89e74b4071760",
+      "lines": 762,
+      "imports": [
+        "../../../../hooks/useObjectUrl",
+        "react",
+        "sonner",
+        "lucide-react",
+        "react-simple-wysiwyg",
+        "../../../../api/services",
+        "../../../../utils/uom"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 2,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 1,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/ProductSales/ProductSales.jsx",
+      "sha256": "3301b57bfe9b83957fd5d5f0e30887dbfdcad878c1578130fcb0567f421c3b9c",
+      "lines": 918,
+      "imports": [
+        "react",
+        "../../../../hooks/useLatestRequest",
+        "recharts",
+        "lucide-react",
+        "sonner",
+        "../../../../api/services",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../theme/useChartChrome",
+        "../../../../utils/csv",
+        "../../../../utils/uom"
+      ],
+      "signals": {
+        "useEffect": 4,
+        "useMemo": 5,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Returns/ReturnManagement.jsx",
+      "sha256": "fab211dd4e3464e329c4d8fdcca24984eb37185ef3027c062cdd85bb6a0e8eb0",
+      "lines": 721,
+      "imports": [
+        "../../../../utils/reportAdminError",
+        "../../../../hooks/useLatestRequest",
+        "react",
+        "lucide-react",
+        "../../../../components/common/StatusPill",
+        "../../../../components/common/EntityAvatar",
+        "../../../../components/common/Pagination",
+        "../../../../hooks/usePagination",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 8,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/Targets.jsx",
+      "sha256": "2fa311825799394133eea738f95526673bfddc27ea979cce7009edb5c35cd140",
+      "lines": 74,
+      "imports": [
+        "react",
+        "lucide-react",
+        "../../../../components/common/AdminSectionBoundary"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/sales/SalesTargetDialog.jsx",
+      "sha256": "3c8154e6e0856bef0f67b7c8697f68a175971d7a16a747d44181ae628e7baa26",
+      "lines": 704,
+      "imports": [
+        "react",
+        "@mui/material",
+        "sonner",
+        "lucide-react",
+        "../../../../../api/services",
+        "./salesTargetMath"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 2,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/sales/SalesTargetHistory.jsx",
+      "sha256": "192d803cb36138cb2c47fda46f99062f21f7f278e42fbfbbb1881f34670c379c",
+      "lines": 412,
+      "imports": [
+        "react",
+        "@mui/material",
+        "lucide-react",
+        "../../../../../api/services",
+        "./salesTargetMath"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/sales/salesTargetMath.js",
+      "sha256": "e4cfaa085562bddee0a082a458e572379afe540748def5c2139062d435af6d56",
+      "lines": 213,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/tabs/CreateTarget.jsx",
+      "sha256": "cff600bf2338bcdfd971a66266246a906be6a066b211341998bdb085ecb6677e",
+      "lines": 1171,
+      "imports": [
+        "../../../../../hooks/useLatestRequest",
+        "../../../../../utils/reportAdminError",
+        "react",
+        "@mui/material",
+        "sonner",
+        "lucide-react",
+        "../../../../../api/services",
+        "../../../../../components/common/ConfirmDialog",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../targetMeta"
+      ],
+      "signals": {
+        "useEffect": 4,
+        "useMemo": 4,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/tabs/SalesTargets.jsx",
+      "sha256": "35c72281b69d8c12a6f48cb104651b64f9a72ba038985a9062a65a3bb39f0999",
+      "lines": 731,
+      "imports": [
+        "../../../../../utils/reportAdminError",
+        "react",
+        "../../../../../hooks/useLatestRequest",
+        "lucide-react",
+        "../../../../../api/services",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../sales/SalesTargetDialog",
+        "../sales/SalesTargetHistory",
+        "../sales/salesTargetMath"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 2,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/tabs/TargetPerformance.jsx",
+      "sha256": "1a5852ce2cd319af7731d584542592ae748b5ab08aa65f0bc3a8d36ea4ba74db",
+      "lines": 475,
+      "imports": [
+        "../../../../../utils/reportAdminError",
+        "../../../../../hooks/useLatestRequest",
+        "react",
+        "lucide-react",
+        "../../../../../api/services",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination",
+        "../targetMeta"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 3,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Targets/targetMeta.js",
+      "sha256": "1e033f4b483d548e5db9a2a318ce12a07715477dd091a0fea4d2ccc9a284bae5",
+      "lines": 107,
+      "imports": [
+        "lucide-react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Auth/Login/AdminLogin.jsx",
+      "sha256": "1831c92ab0227e9986d06f1b20b08a4f5caa10d2b52bd440a41be7d39aec69ba",
+      "lines": 152,
+      "imports": [
+        "react",
+        "../../../utils/adminSession",
+        "react-router-dom",
+        "sonner",
+        "lucide-react",
+        "./AuthShell",
+        "../../../api/services",
+        "../../../hooks/useSignedOutNotice"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
+      }
+    },
+    {
+      "file": "src/pages/Auth/Login/AuthShell.jsx",
+      "sha256": "5ec4f3a521efbd3bafd6d2eafcbbb2037fba3ed841d34d225977930cb53a87b6",
+      "lines": 185,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "lucide-react",
+        "../../../assets/logo/Logo_Final.webp"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 1,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/common/Company/AboutUs.jsx",
+      "sha256": "34aab154d6711926b96606b2bbe4696aeb5cd8e2ca08094f184590ac31f01e87",
+      "lines": 312,
+      "imports": [
+        "lucide-react",
+        "../../../assets/Slides/Slide7.webp",
+        "../../../assets/Slides/Slide8.webp",
+        "../../../assets/logo/logoGold.webp",
+        "../../../assets/logo/BS_Logo_BG.webp",
+        "../../../assets/logo/FSSAI_Logo.webp",
+        "../../../hooks/useReveal"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/common/Company/Careers.jsx",
+      "sha256": "49dc5ad0cc75ae36f7988890e2401754f382a2e8bc6e83c2b6decd7a5ab02d76",
+      "lines": 415,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "lucide-react",
+        "../../../hooks/useReveal"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/common/Contact/HelpAndSupport.jsx",
+      "sha256": "eb59285ed992c333474b2e6876be125b21004cc01b4f268774dca569ad529092",
+      "lines": 493,
+      "imports": [
+        "react",
+        "lucide-react",
+        "../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 4,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/common/HomeBase.jsx",
+      "sha256": "902fbb99dbfab65ca8e945202384f59c3dc15cc87268c5f74ab42ee0d25d27b6",
+      "lines": 40,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "../../components/footer/Footer",
+        "../../components/header/HomeHeader",
+        "../../config/footerRoutes"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/common/Home/Home.jsx",
+      "sha256": "f45788e9e2104f6701e63aaaad34104ef1fcc6b7fd8440705e2913779bbca512",
+      "lines": 598,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "lucide-react",
+        "../../../assets/products/BS_Coriander_Powder.webp",
+        "../../../assets/products/BS_Cumin_Powder.webp",
+        "../../../assets/products/BS_Garam_Masala.webp",
+        "../../../assets/products/BS_Red_Chilli_Powder.webp",
+        "../../../assets/products/BS_Turmeric_Powder.webp",
+        "../../../assets/logo/BS_Home.webp",
+        "../../../assets/logo/BS_Home-960.webp",
+        "../../../assets/logo/FSSAI_Logo.webp",
+        "../../../hooks/useReveal"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/common/Legal/PrivacyPolicy.jsx",
+      "sha256": "e4d23c705d9ae43cce22b65274aba519f3bc69c2e8a18b1aa05ee3bdb4bda0b2",
+      "lines": 83,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/common/Legal/TermsAndConditions.jsx",
+      "sha256": "54094178ef2162daf91ed7440ca308953c8f6dd41cfdf01bb67428e168f88c28",
+      "lines": 208,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/routes/AppRouter.jsx",
+      "sha256": "a02884884974f3ac8544f91bbaef6091d4fa16421930070933d7e9adf42fafe7",
+      "lines": 21,
+      "imports": [
+        "react-router-dom",
+        "react",
+        "./routeConfig"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/routes/ProtectedRoute.jsx",
+      "sha256": "f29a00ceaeb2848b3ba8ac0cdc85478f6074bdc3712ece0df29468a43e7881fe",
+      "lines": 28,
+      "imports": [
+        "react-router-dom",
+        "../hooks/useAdminSession"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 4
+      }
+    },
+    {
+      "file": "src/routes/PublicRoute.jsx",
+      "sha256": "8436c7f73d3218ceda3295beec8904aae2e9ab31e8174570cdd6f698398491e5",
+      "lines": 15,
+      "imports": [
+        "react-router-dom",
+        "../hooks/useAdminSession"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
+      }
+    },
+    {
+      "file": "src/routes/areas/AdminArea.jsx",
+      "sha256": "271a64730a32b8d8bb2668b18a71ca22125dfe28cf437896e7f90a7f93e22554",
+      "lines": 36,
+      "imports": [
+        "react-router-dom",
+        "react",
+        "../../pages/Admin/AdminBase",
+        "../../components/common/AdminSectionBoundary",
+        "../../components/common/ErrorPage",
+        "../../config/adminRoutes"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/routes/routeConfig.jsx",
+      "sha256": "2ad4cf61ed6fd34357f0fac2a4395452cd0bf3cd0fd4aa87828ca99669c3e028",
+      "lines": 181,
+      "imports": [
+        "react",
+        "../config/marketingRoutes",
+        "../routes/ProtectedRoute",
+        "../routes/PublicRoute",
+        "../config/footerRoutes.js",
+        "../config/mapRoutes.jsx",
+        "../pages/common/HomeBase.jsx",
+        "../pages/common/Home/Home",
+        "../components/common/ErrorPage.jsx"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/seo/RouteMeta.jsx",
+      "sha256": "620d0826ef1a991934a2a7eaaafa6b15e9bf427728c327085d29104c6507fe8e",
+      "lines": 70,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "./site"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/seo/site.js",
+      "sha256": "09d00e5665dcd967261ffb2edb7850dedc34d08ac837f1d7b4809a8dcbee04ff",
+      "lines": 270,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/theme/ThemeMode.jsx",
+      "sha256": "f42f09069c4b1f9e48bae23b280ba5452fcfedfe7d67bc38661745801af604fb",
+      "lines": 89,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "@mui/material",
+        "./index",
+        "./useThemeMode"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 2,
+        "useCallback": 3,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 2
+      }
+    },
+    {
+      "file": "src/theme/index.js",
+      "sha256": "824eacce8cf42eb7da16223c6ca619d416cfe8e0af13eb6c1f8a1bfce41769f9",
+      "lines": 81,
+      "imports": [
+        "@mui/material/styles"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/theme/useChartChrome.js",
+      "sha256": "b906fe94188c06d43dccfa6909451333545054663d5f330de52df20bd1185db4",
+      "lines": 50,
+      "imports": [
+        "./useThemeMode"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/theme/useThemeMode.js",
+      "sha256": "64de6991e308802622c4dd63dc0a3afee4f99985f5db07604538578d7ca3cda4",
+      "lines": 30,
+      "imports": [
+        "react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/adminReads.js",
+      "sha256": "e1dcf1b25892f9d72edda6cfb470d891ef48ce71acecde9d15e1fba517f29b62",
+      "lines": 11,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/adminSession.js",
+      "sha256": "852bbb8c0cedaa146628ca4cc5d8d887f5a696653edb9556be377b03bc7201e9",
+      "lines": 53,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 10
+      }
+    },
+    {
+      "file": "src/utils/csv.js",
+      "sha256": "aa62073a8252521311b118332b6e49a7ad634205c17c0f692a8673ba516191de",
+      "lines": 80,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 1,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/image.js",
+      "sha256": "0639e686ecacf976384c0475887fe0c4f598d6fc1915b2034bfb6bdc3e2756e7",
+      "lines": 18,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/permissionUtils.js",
+      "sha256": "27d45f0d470c5966046b5720b5136ec87707bf83b904af35faec5a669947e588",
+      "lines": 36,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
+      }
+    },
+    {
+      "file": "src/utils/reportAdminError.js",
+      "sha256": "32f73c02bcd7321a69a387d5563c1b094e6e147bd49a1c76bbeb9727722c0f47",
+      "lines": 9,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/safeExternalUrl.js",
+      "sha256": "f347ca2c2b30481bbb7cb4719c8e79fc5b6d4a060d082deee700c756b3bc70da",
+      "lines": 9,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/sanitizeHtml.js",
+      "sha256": "d7c7c61d9df7b57352b33769a43892eecbd714fecd7f2fbf3bdc9855eebeeb3e",
+      "lines": 86,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/uom.js",
+      "sha256": "6a539102d141fb348d724786f0bf429d0feb2a9bd86bed7a8eb6483e3ce421f7",
+      "lines": 31,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    }
+  ]
+}

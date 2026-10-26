@@ -47,6 +47,26 @@ notes are ordinary repository files, not an off-machine backup.
 
 ## Backend security review: 26 October 2026
 
+**Local follow-up (not deployed):** the owner subsequently authorized backend and
+Admin-frontend fixes while excluding agent/delivery web changes. See
+[ADMIN_SESSION_HARDENING.md](BackEnd/docs/ADMIN_SESSION_HARDENING.md). Admin login
+now supports an opt-in HttpOnly opaque session cookie backed by an additive
+AdminSession collection (hashed token, one-day expiry/TTL, credential rotation and
+durable logout revocation). Session-info/logout endpoints and CSRF Origin/header
+checks are additive; existing bearer clients keep their contracts. Event streams
+recheck the matching cookie session and close on logout. No business schema or
+calculation changed. Public identity files remain a separate migration; do not
+claim this follow-up made existing URLs private. The deployed state described
+below still refers to release `841e663`.
+
+Local validation: 41 backend tests, nine frontend unit tests, 64 Admin browser
+tests each in Chrome/Edge and four focused StrictMode checks pass. Admin lint and
+the production frontend build/prerender pass; frontend/backend dependency audits
+are clean. CSS is byte-identical after the parser dependency patch. Updated source
+maps cover 121 backend modules, 446 resolved imports and 143 method/path entries.
+See the follow-up report for staging/release/rollback requirements. Unrelated
+Employee/agent-web lint findings and mobile working-tree edits remain untouched.
+
 **Deployed and verified:** application commit `841e663` is pushed to GitHub main
 and live on the VPS. All 36 backend tests passed; production/full dependency
 audits reported zero known vulnerabilities. Deployment file hashes, patched

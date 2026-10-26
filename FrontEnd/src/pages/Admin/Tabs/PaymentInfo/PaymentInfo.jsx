@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -159,7 +161,9 @@ export default function PaymentInfo() {
   const [openStore, setOpenStore] = useState(null);
   const [openOrder, setOpenOrder] = useState(null);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
@@ -167,20 +171,22 @@ export default function PaymentInfo() {
       /* The summary carries a flattened delivery address with no store photo,
          so the store directory is joined in for the card. */
       const [summaryRes, storeRes] = await Promise.all([
-        getPaymentSummary(),
-        getAllStores().catch(() => null),
+        getPaymentSummary({ signal: request.signal }),
+        getAllStores({ signal: request.signal }).catch(() => null),
       ]);
+      if (!request.current()) return;
 
       setOrders(summaryRes?.data || []);
       setStoreRecords(storeRes?.stores || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to fetch payment summary", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch payment summary", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { sanitizeHtml } from "../../../../utils/sanitizeHtml";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -64,6 +65,7 @@ const Skeleton = () => (
 /* ------------------------------------------------------------------ */
 
 export default function ProductDetails() {
+  const beginRequest = useLatestRequest();
   const { productId } = useParams();
   const navigate = useNavigate();
   const basePath = usePanelBasePath();
@@ -76,12 +78,17 @@ export default function ProductDetails() {
   const [editing, setEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loadedId, setLoadedId] = useState(productId);
+  if (loadedId !== productId) {
+    setLoadedId(productId); setProduct(null); setStatus("loading");
+    setEditing(false); setDeleteOpen(false);
+  }
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-
-    try {
-      const res = await getSingleProduct(productId);
+  const [reloadKey, reload] = useReducer((value) => value + 1, 0);
+  useEffect(() => {
+    const request = beginRequest();
+    getSingleProduct(productId, { signal: request.signal }).then((res) => {
+      if (!request.current()) return;
 
       if (!res?.product) {
         setStatus("missing");
@@ -92,14 +99,11 @@ export default function ProductDetails() {
       setActiveImage(res.product.images?.front?.url || "");
       setBrokenMain(false);
       setStatus("ready");
-    } catch (error) {
+    }).catch((error) => {
+      if (!request.current()) return;
       setStatus(error?.response?.status === 404 ? "missing" : "error");
-    }
-  }, [productId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+    });
+  }, [productId, beginRequest, reloadKey]);
 
   /* Explicit order rather than Object.values, which depends on key order */
   const gallery = useMemo(
@@ -157,7 +161,7 @@ export default function ProductDetails() {
             </button>
             {status === "error" && (
               <button
-                onClick={load}
+                onClick={() => { setStatus("loading"); reload(); }}
                 className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
                 <RefreshCcw size={14} />
                 Retry
@@ -426,7 +430,7 @@ export default function ProductDetails() {
         <EditProductDetails
           product={product}
           onClose={() => setEditing(false)}
-          onSuccess={load}
+          onSuccess={() => { setStatus("loading"); reload(); }}
         />
       )}
 

@@ -53,12 +53,10 @@ const PanelLayout = ({
 
   const [pinned, setPinned] = useState(() => readPinned(storageKey));
   const [hovered, setHovered] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobilePath, setMobilePath] = useState(null);
+  const mobileOpen = mobilePath === location.pathname;
+  const setMobileOpen = (open) => setMobilePath(open ? location.pathname : null);
   const [paletteOpen, setPaletteOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
 
   /* Ctrl+K / Cmd+K opens quick navigation from anywhere in the panel */
   useEffect(() => {

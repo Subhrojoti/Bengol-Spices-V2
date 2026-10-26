@@ -1,3 +1,4 @@
+import useObjectUrl from "../../../../hooks/useObjectUrl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -118,22 +119,7 @@ const inputClass = (invalid) =>
 /* One object URL per file, released when the file changes or unmounts. The
    old form called createObjectURL inline during render, minting a fresh URL
    on every pass and never revoking any of them. */
-const useObjectUrl = (file) => {
-  const [url, setUrl] = useState("");
 
-  useEffect(() => {
-    if (!file) {
-      setUrl("");
-      return undefined;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    setUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
-
-  return url;
-};
 
 const ImageDrop = ({ label, file, preview, onSelect, onClear }) => {
   const handle = (e) => {
@@ -178,6 +164,7 @@ const ImageDrop = ({ label, file, preview, onSelect, onClear }) => {
       {file && (
         <button
           type="button"
+          aria-label={`Remove ${label}`}
           onClick={(e) => {
             e.preventDefault();
             onClear();
@@ -210,18 +197,20 @@ export default function ProductCreation() {
   /* Existing categories power the suggestion list, so the catalog does not
      drift into "Spices", "spices" and "Spice". */
   useEffect(() => {
+    const controller = new AbortController();
     const loadCategories = async () => {
       try {
-        const res = await getAllProducts();
+        const res = await getAllProducts({ signal: controller.signal });
         const list = [
           ...new Set((res?.products || []).map((p) => p.category).filter(Boolean)),
         ].sort();
-        setCategories(list);
+        if (!controller.signal.aborted) setCategories(list);
       } catch {
         /* Suggestions are a convenience; the field still accepts free text */
       }
     };
     loadCategories();
+    return () => controller.abort();
   }, []);
 
   const set = (key) => (e) =>
@@ -347,7 +336,7 @@ export default function ProductCreation() {
             icon={<Package size={17} />}>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Product Name" required error={show("name")}>
-                <input
+                <input aria-label="Product Name"
                   value={form.name}
                   onChange={set("name")}
                   placeholder="Haldi Powder"
@@ -356,7 +345,7 @@ export default function ProductCreation() {
               </Field>
 
               <Field label="Title" required error={show("title")}>
-                <input
+                <input aria-label="Title"
                   value={form.title}
                   onChange={set("title")}
                   placeholder="Turmeric, 100g pack"
@@ -425,7 +414,7 @@ export default function ProductCreation() {
               </Field>
 
               <Field label="SKU" required error={show("sku")} hint="must be unique">
-                <input
+                <input aria-label="SKU"
                   value={form.sku}
                   onChange={set("sku")}
                   placeholder="BS-HAL-100"
@@ -459,7 +448,7 @@ export default function ProductCreation() {
             icon={<Box size={17} />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Price" required error={show("price")}>
-                <input
+                <input aria-label="Price"
                   type="number"
                   min="0"
                   step="0.01"
@@ -471,7 +460,7 @@ export default function ProductCreation() {
               </Field>
 
               <Field label="Discount Price" hint="optional" error={show("discountPrice")}>
-                <input
+                <input aria-label="Discount Price"
                   type="number"
                   min="0"
                   step="0.01"
@@ -483,7 +472,7 @@ export default function ProductCreation() {
               </Field>
 
               <Field label="GST %" hint="defaults to 5" error={show("gstPercentage")}>
-                <input
+                <input aria-label="GST %"
                   type="number"
                   min="0"
                   max="100"
@@ -495,7 +484,7 @@ export default function ProductCreation() {
               </Field>
 
               <Field label="Stock" required error={show("stock")}>
-                <input
+                <input aria-label="Stock"
                   type="number"
                   min="0"
                   value={form.stock}
@@ -508,7 +497,7 @@ export default function ProductCreation() {
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Min Order Qty" hint="defaults to 1" error={show("minOrderQty")}>
-                <input
+                <input aria-label="Min Order Qty"
                   type="number"
                   min="1"
                   value={form.minOrderQty}

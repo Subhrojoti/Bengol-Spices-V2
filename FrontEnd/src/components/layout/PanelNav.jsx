@@ -48,6 +48,9 @@ const PanelNav = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { dark } = useThemeMode();
+  // In Admin, keep item positions stable as the rail expands under a pointer.
+  // Inserting headings on hover otherwise moves a different item under a click.
+  const stableGroups = basePath === "/admin";
 
   // Every colour the rail sets in code, for the mode in force
   const tone = dark
@@ -218,9 +221,11 @@ const PanelNav = ({
       <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", py: 1 }}>
         {groups.map((group) => (
           <Box key={group.name || "_"} sx={{ mb: 0.5 }}>
-            {expanded && group.name && (
+            {(expanded || stableGroups) && group.name && (
               <Typography
+                aria-hidden={!expanded}
                 sx={{
+                  visibility: expanded ? "visible" : "hidden",
                   px: 2.5,
                   pt: 1.25,
                   pb: 0.5,

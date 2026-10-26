@@ -1,3 +1,5 @@
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
+import reportAdminError from "../../../../../utils/reportAdminError";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -267,22 +269,26 @@ export default function DeliveryAlerts({ onReassign }) {
   const [trailFor, setTrailFor] = useState(null);
   const [ask, setAsk] = useState(null); // { kind: "retry" | "allow", row }
 
+  const beginLoad = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const request = beginLoad();
     if (quiet) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const res = await getDeliveryAlerts();
+      const res = await getDeliveryAlerts({ signal: request.signal });
+      if (!request.current()) return;
       setData(res.data);
       setStatus("ready");
     } catch (error) {
-      console.error("Could not load delivery alerts:", error);
+      if (!request.current()) return;
+      reportAdminError("Could not load delivery alerts:", error);
       // A quiet refresh that fails leaves what is on screen alone
       if (!quiet) setStatus(error?.response?.status === 403 ? "denied" : "error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginLoad]);
 
   useEffect(() => {
     load();

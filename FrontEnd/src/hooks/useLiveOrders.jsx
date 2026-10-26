@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { PackageX, ShoppingBag } from "lucide-react";
+import { storedAdminCookieSession, storedAdminToken } from "../utils/adminSession";
 
 const API_ROOT = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -74,14 +75,15 @@ const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
    Plain fetch is used instead of EventSource so the token can travel in
    the Authorization header rather than in the URL. */
-export default function useLiveOrders({ tokenKey, ordersPath }) {
+export default function useLiveOrders({ tokenKey, ordersPath, sessionKey }) {
   const navigate = useNavigate();
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
 
   useEffect(() => {
-    const token = localStorage.getItem(tokenKey);
-    if (!token) return undefined;
+    const session = tokenKey === "adminToken" ? storedAdminCookieSession() : null;
+    const token = tokenKey === "adminToken" ? storedAdminToken() : localStorage.getItem(tokenKey);
+    if ((!token && !session) || (session && sessionKey !== session.id)) return undefined;
 
     /* One listening session at a time: its own stop switch and retry timer.
        A session ends when the page is left (see the bottom of this effect)
@@ -195,10 +197,11 @@ export default function useLiveOrders({ tokenKey, ordersPath }) {
       try {
         const res = await fetch(`${API_ROOT}/api/events/stream`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            ...(session ? { "X-Admin-Session": session.id } : { Authorization: `Bearer ${token}` }),
             Accept: "text/event-stream",
           },
           signal,
+          ...(session ? { credentials: "include" } : {}),
         });
 
         // Signed out or not allowed: nothing to listen for
@@ -278,5 +281,5 @@ export default function useLiveOrders({ tokenKey, ordersPath }) {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
     };
-  }, [tokenKey, ordersPath]);
+  }, [tokenKey, ordersPath, sessionKey]);
 }

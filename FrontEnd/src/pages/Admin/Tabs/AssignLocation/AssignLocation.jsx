@@ -1,3 +1,4 @@
+import reportAdminError from "../../../../utils/reportAdminError";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Autocomplete, TextField } from "@mui/material";
@@ -20,6 +21,7 @@ import StatusPill from "../../../../components/common/StatusPill";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
 import Pagination from "../../../../components/common/Pagination";
 import usePagination from "../../../../hooks/usePagination";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import {
   assignLocation,
   agentList,
@@ -119,81 +121,94 @@ export default function AssignLocation() {
 
   /* Guards against a slow reply for an earlier state/city overwriting a
      newer one — the old code fired these with no ordering at all. */
-  const cityReq = useRef(0);
-  const pinReq = useRef(0);
+  const selection = useRef(0);
+  const beginBase = useLatestRequest();
+  const beginCities = useLatestRequest();
+  const beginPins = useLatestRequest();
 
   const loadBase = useCallback(async () => {
+    const request = beginBase();
     setLoadingBase(true);
     try {
       const [agentRes, coverRes, productRes] = await Promise.all([
-        agentList(),
-        getSalesLocations(),
-        fetchProducts(),
+        agentList({ signal: request.signal }),
+        getSalesLocations(undefined, { signal: request.signal }),
+        fetchProducts({ signal: request.signal }),
       ]);
+      if (!request.current()) return;
       setAgents(agentRes?.agents || []);
       setCoverage(coverRes?.locations || []);
       setCatalog(productRes?.products || []);
     } catch (error) {
-      console.error("Failed to load agents or coverage", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to load agents or coverage", error);
       toast.error("Could not load agents and existing coverage");
     } finally {
-      setLoadingBase(false);
+      if (request.current()) setLoadingBase(false);
     }
-  }, []);
+  }, [beginBase]);
 
   useEffect(() => {
     loadBase();
   }, [loadBase]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchStates = async () => {
       try {
         const res = await axios.post(
           "https://countriesnow.space/api/v0.1/countries/states",
           { country: "India" },
+          { signal: controller.signal, timeout: 15000 },
         );
-        setStates((res.data?.data?.states || []).map((s) => s.name));
+        if (!controller.signal.aborted) setStates((res.data?.data?.states || []).map((s) => s.name));
       } catch {
-        toast.error("Could not load the state list");
+        if (!controller.signal.aborted) toast.error("Could not load the state list");
       }
     };
     fetchStates();
+    return () => controller.abort();
   }, []);
 
   const fetchCities = useCallback(async (stateName) => {
     if (!stateName) return;
 
-    const id = ++cityReq.current;
+    const request = beginCities();
     setLoadingCities(true);
 
     try {
       const res = await axios.post(
         "https://countriesnow.space/api/v0.1/countries/state/cities",
         { country: "India", state: stateName },
+        { signal: request.signal, timeout: 15000 },
       );
-      if (id === cityReq.current) setCities(res.data?.data || []);
+      if (!request.current()) return false;
+      setCities(res.data?.data || []);
+      return true;
     } catch {
-      if (id === cityReq.current) {
+      if (request.current()) {
         setCities([]);
         toast.error("Could not load cities for that state");
       }
     } finally {
-      if (id === cityReq.current) setLoadingCities(false);
+      if (request.current()) setLoadingCities(false);
     }
-  }, []);
+  }, [beginCities]);
 
   const fetchSuggestedPins = useCallback(async (cityName, stateName) => {
+    const request = beginPins();
     if (!cityName || !stateName) {
       setSuggested([]);
+      setLoadingPins(false);
       return;
     }
 
-    const id = ++pinReq.current;
     setLoadingPins(true);
 
     try {
       const res = await axios.get(
         `https://api.postalpincode.in/postoffice/${encodeURIComponent(cityName)}`,
+        { signal: request.signal, timeout: 15000 },
       );
       const data = res.data?.[0];
 
@@ -212,13 +227,13 @@ export default function AssignLocation() {
             ].sort()
           : [];
 
-      if (id === pinReq.current) setSuggested(pins);
+      if (request.current()) setSuggested(pins);
     } catch {
-      if (id === pinReq.current) setSuggested([]);
+      if (request.current()) setSuggested([]);
     } finally {
-      if (id === pinReq.current) setLoadingPins(false);
+      if (request.current()) setLoadingPins(false);
     }
-  }, []);
+  }, [beginPins]);
 
   /* Existing record for this agent + state. Saving replaces it, so it is
      pre-loaded into the editor rather than silently wiped. */
@@ -253,6 +268,11 @@ export default function AssignLocation() {
   );
 
   const selectAgent = async (value) => {
+    const current = ++selection.current;
+    beginCities();
+    beginPins();
+    setLoadingCities(false);
+    setLoadingPins(false);
     setAgent(value);
     setPincodes([]);
     setSuggested([]);
@@ -270,7 +290,8 @@ export default function AssignLocation() {
 
     if (matched) {
       setState(matched);
-      await fetchCities(matched);
+      const loaded = await fetchCities(matched);
+      if (!loaded || current !== selection.current) return;
 
       const agentCity = value.addressDetails?.city || "";
       if (agentCity) {
@@ -490,6 +511,11 @@ export default function AssignLocation() {
                   options={states}
                   value={state || null}
                   onChange={(_, value) => {
+                    selection.current++;
+                    beginCities();
+                    beginPins();
+                    setLoadingCities(false);
+                    setLoadingPins(false);
                     setState(value || "");
                     setCity("");
                     setCities([]);
@@ -510,8 +536,7 @@ export default function AssignLocation() {
                   disabled={!state || loadingCities}
                   onChange={(_, value) => {
                     setCity(value || "");
-                    if (value) fetchSuggestedPins(value, state);
-                    else setSuggested([]);
+                    fetchSuggestedPins(value, state);
                   }}
                   renderInput={(params) => (
                     <TextField

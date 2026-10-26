@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Dialog } from "@mui/material";
@@ -228,6 +230,7 @@ const CancelDialog = ({ order, open, busy, onClose, onConfirm }) => {
             Reason for cancellation
           </label>
           <textarea
+            aria-label="Reason for cancellation"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
@@ -291,7 +294,9 @@ export default function OrderManagement() {
   const [params, setParams] = useSearchParams();
   const retriedFor = useRef(null);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
@@ -300,23 +305,26 @@ export default function OrderManagement() {
          store records are fetched alongside and joined by consumerId. A
          failure there must not take the orders down with it. */
       const [orderRes, storeRes] = await Promise.all([
-        getAllAgentOrders(),
-        getAllStores().catch((error) => {
-          console.error("Could not load store details:", error);
+        getAllAgentOrders({ signal: request.signal }),
+        getAllStores({ signal: request.signal }).catch((error) => {
+          if (!request.current()) return null;
+          reportAdminError("Could not load store details:", error);
           return null;
         }),
       ]);
+      if (!request.current()) return;
 
       setOrders(orderRes?.orders || []);
       setStoreRecords(storeRes?.stores || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to fetch orders:", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch orders:", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

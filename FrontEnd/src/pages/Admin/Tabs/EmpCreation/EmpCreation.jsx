@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@mui/material";
 import { toast } from "sonner";
@@ -58,10 +60,11 @@ const Card = ({ className = "", children }) => (
   </div>
 );
 
-const Toggle = ({ checked, onChange, disabled }) => (
+const Toggle = ({ checked, onChange, disabled, label }) => (
   <button
     type="button"
     role="switch"
+    aria-label={label}
     aria-checked={checked}
     disabled={disabled}
     onClick={onChange}
@@ -91,6 +94,7 @@ const Input = ({ label, hint, icon, trailing, ...props }) => (
         </span>
       )}
       <input
+        aria-label={label}
         {...props}
         className={`w-full rounded-xl border border-slate-200 bg-white py-2.5 text-[14.5px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 ${
           icon ? "pl-9" : "pl-3.5"
@@ -326,19 +330,13 @@ const CreateEmployee = ({ onCreated }) => {
 /* ------------------------------------------------------------------ */
 
 const PermissionsDialog = ({ employee, open, busy, onClose, onSave }) => {
-  const [draft, setDraft] = useState({});
-
-  useEffect(() => {
-    if (!employee) return;
-
-    const current = employee.permissions || {};
-    setDraft(
-      PERMISSION_KEYS.reduce((acc, key) => {
-        acc[key] = current[key] === true;
-        return acc;
-      }, {}),
-    );
-  }, [employee]);
+  const initial = () => Object.fromEntries(PERMISSION_KEYS.map((key) => [key, employee?.permissions?.[key] === true]));
+  const [draft, setDraft] = useState(initial);
+  const [draftEmployee, setDraftEmployee] = useState(employee);
+  if (employee !== draftEmployee) {
+    setDraftEmployee(employee);
+    if (employee) setDraft(initial());
+  }
 
   const grantedCount = PERMISSION_KEYS.filter((k) => draft[k]).length;
 
@@ -416,6 +414,7 @@ const PermissionsDialog = ({ employee, open, busy, onClose, onSave }) => {
                   className="flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 transition hover:bg-slate-50">
                   <span className="text-[14px] text-slate-700">{perm.label}</span>
                   <Toggle
+                    label={perm.label}
                     checked={Boolean(draft[perm.key])}
                     disabled={busy}
                     onChange={() =>
@@ -464,21 +463,25 @@ const EmployeeList = () => {
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivating, setDeactivating] = useState(false);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const res = await getAllEmployees();
+      const res = await getAllEmployees({ signal: request.signal });
+      if (!request.current()) return;
       setEmployees(res?.employees || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to fetch employees", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to fetch employees", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

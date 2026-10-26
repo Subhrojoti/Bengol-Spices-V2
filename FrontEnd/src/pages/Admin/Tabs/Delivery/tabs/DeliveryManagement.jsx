@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -113,7 +115,9 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
   const [assigningId, setAssigningId] = useState(null);
   const [reassignTarget, setReassignTarget] = useState(null);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
@@ -122,11 +126,12 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
          directory is joined in for the queue card. A refusal there must not
          take the dispatch board down with it. */
       const [orderRes, partnerRes, returnRes, storeRes] = await Promise.all([
-        getActiveOrders(),
-        getAllDeliveryPartners(),
-        getActiveReturns(),
-        getAllStores().catch(() => null),
+        getActiveOrders({ signal: request.signal }),
+        getAllDeliveryPartners({ signal: request.signal }),
+        getActiveReturns({ signal: request.signal }),
+        getAllStores({ signal: request.signal }).catch(() => null),
       ]);
+      if (!request.current()) return;
 
       setOrders(orderRes?.orders || []);
       setPartners(partnerRes?.data || []);
@@ -134,12 +139,13 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
       setStoreRecords(storeRes?.stores || []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to load dispatch data", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to load dispatch data", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();
@@ -295,7 +301,7 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
       setReassignTarget(null);
       await load(true);
     } catch (error) {
-      console.error("Assignment failed:", error);
+      reportAdminError("Assignment failed:", error);
       toast.error(
         error?.response?.data?.message ||
           error?.message ||

@@ -1,4 +1,5 @@
 import { Dialog } from "@mui/material";
+import { useId } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 const TONE = {
@@ -42,11 +43,14 @@ const ConfirmDialog = ({
   onConfirm,
   onClose,
 }) => {
+  const titleId = useId(), descriptionId = useId();
   const palette = TONE[tone] || TONE.primary;
 
   return (
     <Dialog
       open={open}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
       onClose={busy ? undefined : onClose}
       maxWidth="xs"
       fullWidth
@@ -62,11 +66,11 @@ const ConfirmDialog = ({
           </span>
 
           <div className="min-w-0 flex-1">
-            <h2 className="text-[16px] font-semibold text-slate-900 leading-snug">
+            <h2 id={titleId} className="text-[16px] font-semibold text-slate-900 leading-snug">
               {title}
             </h2>
             {description && (
-              <p className="mt-1.5 text-[14px] leading-relaxed text-slate-500">
+              <p id={descriptionId} className="mt-1.5 text-[14px] leading-relaxed text-slate-500">
                 {description}
               </p>
             )}

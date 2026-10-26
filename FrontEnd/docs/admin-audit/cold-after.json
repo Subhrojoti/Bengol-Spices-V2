@@ -1,0 +1,4368 @@
+{
+  "methodology": {
+    "browser": "installed Chrome headless",
+    "viewport": "1440x1000",
+    "cpuThrottle": 4,
+    "latencyMs": 60,
+    "downloadBytesPerSecond": 200000,
+    "syntheticApiLatencyMs": 40,
+    "stores": 1000,
+    "orders": 2000,
+    "coldContexts": true,
+    "runs": 3,
+    "note": "Laboratory LCP/CLS and Event Timing entries, not field Core Web Vitals or field INP. All API calls intercepted."
+  },
+  "results": [
+    {
+      "run": 1,
+      "path": "/admin/login",
+      "readyMs": 1982.9958000000001,
+      "searchMs": null,
+      "lcp": 2060,
+      "cls": 0,
+      "longTasks": [
+        214,
+        53
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminLogin-BigXPJkm.js",
+          "transferred": 1957,
+          "encoded": 1657,
+          "decoded": 3439
+        },
+        {
+          "file": "useSignedOutNotice-DNs5W6Rf.js",
+          "transferred": 1824,
+          "encoded": 1524,
+          "decoded": 3867
+        },
+        {
+          "file": "eye-C-M-psvg.js",
+          "transferred": 646,
+          "encoded": 346,
+          "decoded": 639
+        },
+        {
+          "file": "key-round-CgF-hWlR.js",
+          "transferred": 557,
+          "encoded": 257,
+          "decoded": 351
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        }
+      ],
+      "domNodes": 107,
+      "apiCalls": [],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 1,
+      "path": "/admin/dashboard",
+      "readyMs": 3908.8144999999995,
+      "searchMs": null,
+      "lcp": 3832,
+      "cls": 0,
+      "longTasks": [
+        235,
+        130,
+        154,
+        109,
+        126,
+        263
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "AdminDashboard-CTqicAV8.js",
+          "transferred": 8214,
+          "encoded": 7914,
+          "decoded": 25374
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "banknote-DopMLSGl.js",
+          "transferred": 506,
+          "encoded": 206,
+          "decoded": 241
+        },
+        {
+          "file": "map-pin-off-Dna-nRp9.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 476
+        },
+        {
+          "file": "clock-3-Bf_duFyj.js",
+          "transferred": 465,
+          "encoded": 165,
+          "decoded": 165
+        },
+        {
+          "file": "wallet-BWydVAD4.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 287
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "user-plus-DqMz2-Oo.js",
+          "transferred": 535,
+          "encoded": 235,
+          "decoded": 311
+        },
+        {
+          "file": "key-round-CgF-hWlR.js",
+          "transferred": 557,
+          "encoded": 257,
+          "decoded": 351
+        },
+        {
+          "file": "hand-coins-BqWkHQGx.js",
+          "transferred": 588,
+          "encoded": 288,
+          "decoded": 411
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "package-search-BeZgWwHk.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 473
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "CartesianChart-C_Lvovr7.js",
+          "transferred": 15661,
+          "encoded": 15361,
+          "decoded": 57864
+        },
+        {
+          "file": "CategoricalChart-CLmRyQOQ.js",
+          "transferred": 76569,
+          "encoded": 76269,
+          "decoded": 247744
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "circle-x-B87lbJmh.js",
+          "transferred": 477,
+          "encoded": 177,
+          "decoded": 203
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "trending-up-B0yh8t6I.js",
+          "transferred": 472,
+          "encoded": 172,
+          "decoded": 176
+        },
+        {
+          "file": "AreaChart-BCVIJrih.js",
+          "transferred": 5677,
+          "encoded": 5377,
+          "decoded": 17149
+        },
+        {
+          "file": "Dot-yXfJu0DP.js",
+          "transferred": 655,
+          "encoded": 355,
+          "decoded": 510
+        },
+        {
+          "file": "package-Bd0ArVKR.js",
+          "transferred": 554,
+          "encoded": 254,
+          "decoded": 373
+        },
+        {
+          "file": "trophy-CrcIoWgj.js",
+          "transferred": 576,
+          "encoded": 276,
+          "decoded": 477
+        },
+        {
+          "file": "BarChart-DDVSS2ce.js",
+          "transferred": 5316,
+          "encoded": 5016,
+          "decoded": 14112
+        },
+        {
+          "file": "getZIndexFromUnknown-Cb7xKvk5.js",
+          "transferred": 1673,
+          "encoded": 1373,
+          "decoded": 2940
+        },
+        {
+          "file": "shopping-cart-Dj_fWLap.js",
+          "transferred": 531,
+          "encoded": 231,
+          "decoded": 288
+        },
+        {
+          "file": "user-check-CnJaL7Ib.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 239
+        }
+      ],
+      "domNodes": 643,
+      "apiCalls": [
+        "GET /admin/dashboard-summary/",
+        "GET /admin/attention"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 1,
+      "path": "/admin/order-management",
+      "readyMs": 3398.4691999999995,
+      "searchMs": 658.7981999999993,
+      "lcp": 3412,
+      "cls": 0.07945712962962963,
+      "longTasks": [
+        211,
+        126,
+        98,
+        82,
+        104,
+        73
+      ],
+      "events": [
+        {
+          "name": "keydown",
+          "id": 9447,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 9447,
+          "duration": 40
+        },
+        {
+          "name": "keyup",
+          "id": 9447,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 9454,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9454,
+          "duration": 16
+        },
+        {
+          "name": "keyup",
+          "id": 9454,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 9461,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 9461,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 9468,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 9468,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 9475,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9475,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 9482,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9482,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 9489,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9489,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 9496,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9496,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 9503,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9503,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 9510,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9510,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 9517,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 9517,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 9524,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 9524,
+          "duration": 24
+        },
+        {
+          "name": "keyup",
+          "id": 9524,
+          "duration": 48
+        },
+        {
+          "name": "keydown",
+          "id": 9531,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 9531,
+          "duration": 32
+        },
+        {
+          "name": "keyup",
+          "id": 9531,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 9538,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 9538,
+          "duration": 24
+        }
+      ],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "OrderManagement-HYZtcr9w.js",
+          "transferred": 8555,
+          "encoded": 8255,
+          "decoded": 27955
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "StatusPill-BLab0TQ8.js",
+          "transferred": 1089,
+          "encoded": 789,
+          "decoded": 1612
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "user-round-JkYWOoBP.js",
+          "transferred": 475,
+          "encoded": 175,
+          "decoded": 178
+        },
+        {
+          "file": "ConfirmDialog-DOtt2Ges.js",
+          "transferred": 1269,
+          "encoded": 969,
+          "decoded": 2084
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "DeliveryTrail-CwQu76rV.js",
+          "transferred": 3343,
+          "encoded": 3043,
+          "decoded": 7716
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "ban-BmTDcc_f.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 177
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "map-pin-off-Dna-nRp9.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 476
+        },
+        {
+          "file": "package-check-D7qF1-Cz.js",
+          "transferred": 578,
+          "encoded": 278,
+          "decoded": 416
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "inbox-CUZCK5rU.js",
+          "transferred": 532,
+          "encoded": 232,
+          "decoded": 287
+        },
+        {
+          "file": "file-text-BvJaoD3n.js",
+          "transferred": 553,
+          "encoded": 253,
+          "decoded": 386
+        }
+      ],
+      "domNodes": 398,
+      "apiCalls": [
+        "GET /agent/orders/all",
+        "GET /agent/store/all"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 1,
+      "path": "/admin/payment-summary",
+      "readyMs": 3281.5524000000005,
+      "searchMs": 942.1306000000004,
+      "lcp": 2784,
+      "cls": 0.00017937364366319445,
+      "longTasks": [
+        220,
+        128,
+        156,
+        63,
+        97,
+        82
+      ],
+      "events": [
+        {
+          "name": "keydown",
+          "id": 6251,
+          "duration": 72
+        },
+        {
+          "name": "keypress",
+          "id": 6251,
+          "duration": 72
+        },
+        {
+          "name": "keyup",
+          "id": 6251,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 6258,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 6258,
+          "duration": 40
+        },
+        {
+          "name": "keyup",
+          "id": 6258,
+          "duration": 56
+        },
+        {
+          "name": "keydown",
+          "id": 6265,
+          "duration": 56
+        },
+        {
+          "name": "keypress",
+          "id": 6265,
+          "duration": 56
+        },
+        {
+          "name": "keydown",
+          "id": 6272,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 6272,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 6279,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 6279,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 6286,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 6286,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 6293,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 6293,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 6300,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 6300,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 6307,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 6307,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 6314,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 6314,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 6321,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 6321,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 6328,
+          "duration": 64
+        },
+        {
+          "name": "keypress",
+          "id": 6328,
+          "duration": 64
+        },
+        {
+          "name": "keydown",
+          "id": 6335,
+          "duration": 56
+        },
+        {
+          "name": "keypress",
+          "id": 6335,
+          "duration": 56
+        },
+        {
+          "name": "keydown",
+          "id": 6342,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 6342,
+          "duration": 32
+        }
+      ],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "PaymentInfo-BMKOH5NG.js",
+          "transferred": 6374,
+          "encoded": 6074,
+          "decoded": 19805
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "ConfirmDialog-DOtt2Ges.js",
+          "transferred": 1269,
+          "encoded": 969,
+          "decoded": 2084
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "banknote-DopMLSGl.js",
+          "transferred": 506,
+          "encoded": 206,
+          "decoded": 241
+        },
+        {
+          "file": "wallet-BWydVAD4.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 287
+        },
+        {
+          "file": "user-round-JkYWOoBP.js",
+          "transferred": 475,
+          "encoded": 175,
+          "decoded": 178
+        },
+        {
+          "file": "clock-3-Bf_duFyj.js",
+          "transferred": 465,
+          "encoded": 165,
+          "decoded": 165
+        }
+      ],
+      "domNodes": 328,
+      "apiCalls": [
+        "GET /agent/orders/payment-issues",
+        "GET /agent/orders/complete-payment-summary",
+        "GET /agent/store/all"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 1,
+      "path": "/admin/product-sales",
+      "readyMs": 3954.601600000002,
+      "searchMs": null,
+      "lcp": 3932,
+      "cls": 0,
+      "longTasks": [
+        228,
+        112,
+        122,
+        706
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "ProductSales-Cfz7sUPr.js",
+          "transferred": 7149,
+          "encoded": 6849,
+          "decoded": 22986
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "CartesianChart-C_Lvovr7.js",
+          "transferred": 15661,
+          "encoded": 15361,
+          "decoded": 57864
+        },
+        {
+          "file": "CategoricalChart-CLmRyQOQ.js",
+          "transferred": 76569,
+          "encoded": 76269,
+          "decoded": 247744
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "arrow-left-CHI1QHs1.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 166
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "info-RMUAUtA8.js",
+          "transferred": 477,
+          "encoded": 177,
+          "decoded": 200
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "package-Bd0ArVKR.js",
+          "transferred": 554,
+          "encoded": 254,
+          "decoded": 373
+        },
+        {
+          "file": "hand-coins-BqWkHQGx.js",
+          "transferred": 588,
+          "encoded": 288,
+          "decoded": 411
+        },
+        {
+          "file": "trophy-CrcIoWgj.js",
+          "transferred": 576,
+          "encoded": 276,
+          "decoded": 477
+        },
+        {
+          "file": "BarChart-DDVSS2ce.js",
+          "transferred": 5316,
+          "encoded": 5016,
+          "decoded": 14112
+        },
+        {
+          "file": "getZIndexFromUnknown-Cb7xKvk5.js",
+          "transferred": 1673,
+          "encoded": 1373,
+          "decoded": 2940
+        }
+      ],
+      "domNodes": 888,
+      "apiCalls": [
+        "GET /targets/admin/agents",
+        "GET /admin/analytics/product-sales?from=2026-10-01&to=2026-10-26&groupBy=day"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "path": "/admin/login",
+      "readyMs": 2048.692600000002,
+      "searchMs": null,
+      "lcp": 2028,
+      "cls": 0,
+      "longTasks": [
+        221,
+        107
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminLogin-BigXPJkm.js",
+          "transferred": 1957,
+          "encoded": 1657,
+          "decoded": 3439
+        },
+        {
+          "file": "useSignedOutNotice-DNs5W6Rf.js",
+          "transferred": 1824,
+          "encoded": 1524,
+          "decoded": 3867
+        },
+        {
+          "file": "eye-C-M-psvg.js",
+          "transferred": 646,
+          "encoded": 346,
+          "decoded": 639
+        },
+        {
+          "file": "key-round-CgF-hWlR.js",
+          "transferred": 557,
+          "encoded": 257,
+          "decoded": 351
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        }
+      ],
+      "domNodes": 107,
+      "apiCalls": [],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "path": "/admin/dashboard",
+      "readyMs": 3853.4040000000023,
+      "searchMs": null,
+      "lcp": 3528,
+      "cls": 0,
+      "longTasks": [
+        191,
+        128,
+        109,
+        105,
+        141,
+        304
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "AdminDashboard-CTqicAV8.js",
+          "transferred": 8214,
+          "encoded": 7914,
+          "decoded": 25374
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "banknote-DopMLSGl.js",
+          "transferred": 506,
+          "encoded": 206,
+          "decoded": 241
+        },
+        {
+          "file": "map-pin-off-Dna-nRp9.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 476
+        },
+        {
+          "file": "clock-3-Bf_duFyj.js",
+          "transferred": 465,
+          "encoded": 165,
+          "decoded": 165
+        },
+        {
+          "file": "wallet-BWydVAD4.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 287
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "user-plus-DqMz2-Oo.js",
+          "transferred": 535,
+          "encoded": 235,
+          "decoded": 311
+        },
+        {
+          "file": "key-round-CgF-hWlR.js",
+          "transferred": 557,
+          "encoded": 257,
+          "decoded": 351
+        },
+        {
+          "file": "hand-coins-BqWkHQGx.js",
+          "transferred": 588,
+          "encoded": 288,
+          "decoded": 411
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "package-search-BeZgWwHk.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 473
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "CartesianChart-C_Lvovr7.js",
+          "transferred": 15661,
+          "encoded": 15361,
+          "decoded": 57864
+        },
+        {
+          "file": "CategoricalChart-CLmRyQOQ.js",
+          "transferred": 76569,
+          "encoded": 76269,
+          "decoded": 247744
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "circle-x-B87lbJmh.js",
+          "transferred": 477,
+          "encoded": 177,
+          "decoded": 203
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "trending-up-B0yh8t6I.js",
+          "transferred": 472,
+          "encoded": 172,
+          "decoded": 176
+        },
+        {
+          "file": "AreaChart-BCVIJrih.js",
+          "transferred": 5677,
+          "encoded": 5377,
+          "decoded": 17149
+        },
+        {
+          "file": "Dot-yXfJu0DP.js",
+          "transferred": 655,
+          "encoded": 355,
+          "decoded": 510
+        },
+        {
+          "file": "package-Bd0ArVKR.js",
+          "transferred": 554,
+          "encoded": 254,
+          "decoded": 373
+        },
+        {
+          "file": "trophy-CrcIoWgj.js",
+          "transferred": 576,
+          "encoded": 276,
+          "decoded": 477
+        },
+        {
+          "file": "BarChart-DDVSS2ce.js",
+          "transferred": 5316,
+          "encoded": 5016,
+          "decoded": 14112
+        },
+        {
+          "file": "getZIndexFromUnknown-Cb7xKvk5.js",
+          "transferred": 1673,
+          "encoded": 1373,
+          "decoded": 2940
+        },
+        {
+          "file": "shopping-cart-Dj_fWLap.js",
+          "transferred": 531,
+          "encoded": 231,
+          "decoded": 288
+        },
+        {
+          "file": "user-check-CnJaL7Ib.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 239
+        }
+      ],
+      "domNodes": 643,
+      "apiCalls": [
+        "GET /admin/dashboard-summary/",
+        "GET /admin/attention"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "path": "/admin/order-management",
+      "readyMs": 3395.0214000000014,
+      "searchMs": 612.8099999999977,
+      "lcp": 3408,
+      "cls": 0.07945712962962963,
+      "longTasks": [
+        295,
+        118,
+        102,
+        81,
+        101,
+        55
+      ],
+      "events": [
+        {
+          "name": "keydown",
+          "id": 8540,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 8540,
+          "duration": 32
+        },
+        {
+          "name": "keyup",
+          "id": 8540,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 8547,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8547,
+          "duration": 16
+        },
+        {
+          "name": "keyup",
+          "id": 8547,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 8554,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 8554,
+          "duration": 24
+        },
+        {
+          "name": "keyup",
+          "id": 8554,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 8561,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8561,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 8568,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8568,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 8582,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8582,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 8589,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8589,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 8596,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8596,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 8603,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8603,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 8610,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 8610,
+          "duration": 16
+        },
+        {
+          "name": "keyup",
+          "id": 8617,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 8624,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 8624,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 8631,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 8631,
+          "duration": 40
+        }
+      ],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "OrderManagement-HYZtcr9w.js",
+          "transferred": 8555,
+          "encoded": 8255,
+          "decoded": 27955
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "StatusPill-BLab0TQ8.js",
+          "transferred": 1089,
+          "encoded": 789,
+          "decoded": 1612
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "user-round-JkYWOoBP.js",
+          "transferred": 475,
+          "encoded": 175,
+          "decoded": 178
+        },
+        {
+          "file": "ConfirmDialog-DOtt2Ges.js",
+          "transferred": 1269,
+          "encoded": 969,
+          "decoded": 2084
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "DeliveryTrail-CwQu76rV.js",
+          "transferred": 3343,
+          "encoded": 3043,
+          "decoded": 7716
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "ban-BmTDcc_f.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 177
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "map-pin-off-Dna-nRp9.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 476
+        },
+        {
+          "file": "package-check-D7qF1-Cz.js",
+          "transferred": 578,
+          "encoded": 278,
+          "decoded": 416
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "inbox-CUZCK5rU.js",
+          "transferred": 532,
+          "encoded": 232,
+          "decoded": 287
+        },
+        {
+          "file": "file-text-BvJaoD3n.js",
+          "transferred": 553,
+          "encoded": 253,
+          "decoded": 386
+        }
+      ],
+      "domNodes": 398,
+      "apiCalls": [
+        "GET /agent/orders/all",
+        "GET /agent/store/all"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "path": "/admin/payment-summary",
+      "readyMs": 3046.3840999999957,
+      "searchMs": 904.6422999999995,
+      "lcp": 2680,
+      "cls": 0.00017937364366319445,
+      "longTasks": [
+        123,
+        90,
+        113,
+        64,
+        63,
+        55,
+        52
+      ],
+      "events": [
+        {
+          "name": "keydown",
+          "id": 2754,
+          "duration": 80
+        },
+        {
+          "name": "keypress",
+          "id": 2754,
+          "duration": 80
+        },
+        {
+          "name": "keyup",
+          "id": 2754,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 2761,
+          "duration": 48
+        },
+        {
+          "name": "keypress",
+          "id": 2761,
+          "duration": 48
+        },
+        {
+          "name": "keydown",
+          "id": 2768,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 2768,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 2775,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 2775,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 2782,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 2782,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 2789,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 2789,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 2796,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 2796,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 2803,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 2803,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 2810,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 2810,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 2817,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 2817,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 2824,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 2824,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 2831,
+          "duration": 80
+        },
+        {
+          "name": "keypress",
+          "id": 2831,
+          "duration": 80
+        },
+        {
+          "name": "keydown",
+          "id": 2838,
+          "duration": 64
+        },
+        {
+          "name": "keypress",
+          "id": 2838,
+          "duration": 64
+        },
+        {
+          "name": "keydown",
+          "id": 2845,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 2845,
+          "duration": 32
+        }
+      ],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "PaymentInfo-BMKOH5NG.js",
+          "transferred": 6374,
+          "encoded": 6074,
+          "decoded": 19805
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "ConfirmDialog-DOtt2Ges.js",
+          "transferred": 1269,
+          "encoded": 969,
+          "decoded": 2084
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "banknote-DopMLSGl.js",
+          "transferred": 506,
+          "encoded": 206,
+          "decoded": 241
+        },
+        {
+          "file": "wallet-BWydVAD4.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 287
+        },
+        {
+          "file": "user-round-JkYWOoBP.js",
+          "transferred": 475,
+          "encoded": 175,
+          "decoded": 178
+        },
+        {
+          "file": "clock-3-Bf_duFyj.js",
+          "transferred": 465,
+          "encoded": 165,
+          "decoded": 165
+        }
+      ],
+      "domNodes": 328,
+      "apiCalls": [
+        "GET /agent/orders/payment-issues",
+        "GET /agent/orders/complete-payment-summary",
+        "GET /agent/store/all"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "path": "/admin/product-sales",
+      "readyMs": 4020.7940000000017,
+      "searchMs": null,
+      "lcp": 3992,
+      "cls": 0,
+      "longTasks": [
+        214,
+        110,
+        102,
+        735
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "ProductSales-Cfz7sUPr.js",
+          "transferred": 7149,
+          "encoded": 6849,
+          "decoded": 22986
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "CartesianChart-C_Lvovr7.js",
+          "transferred": 15661,
+          "encoded": 15361,
+          "decoded": 57864
+        },
+        {
+          "file": "CategoricalChart-CLmRyQOQ.js",
+          "transferred": 76569,
+          "encoded": 76269,
+          "decoded": 247744
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "arrow-left-CHI1QHs1.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 166
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "info-RMUAUtA8.js",
+          "transferred": 477,
+          "encoded": 177,
+          "decoded": 200
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "package-Bd0ArVKR.js",
+          "transferred": 554,
+          "encoded": 254,
+          "decoded": 373
+        },
+        {
+          "file": "hand-coins-BqWkHQGx.js",
+          "transferred": 588,
+          "encoded": 288,
+          "decoded": 411
+        },
+        {
+          "file": "trophy-CrcIoWgj.js",
+          "transferred": 576,
+          "encoded": 276,
+          "decoded": 477
+        },
+        {
+          "file": "BarChart-DDVSS2ce.js",
+          "transferred": 5316,
+          "encoded": 5016,
+          "decoded": 14112
+        },
+        {
+          "file": "getZIndexFromUnknown-Cb7xKvk5.js",
+          "transferred": 1673,
+          "encoded": 1373,
+          "decoded": 2940
+        }
+      ],
+      "domNodes": 888,
+      "apiCalls": [
+        "GET /targets/admin/agents",
+        "GET /admin/analytics/product-sales?from=2026-10-01&to=2026-10-26&groupBy=day"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 3,
+      "path": "/admin/login",
+      "readyMs": 2041.7716999999975,
+      "searchMs": null,
+      "lcp": 2024,
+      "cls": 0,
+      "longTasks": [
+        204,
+        106
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminLogin-BigXPJkm.js",
+          "transferred": 1957,
+          "encoded": 1657,
+          "decoded": 3439
+        },
+        {
+          "file": "useSignedOutNotice-DNs5W6Rf.js",
+          "transferred": 1824,
+          "encoded": 1524,
+          "decoded": 3867
+        },
+        {
+          "file": "eye-C-M-psvg.js",
+          "transferred": 646,
+          "encoded": 346,
+          "decoded": 639
+        },
+        {
+          "file": "key-round-CgF-hWlR.js",
+          "transferred": 557,
+          "encoded": 257,
+          "decoded": 351
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        }
+      ],
+      "domNodes": 107,
+      "apiCalls": [],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 3,
+      "path": "/admin/dashboard",
+      "readyMs": 3778.6992000000027,
+      "searchMs": null,
+      "lcp": 3512,
+      "cls": 0,
+      "longTasks": [
+        201,
+        116,
+        135,
+        89,
+        116,
+        259
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "AdminDashboard-CTqicAV8.js",
+          "transferred": 8214,
+          "encoded": 7914,
+          "decoded": 25374
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "banknote-DopMLSGl.js",
+          "transferred": 506,
+          "encoded": 206,
+          "decoded": 241
+        },
+        {
+          "file": "map-pin-off-Dna-nRp9.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 476
+        },
+        {
+          "file": "clock-3-Bf_duFyj.js",
+          "transferred": 465,
+          "encoded": 165,
+          "decoded": 165
+        },
+        {
+          "file": "wallet-BWydVAD4.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 287
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "user-plus-DqMz2-Oo.js",
+          "transferred": 535,
+          "encoded": 235,
+          "decoded": 311
+        },
+        {
+          "file": "key-round-CgF-hWlR.js",
+          "transferred": 557,
+          "encoded": 257,
+          "decoded": 351
+        },
+        {
+          "file": "hand-coins-BqWkHQGx.js",
+          "transferred": 588,
+          "encoded": 288,
+          "decoded": 411
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "package-search-BeZgWwHk.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 473
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "CartesianChart-C_Lvovr7.js",
+          "transferred": 15661,
+          "encoded": 15361,
+          "decoded": 57864
+        },
+        {
+          "file": "CategoricalChart-CLmRyQOQ.js",
+          "transferred": 76569,
+          "encoded": 76269,
+          "decoded": 247744
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "circle-x-B87lbJmh.js",
+          "transferred": 477,
+          "encoded": 177,
+          "decoded": 203
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "trending-up-B0yh8t6I.js",
+          "transferred": 472,
+          "encoded": 172,
+          "decoded": 176
+        },
+        {
+          "file": "AreaChart-BCVIJrih.js",
+          "transferred": 5677,
+          "encoded": 5377,
+          "decoded": 17149
+        },
+        {
+          "file": "Dot-yXfJu0DP.js",
+          "transferred": 655,
+          "encoded": 355,
+          "decoded": 510
+        },
+        {
+          "file": "package-Bd0ArVKR.js",
+          "transferred": 554,
+          "encoded": 254,
+          "decoded": 373
+        },
+        {
+          "file": "trophy-CrcIoWgj.js",
+          "transferred": 576,
+          "encoded": 276,
+          "decoded": 477
+        },
+        {
+          "file": "BarChart-DDVSS2ce.js",
+          "transferred": 5316,
+          "encoded": 5016,
+          "decoded": 14112
+        },
+        {
+          "file": "getZIndexFromUnknown-Cb7xKvk5.js",
+          "transferred": 1673,
+          "encoded": 1373,
+          "decoded": 2940
+        },
+        {
+          "file": "shopping-cart-Dj_fWLap.js",
+          "transferred": 531,
+          "encoded": 231,
+          "decoded": 288
+        },
+        {
+          "file": "user-check-CnJaL7Ib.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 239
+        }
+      ],
+      "domNodes": 643,
+      "apiCalls": [
+        "GET /admin/dashboard-summary/",
+        "GET /admin/attention"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 3,
+      "path": "/admin/order-management",
+      "readyMs": 3366.178899999999,
+      "searchMs": 569.2430000000022,
+      "lcp": 3356,
+      "cls": 0.07945712962962963,
+      "longTasks": [
+        220,
+        120,
+        118,
+        66,
+        113,
+        57
+      ],
+      "events": [
+        {
+          "name": "keydown",
+          "id": 564,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 564,
+          "duration": 32
+        },
+        {
+          "name": "keyup",
+          "id": 564,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 571,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 571,
+          "duration": 16
+        },
+        {
+          "name": "keyup",
+          "id": 571,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 578,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 578,
+          "duration": 24
+        },
+        {
+          "name": "keyup",
+          "id": 578,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 585,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 585,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 592,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 592,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 599,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 599,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 606,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 606,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 613,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 613,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 620,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 620,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 641,
+          "duration": 16
+        },
+        {
+          "name": "keypress",
+          "id": 641,
+          "duration": 16
+        },
+        {
+          "name": "keydown",
+          "id": 648,
+          "duration": 48
+        },
+        {
+          "name": "keypress",
+          "id": 648,
+          "duration": 48
+        },
+        {
+          "name": "keyup",
+          "id": 648,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 655,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 655,
+          "duration": 24
+        }
+      ],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "OrderManagement-HYZtcr9w.js",
+          "transferred": 8555,
+          "encoded": 8255,
+          "decoded": 27955
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "StatusPill-BLab0TQ8.js",
+          "transferred": 1089,
+          "encoded": 789,
+          "decoded": 1612
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "user-round-JkYWOoBP.js",
+          "transferred": 475,
+          "encoded": 175,
+          "decoded": 178
+        },
+        {
+          "file": "ConfirmDialog-DOtt2Ges.js",
+          "transferred": 1269,
+          "encoded": 969,
+          "decoded": 2084
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "DeliveryTrail-CwQu76rV.js",
+          "transferred": 3343,
+          "encoded": 3043,
+          "decoded": 7716
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "ban-BmTDcc_f.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 177
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "map-pin-off-Dna-nRp9.js",
+          "transferred": 607,
+          "encoded": 307,
+          "decoded": 476
+        },
+        {
+          "file": "package-check-D7qF1-Cz.js",
+          "transferred": 578,
+          "encoded": 278,
+          "decoded": 416
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "inbox-CUZCK5rU.js",
+          "transferred": 532,
+          "encoded": 232,
+          "decoded": 287
+        },
+        {
+          "file": "file-text-BvJaoD3n.js",
+          "transferred": 553,
+          "encoded": 253,
+          "decoded": 386
+        }
+      ],
+      "domNodes": 398,
+      "apiCalls": [
+        "GET /agent/orders/all",
+        "GET /agent/store/all"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 3,
+      "path": "/admin/payment-summary",
+      "readyMs": 3217.097099999999,
+      "searchMs": 958.8836999999985,
+      "lcp": 2736,
+      "cls": 0.00017937364366319445,
+      "longTasks": [
+        213,
+        106,
+        111,
+        75,
+        93,
+        69,
+        61,
+        54
+      ],
+      "events": [
+        {
+          "name": "keydown",
+          "id": 3707,
+          "duration": 64
+        },
+        {
+          "name": "keypress",
+          "id": 3707,
+          "duration": 64
+        },
+        {
+          "name": "keyup",
+          "id": 3707,
+          "duration": 24
+        },
+        {
+          "name": "keydown",
+          "id": 3714,
+          "duration": 48
+        },
+        {
+          "name": "keypress",
+          "id": 3714,
+          "duration": 48
+        },
+        {
+          "name": "keydown",
+          "id": 3721,
+          "duration": 48
+        },
+        {
+          "name": "keypress",
+          "id": 3721,
+          "duration": 48
+        },
+        {
+          "name": "keydown",
+          "id": 3728,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 3728,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 3735,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 3735,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 3742,
+          "duration": 32
+        },
+        {
+          "name": "keypress",
+          "id": 3742,
+          "duration": 32
+        },
+        {
+          "name": "keydown",
+          "id": 3749,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 3749,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 3756,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 3756,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 3763,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 3763,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 3770,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 3770,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 3777,
+          "duration": 40
+        },
+        {
+          "name": "keypress",
+          "id": 3777,
+          "duration": 40
+        },
+        {
+          "name": "keydown",
+          "id": 3784,
+          "duration": 80
+        },
+        {
+          "name": "keypress",
+          "id": 3784,
+          "duration": 80
+        },
+        {
+          "name": "keydown",
+          "id": 3791,
+          "duration": 72
+        },
+        {
+          "name": "keypress",
+          "id": 3791,
+          "duration": 72
+        },
+        {
+          "name": "keydown",
+          "id": 3798,
+          "duration": 24
+        },
+        {
+          "name": "keypress",
+          "id": 3798,
+          "duration": 24
+        }
+      ],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "PaymentInfo-BMKOH5NG.js",
+          "transferred": 6374,
+          "encoded": 6074,
+          "decoded": 19805
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "ConfirmDialog-DOtt2Ges.js",
+          "transferred": 1269,
+          "encoded": 969,
+          "decoded": 2084
+        },
+        {
+          "file": "triangle-alert-C04z7PPo.js",
+          "transferred": 515,
+          "encoded": 215,
+          "decoded": 266
+        },
+        {
+          "file": "loader-circle-DpnhcoF5.js",
+          "transferred": 452,
+          "encoded": 152,
+          "decoded": 140
+        },
+        {
+          "file": "rotate-ccw-Bzazu9h6.js",
+          "transferred": 483,
+          "encoded": 183,
+          "decoded": 201
+        },
+        {
+          "file": "circle-check-57ABwsFK.js",
+          "transferred": 466,
+          "encoded": 166,
+          "decoded": 174
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "indian-rupee-V9fJ0fDy.js",
+          "transferred": 514,
+          "encoded": 214,
+          "decoded": 292
+        },
+        {
+          "file": "banknote-DopMLSGl.js",
+          "transferred": 506,
+          "encoded": 206,
+          "decoded": 241
+        },
+        {
+          "file": "wallet-BWydVAD4.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 287
+        },
+        {
+          "file": "user-round-JkYWOoBP.js",
+          "transferred": 475,
+          "encoded": 175,
+          "decoded": 178
+        },
+        {
+          "file": "clock-3-Bf_duFyj.js",
+          "transferred": 465,
+          "encoded": 165,
+          "decoded": 165
+        }
+      ],
+      "domNodes": 328,
+      "apiCalls": [
+        "GET /agent/orders/payment-issues",
+        "GET /agent/orders/complete-payment-summary",
+        "GET /agent/store/all"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    },
+    {
+      "run": 3,
+      "path": "/admin/product-sales",
+      "readyMs": 3899.846400000002,
+      "searchMs": null,
+      "lcp": 3880,
+      "cls": 0,
+      "longTasks": [
+        205,
+        112,
+        111,
+        663
+      ],
+      "events": [],
+      "js": [
+        {
+          "file": "index-BPhhy9VO.js",
+          "transferred": 177896,
+          "encoded": 177596,
+          "decoded": 542397
+        },
+        {
+          "file": "AdminArea-b8GEruEn.js",
+          "transferred": 3482,
+          "encoded": 3182,
+          "decoded": 8040
+        },
+        {
+          "file": "PanelLayout-rHSYVh49.js",
+          "transferred": 5797,
+          "encoded": 5497,
+          "decoded": 15237
+        },
+        {
+          "file": "Box-CJvxbisG.js",
+          "transferred": 4091,
+          "encoded": 3791,
+          "decoded": 9536
+        },
+        {
+          "file": "Logout-hpXzjSao.js",
+          "transferred": 507,
+          "encoded": 207,
+          "decoded": 233
+        },
+        {
+          "file": "Divider-Bt-NsPoX.js",
+          "transferred": 1594,
+          "encoded": 1294,
+          "decoded": 3724
+        },
+        {
+          "file": "dividerClasses-C3_OsS5E.js",
+          "transferred": 525,
+          "encoded": 225,
+          "decoded": 309
+        },
+        {
+          "file": "Menu-Dm5n2aTh.js",
+          "transferred": 4603,
+          "encoded": 4303,
+          "decoded": 11150
+        },
+        {
+          "file": "Grow-pdIcGNP_.js",
+          "transferred": 12758,
+          "encoded": 12458,
+          "decoded": 35640
+        },
+        {
+          "file": "Tooltip-TDBJCOVB.js",
+          "transferred": 11776,
+          "encoded": 11476,
+          "decoded": 32316
+        },
+        {
+          "file": "ThemeToggle-BIoFxHUd.js",
+          "transferred": 4935,
+          "encoded": 4635,
+          "decoded": 13472
+        },
+        {
+          "file": "MenuItem-BxjjZ1lt.js",
+          "transferred": 1751,
+          "encoded": 1451,
+          "decoded": 3563
+        },
+        {
+          "file": "Avatar-B2CZcDE8.js",
+          "transferred": 1720,
+          "encoded": 1420,
+          "decoded": 2873
+        },
+        {
+          "file": "EntityAvatar-CcLKht6H.js",
+          "transferred": 1075,
+          "encoded": 775,
+          "decoded": 1222
+        },
+        {
+          "file": "store-BH5L32i1.js",
+          "transferred": 586,
+          "encoded": 286,
+          "decoded": 499
+        },
+        {
+          "file": "chevron-right-CGDVEGpS.js",
+          "transferred": 442,
+          "encoded": 142,
+          "decoded": 131
+        },
+        {
+          "file": "Dialog-ReydBcjJ.js",
+          "transferred": 2153,
+          "encoded": 1853,
+          "decoded": 4826
+        },
+        {
+          "file": "index-BfKCeJWj.js",
+          "transferred": 1149,
+          "encoded": 849,
+          "decoded": 1559
+        },
+        {
+          "file": "getThemeProps-BvTrh760.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 212
+        },
+        {
+          "file": "AdminSectionBoundary-Dy9dVbxz.js",
+          "transferred": 4417,
+          "encoded": 4117,
+          "decoded": 8294
+        },
+        {
+          "file": "LocalShipping-BjaNbUZM.js",
+          "transferred": 540,
+          "encoded": 240,
+          "decoded": 398
+        },
+        {
+          "file": "ProductSales-Cfz7sUPr.js",
+          "transferred": 7149,
+          "encoded": 6849,
+          "decoded": 22986
+        },
+        {
+          "file": "useLatestRequest-BwbsDY-B.js",
+          "transferred": 518,
+          "encoded": 218,
+          "decoded": 307
+        },
+        {
+          "file": "usePagination-nPdYSuY9.js",
+          "transferred": 2146,
+          "encoded": 1846,
+          "decoded": 4188
+        },
+        {
+          "file": "CartesianChart-C_Lvovr7.js",
+          "transferred": 15661,
+          "encoded": 15361,
+          "decoded": 57864
+        },
+        {
+          "file": "CategoricalChart-CLmRyQOQ.js",
+          "transferred": 76569,
+          "encoded": 76269,
+          "decoded": 247744
+        },
+        {
+          "file": "csv-DMkUJdMB.js",
+          "transferred": 1081,
+          "encoded": 781,
+          "decoded": 1312
+        },
+        {
+          "file": "uom-wU4Potsz.js",
+          "transferred": 462,
+          "encoded": 162,
+          "decoded": 228
+        },
+        {
+          "file": "arrow-left-CHI1QHs1.js",
+          "transferred": 464,
+          "encoded": 164,
+          "decoded": 166
+        },
+        {
+          "file": "refresh-ccw-BxWEll2v.js",
+          "transferred": 527,
+          "encoded": 227,
+          "decoded": 322
+        },
+        {
+          "file": "info-RMUAUtA8.js",
+          "transferred": 477,
+          "encoded": 177,
+          "decoded": 200
+        },
+        {
+          "file": "circle-alert-fnIEp3Yx.js",
+          "transferred": 488,
+          "encoded": 188,
+          "decoded": 251
+        },
+        {
+          "file": "package-Bd0ArVKR.js",
+          "transferred": 554,
+          "encoded": 254,
+          "decoded": 373
+        },
+        {
+          "file": "hand-coins-BqWkHQGx.js",
+          "transferred": 588,
+          "encoded": 288,
+          "decoded": 411
+        },
+        {
+          "file": "trophy-CrcIoWgj.js",
+          "transferred": 576,
+          "encoded": 276,
+          "decoded": 477
+        },
+        {
+          "file": "BarChart-DDVSS2ce.js",
+          "transferred": 5316,
+          "encoded": 5016,
+          "decoded": 14112
+        },
+        {
+          "file": "getZIndexFromUnknown-Cb7xKvk5.js",
+          "transferred": 1673,
+          "encoded": 1373,
+          "decoded": 2940
+        }
+      ],
+      "domNodes": 888,
+      "apiCalls": [
+        "GET /targets/admin/agents",
+        "GET /admin/analytics/product-sales?from=2026-10-01&to=2026-10-26&groupBy=day"
+      ],
+      "unknownFixtures": [],
+      "errors": []
+    }
+  ]
+}

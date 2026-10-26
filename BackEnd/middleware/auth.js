@@ -3,6 +3,7 @@ import Agent from "../models/Agent.js";
 import Employee from "../models/Employee.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import { agentSessionMatches } from "../utils/agentAccess.js";
+import { authenticateAdminCookie } from "../utils/adminSession.js";
 
 /* A token only proves who someone WAS when they logged in. For every role
    with an account record, the record is checked on each request, so:
@@ -11,8 +12,9 @@ import { agentSessionMatches } from "../utils/agentAccess.js";
      - resetting a password signs out every device that knew the old one,
      - an employee's permissions are read fresh, so a permission the admin
        removes is gone immediately rather than at the employee's next login.
-   Admin has no account record (credentials live in the server config), so
-   an admin token is checked by signature and expiry alone, as before. */
+   Admin has no account record (credentials live in the server config).
+   Legacy Admin bearer tokens retain signature/expiry checks; opt-in Admin
+   cookies also require the live server-side session and current credentials. */
 const ACCOUNTS = {
   AGENT: {
     model: Agent,
@@ -38,7 +40,7 @@ const ACCOUNTS = {
    protect does, so an expired or revoked session is told so rather than
    silently treated as a visitor. */
 export const optionalAuth = (req, res, next) => {
-  if (!req.headers.authorization) return next();
+  if (!req.headers.authorization && !req.headers["x-admin-session"]) return next();
   return protect(req, res, next);
 };
 
@@ -83,12 +85,22 @@ export const authenticatedUser = async (token) => {
 
 export const protect = async (req, res, next) => {
   const header = req.headers.authorization;
-  if (typeof header !== "string" || !header.startsWith("Bearer ")) return unauthorized(res, "No token provided");
+  const bearer = typeof header === "string" && header.startsWith("Bearer ");
+  if (!bearer && !req.headers["x-admin-session"]) return unauthorized(res, "No token provided");
   try {
-    req.user = await authenticatedUser(header.slice(7).trim());
+    if (bearer) {
+      req.authToken = header.slice(7).trim();
+      req.user = await authenticatedUser(req.authToken);
+      req.authType = "bearer";
+    } else {
+      const session = await authenticateAdminCookie(req);
+      req.user = session.user; req.authToken = session.token; req.authType = "admin-cookie";
+      res.setHeader("Cache-Control", "no-store");
+    }
     return next();
   } catch (error) {
     if (error.status === 401) return unauthorized(res, error.message);
+    if (error.status === 403) return res.status(403).json({ success: false, message: error.message });
     console.error("AUTH CHECK ERROR:", error);
     return res.status(500).json({ success: false, message: "Could not verify your session. Please try again." });
   }

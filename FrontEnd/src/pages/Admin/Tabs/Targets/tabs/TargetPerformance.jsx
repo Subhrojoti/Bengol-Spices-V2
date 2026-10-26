@@ -1,3 +1,5 @@
+import reportAdminError from "../../../../../utils/reportAdminError";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -142,22 +144,26 @@ export default function TargetPerformance() {
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
 
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
+    const request = beginRequest();
     if (isRefresh) setRefreshing(true);
     else setStatus("loading");
 
     try {
-      const res = await getTargetPerformance();
+      const res = await getTargetPerformance({ signal: request.signal });
+      if (!request.current()) return;
       setRows(Array.isArray(res?.data) ? res.data : []);
       setRunning(Array.isArray(res?.targets) ? res.targets : []);
       setStatus("ready");
     } catch (error) {
-      console.error("Failed to load target performance", error);
+      if (!request.current()) return;
+      reportAdminError("Failed to load target performance", error);
       setStatus("error");
     } finally {
-      setRefreshing(false);
+      if (request.current()) setRefreshing(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     load();

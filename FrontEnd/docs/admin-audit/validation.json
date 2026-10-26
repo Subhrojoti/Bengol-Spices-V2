@@ -1,0 +1,290 @@
+{
+  "auditDate": "2026-10-26",
+  "baseCommit": "efbebbfd18c24848a4a21eb67373e59babe29e3b",
+  "scope": "Admin frontend and required shared frontend code only; existing unrelated work preserved",
+  "node": "v22.14.0",
+  "chrome": "156.0.8078.47",
+  "browserChecks": [
+    {
+      "name": "browser-results",
+      "expected": 57,
+      "unexpected": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "durationMs": 80393.211
+    },
+    {
+      "name": "browser-edge-results",
+      "expected": 57,
+      "unexpected": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "durationMs": 79460.43100000001
+    },
+    {
+      "name": "browser-strict-results",
+      "expected": 3,
+      "unexpected": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "durationMs": 16521.448
+    }
+  ],
+  "unitTests": {
+    "passed": 8,
+    "failed": 0,
+    "command": "npm test"
+  },
+  "adminLint": {
+    "status": "passed",
+    "errors": 0,
+    "warnings": 0,
+    "command": "npm run lint:admin"
+  },
+  "repositoryLint": {
+    "status": "failed on pre-existing out-of-scope code",
+    "beforeErrors": 21,
+    "beforeWarnings": 2,
+    "afterErrors": 13,
+    "afterWarnings": 2,
+    "remaining": [
+      {
+        "file": "src/components/profile/EmpProfile.jsx",
+        "errors": 2,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars",
+          "react-hooks/set-state-in-effect"
+        ]
+      },
+      {
+        "file": "src/hooks/useAccessSync.js",
+        "errors": 1,
+        "warnings": 1,
+        "rules": [
+          "react-hooks/refs",
+          "react-hooks/exhaustive-deps"
+        ]
+      },
+      {
+        "file": "src/pages/Employee/EmployeeBase.jsx",
+        "errors": 0,
+        "warnings": 1,
+        "rules": [
+          "react-hooks/exhaustive-deps"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/MyStores/MyStoresBase.jsx",
+        "errors": 1,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/MyStores/SubComponents/MyCart.jsx",
+        "errors": 2,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars",
+          "no-unused-vars"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/MyStores/SubComponents/StoresList.jsx",
+        "errors": 1,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/MyStores/SubComponents/ViewOrders.jsx",
+        "errors": 2,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars",
+          "no-unused-vars"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/Overview/Overview.jsx",
+        "errors": 1,
+        "warnings": 0,
+        "rules": [
+          "react-hooks/immutability"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/Payments/components/PaymentModal.jsx",
+        "errors": 1,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/Payments/tabs/CompletedPayments.jsx",
+        "errors": 1,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars"
+        ]
+      },
+      {
+        "file": "src/pages/marketingHub/Tabs/Wallet/Wallet.jsx",
+        "errors": 1,
+        "warnings": 0,
+        "rules": [
+          "no-unused-vars"
+        ]
+      }
+    ]
+  },
+  "typeCheck": {
+    "status": "not configured",
+    "reason": "This JSX frontend has no TypeScript type-check script"
+  },
+  "productionBuild": {
+    "status": "passed",
+    "command": "npm run build",
+    "prerender": "completed",
+    "remainingWarning": "Existing shared entry exceeds 500 kB minified; warning retained"
+  },
+  "dependencies": {
+    "production": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "full": {
+      "info": 0,
+      "low": 0,
+      "moderate": 3,
+      "high": 0,
+      "critical": 0,
+      "total": 3
+    },
+    "zod": "4.6.7",
+    "remaining": "Tailwind 3 / PostCSS selector parser dev-only chain; major styling migration deferred"
+  },
+  "visualChecks": {
+    "viewports": [
+      390,
+      768,
+      1440
+    ],
+    "pages": [
+      "dashboard",
+      "order-management",
+      "product-sales"
+    ],
+    "darkPage": "cash-verification",
+    "documentOverflow": false,
+    "identicalDesktopPngs": [
+      "order-management",
+      "product-sales"
+    ],
+    "note": "Dashboard chart animation timing differs. Offline font fallback. Artifacts remain in ignored .admin-audit.local/visual."
+  },
+  "authorizationLimit": "Mocked frontend responses do not establish backend authorization or verify real financial reconciliation",
+  "deployment": {
+    "pushed": false,
+    "deployed": false,
+    "productionMutations": false
+  },
+  "cleanup": "Audit loopback servers stopped; benchmark dependency junction unlinked without deleting real dependencies",
+  "note": "Initial audit results below are historical; securityFollowUp records the final backend/Admin-only follow-up and supersedes dependency/session findings.",
+  "securityFollowUp": {
+    "date": "2026-10-26",
+    "scope": "Backend and Admin frontend only; excludes agent/delivery web changes and preserves unrelated mobile edits",
+    "browserChecks": [
+      {
+        "name": "chrome",
+        "passed": 64,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "durationMs": 97610.78600000001
+      },
+      {
+        "name": "edge",
+        "passed": 64,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "durationMs": 100935.277
+      },
+      {
+        "name": "strict",
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "durationMs": 24969.264
+      }
+    ],
+    "unitTests": {
+      "passed": 9,
+      "failed": 0
+    },
+    "adminLint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "productionBuild": {
+      "status": "passed",
+      "command": "npm run build",
+      "prerender": "completed",
+      "entryChunkWarning": "Existing shared entry above 500 kB retained"
+    },
+    "dependencyAudits": {
+      "frontendFull": 0,
+      "frontendProduction": 0,
+      "backendFull": 0,
+      "unit": "Known vulnerability findings from npm audit"
+    },
+    "cleanLockfileInstall": {
+      "status": "passed",
+      "command": "npm ci --ignore-scripts --no-audit --no-fund --prefix .admin-audit.local/follow-up/clean-install",
+      "parser": "7.1.6"
+    },
+    "compiledCss": {
+      "byteIdentical": true,
+      "bytes": 97226,
+      "sha256": "3f16f43a0aa36c9113b3b3476867156f2e0a935c074850efc05ddd2e8886c785"
+    },
+    "coreFingerprints": "All unchanged-core.json hashes reverified",
+    "sourceReview": {
+      "backendModules": 121,
+      "backendRelativeImports": 446,
+      "backendEndpoints": 143,
+      "frontendModules": 154,
+      "reachableModules": 95,
+      "adminModules": 36
+    },
+    "sessions": "Opt-in Admin opaque HttpOnly cookie; durable revocation, expiry, credential rotation, Origin/custom-header CSRF checks and cookie verification; legacy bearer clients retained",
+    "retainedIssues": [
+      "Public identity documents require a coordinated storage migration; existing URLs remain public",
+      "13 frontend lint errors and 2 warnings in excluded portal/profile code",
+      "Full-collection endpoints and existing shared entry chunk remain"
+    ],
+    "deployment": {
+      "pushed": false,
+      "deployed": false,
+      "productionMutations": false
+    },
+    "limitations": "Browser APIs mocked; backend HTTP tests use isolated MongoDB. Production HTTPS, proxy, host relationship and CORS require staging verification. Earlier performance timings were not remeasured.",
+    "backendTests": {
+      "passed": 41,
+      "failed": 0,
+      "command": "npm test",
+      "database": "Isolated MongoMemoryReplSet, no configured production connections"
+    },
+    "cleanup": "Temporary loopback servers stopped; clean-install proof retained under ignored .admin-audit.local; real dependencies intact"
+  }
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "file": "src/utils/csv.js",
+    "unchanged": true,
+    "sha256": "aa62073a8252521311b118332b6e49a7ad634205c17c0f692a8673ba516191de"
+  },
+  {
+    "file": "src/utils/sanitizeHtml.js",
+    "unchanged": true,
+    "sha256": "d7c7c61d9df7b57352b33769a43892eecbd714fecd7f2fbf3bdc9855eebeeb3e"
+  },
+  {
+    "file": "src/config/permissions.js",
+    "unchanged": true,
+    "sha256": "d0010ead2118b5ab430873aef75fda9828fe2ed5cc3faacb39c7c22d00628a36"
+  },
+  {
+    "file": "src/pages/Admin/Tabs/Targets/targetMeta.js",
+    "unchanged": true,
+    "sha256": "1e033f4b483d548e5db9a2a318ce12a07715477dd091a0fea4d2ccc9a284bae5"
+  },
+  {
+    "file": "src/pages/Admin/Tabs/Targets/sales/salesTargetMath.js",
+    "unchanged": true,
+    "sha256": "e4cfaa085562bddee0a082a458e572379afe540748def5c2139062d435af6d56"
+  },
+  {
+    "file": "src/pages/Admin/Tabs/Orders/OrderStoreSidebar.jsx",
+    "unchanged": true,
+    "sha256": "0463e34afa72de8c654e52313c4aae2c4df721934420e57202bb4edea457a53e"
+  },
+  {
+    "file": "src/pages/Admin/Tabs/Orders/OrderStoreSidebar.css",
+    "unchanged": true,
+    "sha256": "d624dd9a2e173527bc3562376e2ff76f6f576b4c56bd469e7405477f4afdb433"
+  }
+]

@@ -10,6 +10,7 @@
    ===================================================================== */
 
 import { authenticatedUser } from "../middleware/auth.js";
+import { authenticatedAdminSession } from "../utils/adminSession.js";
 
 const clients = new Set();
 
@@ -29,13 +30,13 @@ const mayReceive = (user, permission) =>
 export const openEventStream = (req, res) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache, no-transform",
+    "Cache-Control": req.authType === "admin-cookie" ? "no-store, no-transform" : "no-cache, no-transform",
     Connection: "keep-alive",
     "X-Accel-Buffering": "no", // nginx: pass each event through at once
   });
   res.write("event: ready\ndata: {}\n\n");
 
-  const client = { res, user: req.user, token: req.headers.authorization.slice(7).trim(), pending: Promise.resolve() };
+  const client = { res, user: req.user, token: req.authToken || req.headers.authorization.slice(7).trim(), authType: req.authType, pending: Promise.resolve() };
   clients.add(client);
 
   /* Everything that ends a stream goes through here, and takes it off the
@@ -92,7 +93,8 @@ export const publish = async (type, payload, permission) => {
   await Promise.all([...clients].map((client) => {
     client.pending = client.pending.then(async () => {
       if (!clients.has(client)) return;
-      client.user = await authenticatedUser(client.token);
+      client.user = client.authType === "admin-cookie"
+        ? await authenticatedAdminSession(client.token) : await authenticatedUser(client.token);
       if (clients.has(client) && mayReceive(client.user, permission)) client.res.write(message);
     }).catch(() => {
       // Fail closed on revoked/expired sessions or a failed authorization read.
@@ -107,6 +109,12 @@ export const publish = async (type, payload, permission) => {
  * their own, and the server will not stop while one is still open. Each
  * panel reconnects by itself once the server is back.
  */
+export const closeAdminSessionStreams = (sessionId) => {
+  for (const client of clients) if (client.user.adminSessionId === sessionId) {
+    try { client.close(); } catch { clients.delete(client); }
+  }
+};
+
 export const closeEventStreams = () => {
   for (const client of clients) {
     try {
