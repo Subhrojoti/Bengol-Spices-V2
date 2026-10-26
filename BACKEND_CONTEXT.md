@@ -5,6 +5,10 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Latest verified release:** `ea08a37` (26 October 2026), backend and Admin
+frontend audit/session hardening. See [current release record](deploy/releases/2026-10-26-admin-audit.md).
+The release entries below retain the earlier deployment history.
+
 **Deployment update (26 October 2026, Asia/Calcutta):** application release
 `bc05a475b04e4ac2451166d1bd93420ca2f52b94` is pushed to GitHub `main`
 and deployed on the production VPS. Backend deployment completed on 25 October;
@@ -47,7 +51,11 @@ notes are ordinary repository files, not an off-machine backup.
 
 ## Backend security review: 26 October 2026
 
-**Local follow-up (not deployed):** the owner subsequently authorized backend and
+**Follow-up deployed and verified:** application commit `ea08a37` is pushed to
+GitHub main and live on the VPS, including the Admin frontend audit. See
+[release evidence](deploy/releases/2026-10-26-admin-audit.md) for backups, file
+hashes, HTTPS cookie/CORS checks and real Chrome sign-in/reload/two-tab logout.
+The owner subsequently authorized backend and
 Admin-frontend fixes while excluding agent/delivery web changes. See
 [ADMIN_SESSION_HARDENING.md](BackEnd/docs/ADMIN_SESSION_HARDENING.md). Admin login
 now supports an opt-in HttpOnly opaque session cookie backed by an additive
@@ -56,8 +64,8 @@ durable logout revocation). Session-info/logout endpoints and CSRF Origin/header
 checks are additive; existing bearer clients keep their contracts. Event streams
 recheck the matching cookie session and close on logout. No business schema or
 calculation changed. Public identity files remain a separate migration; do not
-claim this follow-up made existing URLs private. The deployed state described
-below still refers to release `841e663`.
+claim this follow-up made existing URLs private. The earlier security release
+described below refers to `841e663` and is retained as historical evidence.
 
 Local validation: 41 backend tests, nine frontend unit tests, 64 Admin browser
 tests each in Chrome/Edge and four focused StrictMode checks pass. Admin lint and

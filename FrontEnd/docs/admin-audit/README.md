@@ -8,8 +8,12 @@ HttpOnly server sessions. See [the follow-up report](../../../BackEnd/docs/ADMIN
 The original scope, measurements and retained issues below are the initial audit
 snapshot; the follow-up report and validation record supersede its dependency and
 Admin-token-storage statements. Unrelated portal lint issues remain out of scope.
-This records a local source audit and synthetic browser validation, not a live
-production security certification. No deployment has been performed for this task.
+**Released:** application commit `ea08a37` was pushed and deployed on 26 October
+2026. See [production evidence](../../../deploy/releases/2026-10-26-admin-audit.md)
+for backups, exact scope and live verification. The separate pre-existing Product
+Sales URL/Back work remains local; the release includes only this audit's safety
+changes to that file. Audit/performance measurements below remain historical
+snapshots and are not a production security certification.
 
 ## Final backend/Admin security follow-up
 
@@ -23,8 +27,8 @@ for the additive endpoints, collection, deployment order and rollback limits.
 Final checks: 64/64 browser tests in Chrome, 64/64 in Edge, four focused React
 StrictMode checks, nine frontend unit tests, clean Admin lint, and the production
 build including prerendering. The backend suite includes the five new isolated
-cookie-session tests. Browser APIs are mocked; production HTTPS/CORS/proxy cookie
-behavior still needs staging verification before deployment.
+cookie-session tests. Those browser APIs are mocked; the production release
+record separately documents real HTTPS/CORS/cookie and Chrome login/logout checks.
 
 Full frontend and backend dependency audits report zero known vulnerabilities.
 The parser override installs from the lockfile and produces byte-identical CSS

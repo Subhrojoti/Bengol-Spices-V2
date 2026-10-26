@@ -1,9 +1,12 @@
 # Admin-only security follow-up — 26 October 2026
 
-Status: **local implementation; not pushed or deployed**. The owner expanded the
+Status: **pushed and deployed on 26 October 2026**, application commit `ea08a37`.
+See [production release evidence](../../deploy/releases/2026-10-26-admin-audit.md).
+The owner expanded the
 frontend audit follow-up to backend and Admin frontend changes only, explicitly
 excluding the agent and delivery web versions. No customer records, production
-sessions or stored media were changed during implementation/testing.
+sessions or stored media were changed during local implementation/testing.
+Live verification created and revoked only its own Admin sign-in sessions.
 
 ## Admin sessions
 
