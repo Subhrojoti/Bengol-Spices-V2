@@ -5,6 +5,13 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Deployment update (26 October 2026, Asia/Calcutta):** application release
+`bc05a475b04e4ac2451166d1bd93420ca2f52b94` is pushed to GitHub `main`
+and deployed on the production VPS. Backend deployment completed on 25 October;
+website deployment and final verification completed on 26 October after resuming
+the session. See [release record](deploy/releases/2026-10-26-admin-management.md).
+Earlier statements about local-only implementation are historical.
+
 The owner asked for a complete backend review before supplying future admin
 features and changes, and for repository notes that survive loss of the chat.
 The initial review changed documentation only. The owner subsequently supplied
