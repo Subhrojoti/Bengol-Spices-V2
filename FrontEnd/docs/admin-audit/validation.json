@@ -361,7 +361,7 @@
   },
   "employeeHeaderFix": {
     "date": "2026-10-27",
-    "status": "local; release validation in progress",
+    "status": "pushed, deployed and verified",
     "runtimeChange": "Restore missing UserRound import in shared header",
     "before": "Bare Employee browser regression failed before restoration",
     "focusedEmployeeChecks": {
@@ -370,6 +370,29 @@
     },
     "jsxImportLintProbe": "Undefined JSX icon rejected",
     "permissionsAndApiChanged": false,
-    "record": "EMPLOYEE_HEADER_FIX.md"
+    "record": "EMPLOYEE_HEADER_FIX.md",
+    "release": {
+      "date": "2026-10-27",
+      "timezone": "Asia/Calcutta",
+      "applicationCommit": "d646056e688985d4512b25dc0b56eb913ec20de0",
+      "pushed": true,
+      "deployed": true,
+      "frontendOnly": true,
+      "backendRestarted": false,
+      "isolatedChrome": {
+        "passed": 74,
+        "failed": 0,
+        "durationMs": 111868.27
+      },
+      "targetedLint": "passed",
+      "fullBuildAndPrerender": "passed",
+      "websiteFilesVerified": 205,
+      "deployedMissingIconReproducedBefore": true,
+      "deployedEmployeeUiPassedAfter": true,
+      "liveEmployeeProbeApis": "Synthetic intercepted fixtures; real frontend assets; no real employee password used",
+      "permissionsChanged": false,
+      "businessMutations": false,
+      "record": "../../../deploy/releases/2026-10-27-employee-header-fix.md"
+    }
   }
 }

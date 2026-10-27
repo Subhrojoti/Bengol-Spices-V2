@@ -1,6 +1,7 @@
 # Employee header crash — 27 October 2026
 
-Status: fixed and tested locally; release validation in progress.
+Status: **pushed, deployed and verified**, application commit `d646056`.
+See [production evidence](../../../deploy/releases/2026-10-27-employee-header-fix.md).
 
 Employee login successfully obtained its session, but rendering the shared header
 threw `ReferenceError: UserRound is not defined`. The profile-menu icon remained
@@ -24,4 +25,9 @@ navigation; no unrelated Employee login or navigation source was changed.
 
 Existing mobile/Product Sales working edits remain out of scope. The isolated
 release excludes them. Full Admin/Employee browser checks, frontend build and
-live-host validation are recorded in the release evidence once completed.
+live-host validation are recorded in the release evidence: all 74 Chrome cases,
+targeted lint, complete build/prerender and 205 deployed file hashes passed.
+The before/after live-host frontend probes used synthetic intercepted Employee
+APIs and reproduced/removed the exact missing-icon crash without using any real
+employee password. Backend processes and permissions were unchanged. An existing
+error tab needs Reload Page or Ctrl+Shift+R to fetch the corrected JavaScript.

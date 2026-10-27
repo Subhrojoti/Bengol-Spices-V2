@@ -5,10 +5,12 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Employee frontend repair in progress (27 October 2026):** the earlier shared
+**Employee frontend repair deployed/verified `d646056` (27 October 2026):** the earlier shared
 header cleanup removed the `UserRound` import while Employee's Profile menu still
 used it, causing the photographed full-page error after login. The import is
-restored and three Employee workflow checks pass. Permissions/backend unchanged.
+restored and all 74 Admin/Employee browser cases pass. The deployed Employee
+frontend now passes login/profile/reload rendering checks using synthetic API
+fixtures. Permissions/backend unchanged; 205 website hashes match the release.
 See [repair notes](FrontEnd/docs/admin-audit/EMPLOYEE_HEADER_FIX.md).
 
 **Latest backend hotfix (27 October 2026, deployed/verified `73c6f99`):** removed the GPS-only
@@ -20,7 +22,7 @@ checks and API/database health pass. No app/website deployment or data migration
 was needed. Read [GPS fix notes](BackEnd/docs/STORE_GPS_REGISTRATION_FIX.md) and
 [release evidence](deploy/releases/2026-10-27-store-gps-hotfix.md) for recovery.
 
-**Latest verified website release:** `9d4754e` (26 October 2026), Admin store-photo
+**Previous website release:** `9d4754e` (26 October 2026), Admin store-photo
 preview. See [release evidence](deploy/releases/2026-10-26-store-photo-preview.md).
 This was frontend-only; the API was not reloaded.
 
