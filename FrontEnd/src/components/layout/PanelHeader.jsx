@@ -7,6 +7,7 @@ import {
   Pin,
   PinOff,
   Search,
+  UserRound,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EntityAvatar from "../common/EntityAvatar";

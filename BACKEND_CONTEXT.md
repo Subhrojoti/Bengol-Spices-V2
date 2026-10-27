@@ -5,6 +5,12 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Employee frontend repair in progress (27 October 2026):** the earlier shared
+header cleanup removed the `UserRound` import while Employee's Profile menu still
+used it, causing the photographed full-page error after login. The import is
+restored and three Employee workflow checks pass. Permissions/backend unchanged.
+See [repair notes](FrontEnd/docs/admin-audit/EMPLOYEE_HEADER_FIX.md).
+
 **Latest backend hotfix (27 October 2026, deployed/verified `73c6f99`):** removed the GPS-only
 store duplicate rejection that blocks separate shops with equal captured
 coordinates. Existing phone, GPS validity and assigned-coverage checks remain.

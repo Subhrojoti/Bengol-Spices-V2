@@ -3,6 +3,7 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import jsxNoUndef from './scripts/jsxNoUndef.mjs'
 
 export default defineConfig([
   globalIgnores(['dist', '.admin-audit.local']),
@@ -22,7 +23,9 @@ export default defineConfig([
         sourceType: 'module',
       },
     },
+    plugins: { project: { rules: { 'jsx-no-undef': jsxNoUndef } } },
     rules: {
+      'project/jsx-no-undef': 'error',
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },

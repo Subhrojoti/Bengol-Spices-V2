@@ -358,5 +358,18 @@
       "liveBusinessMutations": false,
       "record": "../../../deploy/releases/2026-10-26-store-photo-preview.md"
     }
+  },
+  "employeeHeaderFix": {
+    "date": "2026-10-27",
+    "status": "local; release validation in progress",
+    "runtimeChange": "Restore missing UserRound import in shared header",
+    "before": "Bare Employee browser regression failed before restoration",
+    "focusedEmployeeChecks": {
+      "passed": 3,
+      "failed": 0
+    },
+    "jsxImportLintProbe": "Undefined JSX icon rejected",
+    "permissionsAndApiChanged": false,
+    "record": "EMPLOYEE_HEADER_FIX.md"
   }
 }

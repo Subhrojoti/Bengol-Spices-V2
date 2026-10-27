@@ -308,8 +308,8 @@
     },
     {
       "file": "src/components/layout/PanelHeader.jsx",
-      "sha256": "1ff53af96f02690a624cbae935999789c4c28ee7a25ab684d0a67fa920a323d5",
-      "lines": 188,
+      "sha256": "0c5cde45b25b4e4354e5c66269b1622df3bfec7776bb03be5f8c4be4d8fcd6e7",
+      "lines": 189,
       "imports": [
         "react",
         "@mui/material",
