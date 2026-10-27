@@ -16,6 +16,7 @@ import Employee from "../models/Employee.js";
 import Agent from "../models/Agent.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import Counter from "../models/Counter.js";
+import OperationLock from "../models/OperationLock.js";
 import cloudinary from "../config/cloudinary.js";
 
 // Isolated synthetic accounts only; never load dotenv/server.js/live settings.
@@ -61,7 +62,15 @@ beforeEach(async () => {
   await Invoice.create({ invoiceNumber: "BS/26-27/17", orderId, invoiceDate: "2026-10-24", buyer: { name: "Synthetic Store" }, totalAmount: 182, paidAmount: 1, dueAmount: 181, totalGST: 8.67,
     items: [{ name: "Sample Spice", quantity: 10, unitPrice: 17.333, totalAmount: 182, gstAmount: 8.67, gstRate: 5 }], pdfUrl: "https://example.invalid/old-file.pdf" });
 });
-after(async () => { if (server) await new Promise((resolve) => server.close(resolve)); await mongoose.disconnect(); await replica?.stop(); });
+after(async () => {
+  if (server) await new Promise((resolve) => server.close(resolve));
+  // The HTTP body can reach fetch before the route's finally releases its lock.
+  for (let attempt = 0; attempt < 100 && await OperationLock.exists({}); attempt++) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(await OperationLock.countDocuments(), 0);
+  // A deleted lock can be visible before its driver's command acknowledgement.
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  await mongoose.disconnect(); await replica?.stop();
+});
 
 test("permitted Employee receives PDF bytes and attachment headers from the API, not a storage redirect", async () => {
   const before = await Invoice.findOne({ orderId }).lean();

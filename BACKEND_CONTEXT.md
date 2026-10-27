@@ -5,6 +5,18 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Store-only test cleanup (27 October 2026, local; not deployed):** the owner
+requested deletion of one test store with a cancelled order while keeping the
+agent and other stores. Added Admin-only preview/execute endpoints and a separate
+review under Agents > Manage agents & stores > Stores > Delete / archive >
+Review test-store cleanup. Typed store ID, DELETE TEST STORE and test-data
+confirmation are required. Existing unused-store deletion/archive rules remain.
+Cancellation-only cleanup preserves agent targets/settings/incentives and stock;
+online-payment, shared-record and potentially affected target/monthly-accounting
+cases are blocked for review. All 56 backend tests, nine frontend unit tests and
+81 Admin/Employee browser tests pass; lint/build pass. No live store was deleted.
+Read [store cleanup notes](BackEnd/docs/STORE_TEST_CLEANUP.md) before rollout/use.
+
 **Invoice repair deployed/verified `5cf4f64` (27 October 2026):** downloads now return
 PDF bytes from the authenticated API instead of redirecting credentialed requests
 to storage. Current rendering includes the supplied logo and saved packet units;

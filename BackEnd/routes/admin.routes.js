@@ -34,7 +34,7 @@ import { isAdmin } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
 
 const router = express.Router();
-import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview, executeRemoval, getManagedStores, getManagementAudit, getAgentPurgePreview, executeAgentPurge, getCleanupStatus, retryCleanup } from "../controllers/adminManagement.controller.js";
+import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview, executeRemoval, getManagedStores, getManagementAudit, getAgentPurgePreview, executeAgentPurge, getStorePurgePreview, executeStorePurge, getCleanupStatus, retryCleanup } from "../controllers/adminManagement.controller.js";
 
 // 🔒 All routes require login
 router.use(protect);
@@ -43,6 +43,8 @@ router.post("/store-transfers/preview", isAdmin, getTransferPreview);
 router.post("/store-transfers", isAdmin, executeTransfer);
 router.get("/store-management/:consumerId/removal-preview", isAdmin, getRemovalPreview);
 router.post("/store-management/:consumerId/remove", isAdmin, executeRemoval);
+router.get("/store-management/:consumerId/purge-preview", isAdmin, getStorePurgePreview);
+router.post("/store-management/:consumerId/purge", isAdmin, executeStorePurge);
 router.post("/agents/:agentId/access", isAdmin, setAgentAccess);
 router.get("/management-audit", isAdmin, getManagementAudit);
 router.get("/agents/:agentId/purge-preview", isAdmin, getAgentPurgePreview);

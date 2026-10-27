@@ -78,6 +78,8 @@ export const removeManagedStore = async (consumerId, body) => (await axiosInstan
 export const changeAgentAccess = async (agentId, body) => (await axiosInstance.post(`/admin/agents/${encodeURIComponent(agentId)}/access`, body)).data;
 export const previewAgentDeletion = async (agentId) => (await get(`/admin/agents/${encodeURIComponent(agentId)}/purge-preview`)).data;
 export const permanentlyDeleteAgent = async (agentId, body) => (await axiosInstance.post(`/admin/agents/${encodeURIComponent(agentId)}/purge`, body)).data;
+export const previewTestStoreDeletion = async (consumerId) => (await get(`/admin/store-management/${encodeURIComponent(consumerId)}/purge-preview`)).data;
+export const permanentlyDeleteTestStore = async (consumerId, body) => (await axiosInstance.post(`/admin/store-management/${encodeURIComponent(consumerId)}/purge`, body)).data;
 export const retryAgentFileCleanup = async (requestId) => (await axiosInstance.post(`/admin/data-cleanups/${encodeURIComponent(requestId)}/retry-media`)).data;
 export const getManagementAudit = async (agentId, options) => (await get("/admin/management-audit", { ...options, params: agentId ? { agentId } : undefined })).data;
 

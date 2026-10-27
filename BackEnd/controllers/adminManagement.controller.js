@@ -4,6 +4,7 @@ import AdminAudit from "../models/AdminAudit.js";
 import { assignmentFilter, managerOf } from "../services/storeAccess.service.js";
 import { actorOf, changeAgentAccess, previewTransfer, transferStores, previewRemoval, removeStore } from "../services/adminManagement.service.js";
 import { previewAgentPurge, purgeAgent } from "../services/agentPurge.service.js";
+import { previewStorePurge, purgeStore } from "../services/storePurge.service.js";
 import { getMediaCleanup, processMediaCleanup } from "../services/mediaCleanup.service.js";
 
 const handle = (fn) => async (req, res) => {
@@ -26,8 +27,10 @@ export const getRemovalPreview = handle(async (req) => {
 export const executeRemoval = handle((req) => removeStore(req.params.consumerId, req.body || {}, actorOf(req.user)));
 export const getAgentPurgePreview = handle((req) => previewAgentPurge(req.params.agentId));
 export const executeAgentPurge = handle((req) => purgeAgent(req.params.agentId, req.body || {}, actorOf(req.user)));
+export const getStorePurgePreview = handle((req) => previewStorePurge(req.params.consumerId));
+export const executeStorePurge = handle((req) => purgeStore(req.params.consumerId, req.body || {}, actorOf(req.user)));
 const cleanupBatch = async (req, retry) => {
-  const record = await AdminAudit.findOne({ requestId: req.params.requestId, action: { $in: ["PURGE_TEST_AGENT", "REMOVE_STORE"] }, outcome: "COMPLETED" }).select("result.unrecognizedFiles").lean();
+  const record = await AdminAudit.findOne({ requestId: req.params.requestId, action: { $in: ["PURGE_TEST_AGENT", "PURGE_TEST_STORE", "REMOVE_STORE"] }, outcome: "COMPLETED" }).select("result.unrecognizedFiles").lean();
   if (!record) throw Object.assign(new Error("Completed deletion batch not found"), { status: 404 });
   return { success: true, unrecognizedFiles: record.result?.unrecognizedFiles || 0, cleanup: await (retry ? processMediaCleanup : getMediaCleanup)(req.params.requestId) };
 };

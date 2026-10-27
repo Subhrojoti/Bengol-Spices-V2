@@ -440,5 +440,39 @@
       "unrelatedFilesAndStagingPreserved": true,
       "record": "../../../deploy/releases/2026-10-27-invoice-download.md"
     }
+  },
+  "storeOnlyTestCleanup": {
+    "date": "2026-10-27",
+    "status": "local only; not committed, pushed or deployed",
+    "baseCommit": "59939e9983cf587e289a02ed2b5f29f887d4c31b",
+    "scope": "Admin store-only cancelled test-history cleanup; backend transaction and operation coordination",
+    "backendTests": {
+      "passed": 56,
+      "failed": 0
+    },
+    "finalFocusedBackend": {
+      "passed": 7,
+      "failed": 0
+    },
+    "isolatedChrome": {
+      "passed": 81,
+      "failed": 0,
+      "newCases": 5
+    },
+    "finalDesktopReviewCheck": {
+      "passed": 1,
+      "failed": 0
+    },
+    "frontendUnitTests": {
+      "passed": 9,
+      "failed": 0
+    },
+    "adminLint": "passed",
+    "fullBuildAndPrerender": "passed",
+    "visualReview": "Desktop and phone inspected",
+    "businessMutations": false,
+    "unrelatedProductSalesAndMobileEditsExcluded": true,
+    "unrelatedWorkingFilesAndStagingPreserved": true,
+    "record": "../../../BackEnd/docs/STORE_TEST_CLEANUP.md"
   }
 }

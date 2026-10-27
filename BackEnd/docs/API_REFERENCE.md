@@ -1,6 +1,6 @@
 # Backend API reference
 
-Source snapshot: 27 October 2026, including the store GPS collision and invoice download fixes. Full paths include server.js mounts.
+Source snapshot: 27 October 2026, including the store GPS, invoice download and local test-store cleanup fixes. Full paths include server.js mounts.
 Generated offline by `node BackEnd/scripts/review-source.mjs`; no API or production state is inferred.
 See [PRODUCTION_ENHANCEMENTS.md](PRODUCTION_ENHANCEMENTS.md) for request bodies, behavior and deployment requirements.
 
@@ -36,33 +36,35 @@ Router: [admin.routes.js](../routes/admin.routes.js).
 | POST | `/admin/store-transfers` | `protect -> isAdmin -> executeTransfer` | 43 |
 | GET | `/admin/store-management/:consumerId/removal-preview` | `protect -> isAdmin -> getRemovalPreview` | 44 |
 | POST | `/admin/store-management/:consumerId/remove` | `protect -> isAdmin -> executeRemoval` | 45 |
-| POST | `/admin/agents/:agentId/access` | `protect -> isAdmin -> setAgentAccess` | 46 |
-| GET | `/admin/management-audit` | `protect -> isAdmin -> getManagementAudit` | 47 |
-| GET | `/admin/agents/:agentId/purge-preview` | `protect -> isAdmin -> getAgentPurgePreview` | 48 |
-| POST | `/admin/agents/:agentId/purge` | `protect -> isAdmin -> executeAgentPurge` | 49 |
-| GET | `/admin/data-cleanups/:requestId` | `protect -> isAdmin -> getCleanupStatus` | 50 |
-| POST | `/admin/data-cleanups/:requestId/retry-media` | `protect -> isAdmin -> retryCleanup` | 51 |
-| PUT | `/admin/:employeeId/permissions` | `protect -> isAdmin -> updateEmployeePermissions` | 58 |
-| POST | `/admin/agents/:agentId/approve` | `protect -> checkPermission("canManageAgents") -> approveAgent` | 65 |
-| POST | `/admin/agents/:agentId/reject` | `protect -> checkPermission("canManageAgents") -> rejectAgent` | 72 |
-| POST | `/admin/delivery-partners/:partnerId/approve` | `protect -> checkPermission("canManageDeliveryPartners") -> approveDeliveryPartner` | 79 |
-| POST | `/admin/delivery-partners/:partnerId/reject` | `protect -> checkPermission("canManageDeliveryPartners") -> rejectDeliveryPartner` | 85 |
-| GET | `/admin/agents` | `protect -> checkPermission("canManageAgents") -> getAllAgents` | 92 |
-| GET | `/admin/dashboard-summary` | `protect -> checkPermission("canViewDashboardSummary") -> getDashboardSummary` | 95 |
-| GET | `/admin/attention` | `protect -> checkPermission("canViewDashboardSummary") -> getAttentionSummary` | 103 |
-| GET | `/admin/analytics/product-sales` | `protect -> checkPermission(["canViewDashboardSummary", "canManageAgents"]) -> getProductSales` | 111 |
-| GET | `/admin/cash-payments` | `protect -> checkPermission("canVerifyPayments") -> getCashPayments` | 121 |
-| POST | `/admin/cash-payments/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCashBulk` | 122 |
-| GET | `/admin/cash-payments/:paymentId` | `protect -> checkPermission("canVerifyPayments") -> getCashPaymentDetail` | 127 |
-| POST | `/admin/cash-payments/:paymentId/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCash` | 132 |
-| POST | `/admin/cash-payments/:paymentId/reject` | `protect -> checkPermission("canVerifyPayments") -> rejectCash` | 137 |
-| GET | `/admin/delivery/alerts` | `protect -> checkPermission("canAssignDelivery") -> getDeliveryAlerts` | 148 |
-| GET | `/admin/delivery/orders/:orderId/trail` | `protect -> checkPermission(["canAssignDelivery", "canGetAllOrders"]) -> getDeliveryTrail` | 153 |
-| POST | `/admin/delivery/orders/:orderId/retry` | `protect -> checkPermission("canAssignDelivery") -> retryDelivery` | 158 |
-| POST | `/admin/delivery/orders/:orderId/allow-without-location` | `protect -> checkPermission("canAssignDelivery") -> allowWithoutLocation` | 163 |
-| POST | `/admin/delivery/events/:eventId/review` | `protect -> checkPermission("canAssignDelivery") -> markDeliveryEventReviewed` | 168 |
-| GET | `/admin/delivery/settings` | `protect -> checkPermission("canAssignDelivery") -> getDeliverySettings` | 173 |
-| PUT | `/admin/delivery/settings` | `protect -> isAdmin -> updateDeliverySettings` | 179 |
+| GET | `/admin/store-management/:consumerId/purge-preview` | `protect -> isAdmin -> getStorePurgePreview` | 46 |
+| POST | `/admin/store-management/:consumerId/purge` | `protect -> isAdmin -> executeStorePurge` | 47 |
+| POST | `/admin/agents/:agentId/access` | `protect -> isAdmin -> setAgentAccess` | 48 |
+| GET | `/admin/management-audit` | `protect -> isAdmin -> getManagementAudit` | 49 |
+| GET | `/admin/agents/:agentId/purge-preview` | `protect -> isAdmin -> getAgentPurgePreview` | 50 |
+| POST | `/admin/agents/:agentId/purge` | `protect -> isAdmin -> executeAgentPurge` | 51 |
+| GET | `/admin/data-cleanups/:requestId` | `protect -> isAdmin -> getCleanupStatus` | 52 |
+| POST | `/admin/data-cleanups/:requestId/retry-media` | `protect -> isAdmin -> retryCleanup` | 53 |
+| PUT | `/admin/:employeeId/permissions` | `protect -> isAdmin -> updateEmployeePermissions` | 60 |
+| POST | `/admin/agents/:agentId/approve` | `protect -> checkPermission("canManageAgents") -> approveAgent` | 67 |
+| POST | `/admin/agents/:agentId/reject` | `protect -> checkPermission("canManageAgents") -> rejectAgent` | 74 |
+| POST | `/admin/delivery-partners/:partnerId/approve` | `protect -> checkPermission("canManageDeliveryPartners") -> approveDeliveryPartner` | 81 |
+| POST | `/admin/delivery-partners/:partnerId/reject` | `protect -> checkPermission("canManageDeliveryPartners") -> rejectDeliveryPartner` | 87 |
+| GET | `/admin/agents` | `protect -> checkPermission("canManageAgents") -> getAllAgents` | 94 |
+| GET | `/admin/dashboard-summary` | `protect -> checkPermission("canViewDashboardSummary") -> getDashboardSummary` | 97 |
+| GET | `/admin/attention` | `protect -> checkPermission("canViewDashboardSummary") -> getAttentionSummary` | 105 |
+| GET | `/admin/analytics/product-sales` | `protect -> checkPermission(["canViewDashboardSummary", "canManageAgents"]) -> getProductSales` | 113 |
+| GET | `/admin/cash-payments` | `protect -> checkPermission("canVerifyPayments") -> getCashPayments` | 123 |
+| POST | `/admin/cash-payments/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCashBulk` | 124 |
+| GET | `/admin/cash-payments/:paymentId` | `protect -> checkPermission("canVerifyPayments") -> getCashPaymentDetail` | 129 |
+| POST | `/admin/cash-payments/:paymentId/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCash` | 134 |
+| POST | `/admin/cash-payments/:paymentId/reject` | `protect -> checkPermission("canVerifyPayments") -> rejectCash` | 139 |
+| GET | `/admin/delivery/alerts` | `protect -> checkPermission("canAssignDelivery") -> getDeliveryAlerts` | 150 |
+| GET | `/admin/delivery/orders/:orderId/trail` | `protect -> checkPermission(["canAssignDelivery", "canGetAllOrders"]) -> getDeliveryTrail` | 155 |
+| POST | `/admin/delivery/orders/:orderId/retry` | `protect -> checkPermission("canAssignDelivery") -> retryDelivery` | 160 |
+| POST | `/admin/delivery/orders/:orderId/allow-without-location` | `protect -> checkPermission("canAssignDelivery") -> allowWithoutLocation` | 165 |
+| POST | `/admin/delivery/events/:eventId/review` | `protect -> checkPermission("canAssignDelivery") -> markDeliveryEventReviewed` | 170 |
+| GET | `/admin/delivery/settings` | `protect -> checkPermission("canAssignDelivery") -> getDeliverySettings` | 175 |
+| PUT | `/admin/delivery/settings` | `protect -> isAdmin -> updateDeliverySettings` | 181 |
 
 ## /employee
 
@@ -237,7 +239,7 @@ Router: [invoice.routes.js](../routes/invoice.routes.js).
 
 | Method | Full path | Pipeline and handler | Router line |
 |---|---|---|---|
-| GET | `/api/invoice/download/:orderId` | `protect -> downloadInvoice` | 8 |
+| GET | `/api/invoice/download/:orderId` | `protect -> storeOperation(downloadInvoice)` | 8 |
 
 ## /api/incentives
 
@@ -258,4 +260,4 @@ Router: [events.routes.js](../routes/events.routes.js).
 |---|---|---|---|
 | GET | `/api/events/stream` | `protect -> isAdminOrEmployee -> openEventStream` | 10 |
 
-Registered method/path entries: **143**, including health. Commented routes are excluded.
+Registered method/path entries: **145**, including health. Commented routes are excluded.

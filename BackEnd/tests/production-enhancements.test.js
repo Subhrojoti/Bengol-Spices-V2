@@ -483,6 +483,141 @@ const storageFixture = () => {
 };
 const assetUrl = (file) => `https://res.cloudinary.com/synthetic-storage/image/upload/v1/bengol_spices/agents/${file}.png`;
 const purgeCommand = (preview, agentId = "A", extra = {}) => ({ requestId: id(), confirmationToken: preview.data.confirmationToken, confirmIdentifier: agentId, confirmPhrase: "DELETE TEST DATA", testDataConfirmed: true, restoreStock: false, ...extra });
+const storePurgeCommand = (preview, consumerId = "S", extra = {}) => ({ requestId: id(), confirmationToken: preview.data.confirmationToken, confirmIdentifier: consumerId, confirmPhrase: "DELETE TEST STORE", testDataConfirmed: true, ...extra });
+
+test("test-store cleanup removes only cancelled store history and unshared files, preserving its active agent and other stores", async () => {
+  const storage = storageFixture();
+  try {
+    const a = await person("A"), b = await person("B");
+    const s = await shop("S", a, { image: { url: assetUrl("only-this-store") } }), keep = await shop("KEEP", a), other = await shop("OTHER", b);
+    const product = await Product.create({ name: "Spice", title: "Spice", category: "Spice", sku: "STORE-PURGE", uom: "packet", price: 10, stock: 9, images: { front: { url: "f", publicId: "f" }, back: { url: "b", publicId: "b" } } });
+    await rawOrder("CANCELLED", s, a, { status: "CANCELLED", products: [{ productId: product._id, quantity: 2 }] });
+    await rawOrder("KEEP-ORDER", keep, a); await rawOrder("OTHER-ORDER", other, b);
+    const payment = await Payment.create({ orderId: "CANCELLED", consumerId: "S", agentId: "A", amount: 1, method: "CASH" });
+    await Payment.create({ orderId: "KEEP-ORDER", consumerId: "KEEP", agentId: "A", amount: 3, method: "CASH" });
+    await Invoice.create({ orderId: "CANCELLED", invoiceNumber: "STORE-FAKE-1", pdfUrl: "https://res.cloudinary.com/synthetic-storage/image/upload/v1/bengol_spices/invoices/STORE-FAKE-1-older-key.pdf" });
+    await Invoice.create({ orderId: "KEEP-ORDER", invoiceNumber: "KEEP-INVOICE" });
+    await Return.collection.insertOne({ returnId: "R", orderId: "CANCELLED", consumerId: "S", agentId: "A", status: "CANCELLED" });
+    await model("DeliveryEvent").create({ orderId: "CANCELLED", action: "CANCELLED" });
+    await Notification.create([{ title: "Store", message: "test", recipientModel: "Agent", recipientId: a._id, meta: { consumerId: "S" } }, { title: "Return", message: "test", recipientModel: "Employee", recipientId: new mongoose.Types.ObjectId(), meta: { returnId: "R" } }, { title: "Payment", message: "test", recipientModel: "Agent", recipientId: a._id, meta: { paymentId: String(payment._id) } }, { title: "Keep", message: "keep", recipientModel: "Agent", recipientId: a._id }]);
+    await model("AgentSalesLocation").create({ agentId: "A", state: "WEST BENGAL", assignedByModel: "Admin" });
+    await model("SalesTargetConfig").create({ scope: "AGENT", agentId: "A" });
+    await model("AgentIncentiveLedger").create({ agentId: "A", amount: 5, source: "MANUAL", type: "EARNING" });
+    const retained = await Agent.findById(a._id).lean();
+    const normal = await call("/admin/store-management/S/removal-preview", admin());
+    assert.equal(normal.data.options.find((option) => option.key === "PERMANENT").allowed, false);
+    const preview = await call("/admin/store-management/S/purge-preview", admin());
+    assert.equal(preview.status, 200); assert.equal(preview.data.allowed, true); assert.equal(preview.data.counts.orders, 1); assert.equal(preview.data.counts.payments, 1); assert.equal(preview.data.counts.notifications, 3);
+    const command = storePurgeCommand(preview), deleted = await call("/admin/store-management/S/purge", admin(), "POST", command);
+    assert.equal(deleted.status, 200); assert.equal(deleted.data.cleanup.failed, 0); assert.equal(deleted.data.removed.stores, 1);
+    for (const name of ["Store", "Order", "Payment", "Return", "Invoice", "DeliveryEvent"]) {
+      const filter = name === "Store" ? { consumerId: "S" } : name === "Return" ? { returnId: "R" } : { orderId: "CANCELLED" };
+      assert.equal(await model(name).countDocuments(filter), 0, name);
+    }
+    assert.deepEqual(await Agent.findById(a._id).lean(), retained); assert.equal(await Agent.countDocuments(), 2);
+    assert.equal(await Store.countDocuments(), 2); assert.equal(await Order.countDocuments(), 2); assert.equal(await Invoice.countDocuments(), 1); assert.equal(await Payment.countDocuments(), 1); assert.equal(await Notification.countDocuments(), 1);
+    for (const name of ["AgentSalesLocation", "SalesTargetConfig", "AgentIncentiveLedger"]) assert.equal(await model(name).countDocuments({ agentId: "A" }), 1, name);
+    assert.equal((await Product.findById(product._id)).stock, 9); assert.equal(await Counter.countDocuments(), 0);
+    const calls = storage.calls.length; assert(calls >= 2);
+    assert(storage.calls.some(({ publicId }) => publicId === "bengol_spices/invoices/STORE-FAKE-1-older-key.pdf"));
+    assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", command)).data.alreadyProcessed, true);
+    assert.equal(storage.calls.length, calls); assert.equal(await AdminAudit.countDocuments({ action: "PURGE_TEST_STORE", outcome: "COMPLETED" }), 1);
+    assert.equal((await call(`/admin/data-cleanups/${command.requestId}`, admin())).status, 200);
+    const keepPreview = await call("/admin/store-management/KEEP/purge-preview", admin());
+    assert.equal((await call("/admin/store-management/KEEP/purge", admin(), "POST", storePurgeCommand(keepPreview, "KEEP", { requestId: command.requestId }))).status, 409);
+  } finally { storage.restore(); }
+});
+
+test("test-store cleanup is Admin-only and requires its store-specific, expiring, typed test confirmation", async () => {
+  const a = await person("A"), s = await shop("S", a); await rawOrder("C", s, a, { status: "CANCELLED" });
+  const employee = await Employee.create({ employeeId: "E", name: "Employee", email: "e@test.invalid", phone: "staff", password: "hash", status: "ACTIVE", permissions: { canManageAgents: true } });
+  const staff = jwt.sign({ role: "EMPLOYEE", id: String(employee._id), employeeId: "E" }, process.env.JWT_SECRET);
+  const preview = await call("/admin/store-management/S/purge-preview", admin());
+  for (const user of [token(a), staff]) {
+    assert.equal((await call("/admin/store-management/S/purge-preview", user)).status, 403);
+    assert.equal((await call("/admin/store-management/S/purge", user, "POST", storePurgeCommand(preview))).status, 403);
+  }
+  assert.equal((await call("/admin/store-management/S/purge-preview", "")).status, 401);
+  for (const extra of [{ confirmIdentifier: "OTHER" }, { confirmPhrase: "DELETE TEST DATA" }, { testDataConfirmed: false }]) assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(preview, "S", extra))).status, 400);
+  const normal = await call("/admin/store-management/S/removal-preview", admin());
+  assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(normal))).status, 400);
+  assert.equal((await call("/admin/store-management/OTHER/purge", admin(), "POST", storePurgeCommand(preview, "OTHER"))).status, 400);
+  const expired = jwt.sign({ purpose: "admin-management-preview", kind: "PURGE_STORE", consumerIds: ["S"] }, process.env.JWT_SECRET, { expiresIn: -1 });
+  assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(preview, "S", { confirmationToken: expired }))).status, 409);
+  assert(await Store.exists({ consumerId: "S" })); assert(await Order.exists({ orderId: "C" }));
+});
+
+test("store cleanup refuses active history, online payments, open returns, transfers and inconsistent cross-store links", async () => {
+  const a = await person("A"), b = await person("B"), s = await shop("S", a), keep = await shop("KEEP", a); await rawOrder("C", s, a, { status: "PLACED" }); await rawOrder("KEEP", keep, a);
+  const blocked = async (reason) => { const preview = await call("/admin/store-management/S/purge-preview", admin()); assert.equal(preview.data.allowed, false); assert(preview.data.blockers.some((message) => message.includes(reason)), JSON.stringify(preview.data.blockers)); assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(preview))).status, 409); assert(await Store.exists({ consumerId: "S" })); };
+  await blocked("Cancel all test orders"); await Order.updateOne({ orderId: "C" }, { status: "DELIVERED" }); await blocked("Cancel all test orders"); await Order.updateOne({ orderId: "C" }, { status: "CANCELLED" });
+  await Return.collection.insertOne({ returnId: "R", orderId: "C", consumerId: "S", agentId: "A", status: "INITIATED" }); await blocked("Close or cancel"); await Return.deleteMany({});
+  const gateway = await GatewayPayment.create({ key: "payment:test-store", orderId: "C", agentId: "A", status: "PROCESSING", purpose: "ORDER_DUE" }); await blocked("Online payment"); await GatewayPayment.updateOne({ _id: gateway._id }, { status: "APPLIED" }); await blocked("Online payment"); await GatewayPayment.deleteMany({});
+  const payment = await Payment.create({ orderId: "C", consumerId: "S", agentId: "A", amount: 1, method: "RAZORPAY" }); await blocked("Online payment"); await Payment.updateOne({ _id: payment._id }, { method: "CASH", consumerId: "KEEP" }); await blocked("another store"); await Payment.deleteMany({});
+  await Store.updateOne({ consumerId: "S" }, { currentAgentId: b.agentId }); await blocked("Transferred"); await Store.updateOne({ consumerId: "S" }, { currentAgentId: a.agentId });
+  await Notification.create({ title: "Shared", message: "test", recipientModel: "Agent", recipientId: a._id, meta: { consumerId: "S", orderId: "KEEP" } }); await blocked("shared with another store");
+  assert.equal(await Order.countDocuments(), 2); assert.equal(await model("MediaDeletionJob").countDocuments(), 0);
+});
+
+test("store cleanup protects overlapping target/reward accounting but preserves unrelated target periods", async () => {
+  const a = await person("A"), s = await shop("S", a); await rawOrder("C", s, a, { status: "CANCELLED" });
+  await Payment.create({ orderId: "C", consumerId: "S", agentId: "A", amount: 1, method: "CASH" });
+  const target = await model("Target").create({ name: "Old target", type: "STORE_CREATION", targetValue: 1, rewardAmount: 5, startDate: new Date("2020-01-01"), endDate: new Date("2020-01-02") });
+  await model("AgentTargetProgress").create({ agentId: "A", targetId: target._id, type: "STORE_CREATION", achievedValue: 1 });
+  assert.equal((await call("/admin/store-management/S/purge-preview", admin())).data.allowed, true);
+  await model("Target").updateOne({ _id: target._id }, { startDate: new Date(s.createdAt.getTime() - 1000), endDate: new Date(s.createdAt.getTime() + 1000) });
+  const blocked = await call("/admin/store-management/S/purge-preview", admin()); assert.equal(blocked.data.allowed, false); assert.equal(blocked.data.counts.targetProgressConflicts, 1);
+  assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(blocked))).status, 409);
+  await model("Target").updateOne({ _id: target._id }, { startDate: new Date("2020-01-01"), endDate: new Date("2020-01-02") });
+  const period = await model("AgentSalesPeriod").create({ agentId: "A", month: new Date(Date.now() + 330 * 60000).toISOString().slice(0, 7), closedAt: new Date() });
+  const monthly = await call("/admin/store-management/S/purge-preview", admin()); assert.equal(monthly.data.allowed, false); assert.equal(monthly.data.counts.salesPeriodConflicts, 1);
+  await model("AgentSalesPeriod").updateOne({ _id: period._id }, { closedAt: null });
+  const preview = await call("/admin/store-management/S/purge-preview", admin()); assert.equal(preview.data.allowed, true);
+  assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(preview))).status, 200);
+  assert.equal(await model("AgentTargetProgress").countDocuments(), 1); assert.equal(await model("AgentSalesPeriod").countDocuments(), 1); assert.equal(await model("Target").countDocuments(), 1);
+});
+
+test("stale store-cleanup previews and transaction failure never remove records or queue files", async () => {
+  const storage = storageFixture();
+  try {
+    const a = await person("A"), s = await shop("S", a, { image: { url: assetUrl("rollback-store") } }); await rawOrder("C", s, a, { status: "CANCELLED" });
+    const old = await call("/admin/store-management/S/purge-preview", admin()); await Order.updateOne({ orderId: "C" }, { paidAmount: 7 });
+    assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(old))).status, 409);
+    const fresh = await call("/admin/store-management/S/purge-preview", admin()), create = AdminAudit.create;
+    try { AdminAudit.create = async () => { throw new Error("Injected store cleanup audit failure"); }; assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(fresh))).status, 500); }
+    finally { AdminAudit.create = create; }
+    assert(await Store.exists({ consumerId: "S" })); assert(await Order.exists({ orderId: "C" })); assert.equal(await model("MediaDeletionJob").countDocuments(), 0); assert.equal(storage.calls.length, 0);
+  } finally { storage.restore(); }
+});
+
+test("store cleanup uses shared locks with invoice recovery and cash verification", async () => {
+  const a = await person("A"), s = await shop("S", a); await rawOrder("C", s, a, { status: "CANCELLED" });
+  const payment = await Payment.create({ orderId: "C", consumerId: "S", agentId: "A", amount: 1, method: "CASH", verification: { status: "PENDING" } });
+  const preview = await call("/admin/store-management/S/purge-preview", admin());
+  await withStoreLocks(["S"], async () => {
+    assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(preview))).status, 409);
+    assert.equal((await call("/api/invoice/download/C", admin())).status, 409);
+    assert.equal((await approveCashPayment({ paymentId: String(payment._id), actor: { role: "ADMIN" } })).code, 409);
+    assert.equal((await rejectCashPayment({ paymentId: String(payment._id), reason: "test", actor: { role: "ADMIN" } })).code, 409);
+  });
+  assert.equal((await Payment.findById(payment._id)).verification.status, "PENDING");
+  assert.equal((await call("/admin/store-management/S/purge", admin(), "POST", storePurgeCommand(preview))).status, 200);
+});
+
+test("test-store file failures remain retryable and shared photos are retained", async () => {
+  const storage = storageFixture();
+  try {
+    const a = await person("A"), s = await shop("S", a, { image: { url: assetUrl("shared-store-photo") } }); await shop("KEEP", a, { image: { url: assetUrl("shared-store-photo") } });
+    await rawOrder("C", s, a, { status: "CANCELLED" }); await Invoice.create({ orderId: "C", invoiceNumber: "STORE-RETRY", pdfUrl: "https://res.cloudinary.com/synthetic-storage/image/upload/v1/bengol_spices/invoices/STORE-RETRY.pdf" });
+    const preview = await call("/admin/store-management/S/purge-preview", admin()); assert.equal(preview.data.counts.sharedFiles, 1);
+    cloudinary.uploader.destroy = async () => { throw new Error("Synthetic file outage"); };
+    const command = storePurgeCommand(preview), result = await call("/admin/store-management/S/purge", admin(), "POST", command);
+    assert.equal(result.status, 200); assert(result.data.cleanup.failed > 0); assert.equal(result.data.cleanup.shared, 1); assert.equal(await Store.exists({ consumerId: "S" }), null);
+    cloudinary.uploader.destroy = async (publicId) => { storage.calls.push({ publicId }); return { result: "not found" }; };
+    const retry = await call(`/admin/data-cleanups/${command.requestId}/retry-media`, admin(), "POST", {});
+    assert.equal(retry.status, 200); assert.equal(retry.data.cleanup.failed, 0); assert(!storage.calls.some(({ publicId }) => publicId.includes("shared-store-photo"))); assert(await Store.exists({ consumerId: "KEEP" }));
+  } finally { storage.restore(); }
+});
 
 test("complete test-agent deletion removes its whole graph and files, restores optional stock once, and preserves other accounts", async () => {
   const storage = storageFixture();

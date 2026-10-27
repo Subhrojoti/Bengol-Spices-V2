@@ -49,8 +49,8 @@
     },
     {
       "file": "src/api/services.js",
-      "sha256": "ef553e461aa873ff488c4704d07f92f0a1acbd14a984caa33ba15f3630a646c7",
-      "lines": 1038,
+      "sha256": "830fdf6ea02b9a616cceed98ed81899d7a3c29a76543f622fb3adfa88dc9606d",
+      "lines": 1040,
       "imports": [
         "axios",
         "./axiosInstance",
@@ -732,8 +732,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Agent/AgentAdministration.jsx",
-      "sha256": "bc0f1177c6829f41bfe0f15a9bcc65c5a83319f10b431de41f57696011316748",
-      "lines": 137,
+      "sha256": "7ddf99257f77d186d6ca04fe0ebb6594152a9e1382f8a68e51e3f077afc3dbd3",
+      "lines": 144,
       "imports": [
         "react",
         "@mui/material",

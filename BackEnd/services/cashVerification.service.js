@@ -7,6 +7,7 @@ import { updateTargetProgress } from "./target.service.js";
 import { syncAfterVerification } from "./salesTarget.service.js";
 import { publish } from "./liveEvents.js";
 import { historyConsumerIds } from "./storeAccess.service.js";
+import { withStoreLocks } from "./storeOperation.service.js";
 import { dateKeyOf, dayRange, isDateKey, monthKeyOf, monthRange } from "../utils/salesTarget.js";
 
 /* A sales target counts money collected on an order placed in the same
@@ -338,7 +339,7 @@ const whyNot = async (paymentId, action) => {
  *
  * @returns {Promise<{ok: true, payment: object} | {ok: false, code: number, message: string}>}
  */
-export const approveCashPayment = async ({ paymentId, note, actor, now = new Date() }) => {
+const approveCashPaymentUnlocked = async ({ paymentId, note, actor, now = new Date() }) => {
   if (!mongoose.isValidObjectId(paymentId)) return refuse(404, "Payment not found");
 
   const found = await Payment.findById(paymentId).select("createdAt").lean();
@@ -415,7 +416,7 @@ export const approveCashPayment = async ({ paymentId, note, actor, now = new Dat
  * amount does not match. It stays out of the agent's sales. The order is
  * not touched. A reason is required; the agent is shown it.
  */
-export const rejectCashPayment = async ({ paymentId, reason, actor, now = new Date() }) => {
+const rejectCashPaymentUnlocked = async ({ paymentId, reason, actor, now = new Date() }) => {
   if (!mongoose.isValidObjectId(paymentId)) return refuse(404, "Payment not found");
 
   const why = clean(reason);
@@ -450,6 +451,19 @@ export const rejectCashPayment = async ({ paymentId, reason, actor, now = new Da
 
   return { ok: true, payment };
 };
+
+const withPaymentStoreLock = async (options, work) => {
+  if (!mongoose.isValidObjectId(options.paymentId)) return work(options);
+  const payment = await Payment.findById(options.paymentId).select("consumerId").lean();
+  if (!payment?.consumerId) return work(options);
+  try { return await withStoreLocks([payment.consumerId], () => work(options)); }
+  catch (error) { if (error.status) return refuse(error.status, error.message); throw error; }
+};
+
+// Include post-verification target/notification work in the store lock so a
+// test-store cleanup cannot remove an order midway through that work.
+export const approveCashPayment = (options) => withPaymentStoreLock(options, approveCashPaymentUnlocked);
+export const rejectCashPayment = (options) => withPaymentStoreLock(options, rejectCashPaymentUnlocked);
 
 /**
  * Approves several payments, one after another: the cash an agent handed
