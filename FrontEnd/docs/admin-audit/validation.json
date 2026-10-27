@@ -394,5 +394,32 @@
       "businessMutations": false,
       "record": "../../../deploy/releases/2026-10-27-employee-header-fix.md"
     }
+  },
+  "invoiceDownloadFix": {
+    "date": "2026-10-27",
+    "status": "local only; not committed, pushed or deployed",
+    "baseCommit": "ca2f1a97d4a6e1b2538bb9587692703403acfc81",
+    "scope": "Backend invoice response/template and shared Admin/Employee download feedback",
+    "backendTests": {
+      "passed": 49,
+      "failed": 0
+    },
+    "frontendUnitTests": {
+      "passed": 9,
+      "failed": 0
+    },
+    "isolatedChrome": {
+      "passed": 76,
+      "failed": 0
+    },
+    "adminLint": "passed",
+    "fullBuildAndPrerender": "passed",
+    "pdfVisualReview": "Packet example and multi-page invoice logo/table/totals/footer inspected",
+    "hsn": "Blank; no codes stored, owner declined for now",
+    "productionBefore": "Normal Admin cookie sign-in reproduced browser TypeError on storage redirect",
+    "productionAfter": "Pending rollout; no real Employee password used",
+    "businessMutations": false,
+    "unrelatedProductSalesAndMobileEditsExcluded": true,
+    "record": "../../../BackEnd/docs/INVOICE_DOWNLOAD_FIX.md"
   }
 }

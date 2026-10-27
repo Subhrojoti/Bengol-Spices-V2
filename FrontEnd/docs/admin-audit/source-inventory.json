@@ -49,7 +49,7 @@
     },
     {
       "file": "src/api/services.js",
-      "sha256": "d47a0b8cd09c1a5e53a2b397196dbd3d1808c6e9cdf9d5ebb4076c34c1dd2fd4",
+      "sha256": "ef553e461aa873ff488c4704d07f92f0a1acbd14a984caa33ba15f3630a646c7",
       "lines": 1038,
       "imports": [
         "axios",
@@ -1174,7 +1174,7 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Orders/OrderManagement.jsx",
-      "sha256": "a58a2a94d5b211cfe61989e2fe29332563a52e79f54fd87e93a9447f33b7390a",
+      "sha256": "a1ff070a4adce96d291d16ebd53517cc1eaa1904257501cee3bf1ba41a916f19",
       "lines": 1007,
       "imports": [
         "../../../../utils/reportAdminError",

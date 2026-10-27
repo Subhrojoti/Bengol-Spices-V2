@@ -11,7 +11,7 @@ const standardFontDataUrl = fileURLToPath(new URL("../node_modules/pdfjs-dist/st
 const sample = (count, state) => ({
   invoiceNumber: `TEST-${count}`, orderId: `ORDER-${count}`, invoiceDate: "2026-10-25T08:00:00Z",
   totalAmount: count * 105, buyer: { name: "Sample Store", address: "Sample Road", gstin: "TEST-GST" },
-  items: Array.from({ length: count }, (_, i) => ({ name: `Sample Spice ${i + 1}`, hsn: "0910", quantity: 1, unitPrice: 105, totalAmount: 105, gstAmount: 5, gstRate: 5 })),
+  items: Array.from({ length: count }, (_, i) => ({ name: `Sample Spice ${i + 1}`, hsn: "0910", quantity: 1, unitPrice: 100, totalAmount: 105, gstAmount: 5, gstRate: 5 })),
   state,
 });
 
@@ -48,3 +48,23 @@ for (const [count, state] of [[2, "WEST BENGAL"], [65, "BIHAR"]]) {
     await loadingTask.destroy();
   });
 }
+
+test("invoice PDF retains packet units, precise net rates and the reported four-line totals", async () => {
+  const gross = [36, 75, 35, 36], tax = [1.71, 3.57, 1.67, 1.71];
+  const invoice = { invoiceNumber: "SAMPLE-182", orderId: "SAMPLE-ORDER", invoiceDate: "2026-10-24", totalAmount: 182, paidAmount: 1, dueAmount: 181,
+    items: gross.map((totalAmount, i) => ({ name: `Sample Spice ${i + 1}`, quantity: 10, unitPrice: Math.round((totalAmount - tax[i]) * 100) / 1000, totalAmount, gstAmount: tax[i], gstRate: 5 })), buyer: { name: "Sample Store" } };
+  const order = { createdAt: invoice.invoiceDate, paymentMode: "CASH", deliveryAddress: { storeName: "Sample Store", street: "Sample Road", city: "Kolkata", pincode: "743503", state: "WEST BENGAL" }, products: invoice.items.map((item) => ({ name: item.name, quantity: item.quantity, uom: "packet" })) };
+  const before = structuredClone({ invoice, order });
+  const buffer = await generateInvoicePDFBuffer(invoice, order);
+  assert.deepEqual({ invoice, order }, before);
+  await fs.mkdir(output, { recursive: true }); await fs.writeFile(new URL("invoice-packets.pdf", output), buffer);
+  const loadingTask = getDocument({ data: new Uint8Array(buffer), standardFontDataUrl }), pdf = await loadingTask.promise;
+  assert.equal(pdf.numPages, 1);
+  const page = await pdf.getPage(1), text = (await page.getTextContent()).items.map((item) => item.str).join(" ");
+  for (const value of ["10 packets", "40 packets", "3.429", "7.143", "182.00", "173.34", "4.33"]) assert(text.includes(value), value);
+  assert(!/\bpcs\b/.test(text));
+  const viewport = page.getViewport({ scale: 1.6 }), canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+  await fs.writeFile(new URL("invoice-packets-page-1.png", output), canvas.toBuffer("image/png"));
+  await loadingTask.destroy();
+});

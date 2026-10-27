@@ -5,6 +5,16 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Invoice repair (27 October 2026, local; rollout pending):** downloads now return
+PDF bytes from the authenticated API instead of redirecting credentialed requests
+to storage. Current rendering includes the supplied logo and saved packet units;
+financial records/calculations and access checks are unchanged. HSN remains blank
+at the owner's request. All 49 backend, nine frontend unit and 76 Admin/Employee
+browser tests pass; lint and the production build/prerender pass. See
+[invoice repair notes](BackEnd/docs/INVOICE_DOWNLOAD_FIX.md) for diagnosis,
+verification limits and rollout requirements. Do not infer production success
+until the rollout is recorded.
+
 **Employee frontend repair deployed/verified `d646056` (27 October 2026):** the earlier shared
 header cleanup removed the `UserRound` import while Employee's Profile menu still
 used it, causing the photographed full-page error after login. The import is

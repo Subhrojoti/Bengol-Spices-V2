@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { normalizeUnit, quantityWithUnit } from "./uom.js";
 
 /* ══════════════════════════════════════════════════════════════
    TAX INVOICE — a recreation of the company's Tally invoice
@@ -158,6 +159,12 @@ const money = (n) =>
     maximumFractionDigits: 2,
   });
 
+// Net unit rates may need more than two decimals to agree with the line amount.
+const unitRate = (n) => Number(n || 0).toLocaleString("en-IN", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 6,
+});
+
 // Tally prints a negative adjustment as (-)0.01
 const signedMoney = (n) => (n < 0 ? `(-)${money(-n)}` : money(n));
 
@@ -303,9 +310,11 @@ const buildInvoiceData = (invoice, order) => {
   const address = order?.deliveryAddress ?? {};
   const state = resolveState(address.state);
 
-  const items = (invoice.items ?? []).map((item) => {
+  const items = (invoice.items ?? []).map((item, index) => {
     const total = Number(item.totalAmount) || 0;
     const tax = Number(item.gstAmount) || 0;
+    const original = order?.products?.[index];
+    const matchingLine = original?.name === item.name && Number(original.quantity) === Number(item.quantity);
 
     return {
       name: item.name ?? "",
@@ -315,6 +324,7 @@ const buildInvoiceData = (invoice, order) => {
       taxable: round2(total - tax),
       tax,
       gstRate: Number(item.gstRate) || 0,
+      unit: normalizeUnit(item.uom || (matchingLine ? original.uom : "")) || "pcs",
     };
   });
 
@@ -390,6 +400,7 @@ const buildInvoiceData = (invoice, order) => {
     },
     items,
     totalQuantity: sumOf(items, "quantity"),
+    totalUnit: new Set(items.map((item) => item.unit)).size === 1 ? items[0].unit : null,
     intraState,
     taxRows,
     taxLines,
@@ -634,21 +645,21 @@ const drawRows = (doc, rows, firstBaseline) => {
       });
     }
 
-    const quantity = `${count(item.quantity)} pcs`;
+    const quantity = quantityWithUnit(count(item.quantity), item.unit);
     put(doc, quantity, 343, y, {
       font: F.b,
       align: "right",
       scale: fitScale(doc, quantity, 45, { font: F.b }),
     });
 
-    const rate = money(item.rate);
+    const rate = unitRate(item.rate);
     put(doc, rate, 399, y, {
       size: 9,
       align: "right",
       scale: fitScale(doc, rate, 45, { size: 9 }),
     });
 
-    put(doc, "pcs", 408, y, { size: 9 });
+    put(doc, item.unit, 406, y, { size: 8, scale: fitScale(doc, item.unit, 18, { size: 8 }) });
 
     const amount = money(item.taxable);
     put(doc, amount, 495, y, {
@@ -711,7 +722,7 @@ const drawTotals = (doc, data, layout, bodyBottom, rupeeFont) => {
 
   put(doc, "Total", 240.6, bb + 11, { size: 9, align: "right" });
   if (data.items.length) {
-    const quantity = `${count(data.totalQuantity)} pcs`;
+    const quantity = data.totalUnit ? quantityWithUnit(count(data.totalQuantity), data.totalUnit) : "Mixed units";
     put(doc, quantity, 343, bb + 11, {
       font: F.b,
       align: "right",

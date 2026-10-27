@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { installFixtures, employees, tokenFor } from "./admin-fixtures.mjs";
+import { installFixtures, employees, tokenFor, orders } from "./admin-fixtures.mjs";
 
 const employee = { ...employees[0], status: "ACTIVE", permissions: { canViewDashboardSummary: true, canGetAllOrders: true } };
 const setup = (context, options = {}) => installFixtures(context, { role: "EMPLOYEE", ...options, overrides: {
@@ -45,4 +45,28 @@ test("Employee permission restrictions remain enforced after the header renders"
   await expect(page.getByRole("button", { name: "Orders", exact: true })).toBeVisible();
   await page.goto("/employee/dashboard");
   await expect(page.getByText("Access Restricted", { exact: true })).toBeVisible();
+});
+
+test("Employee downloads an invoice as a PDF through its existing bearer-authenticated API request", async ({ context, page }) => {
+  const order = orders[0], path = `/api/invoice/download/${order.orderId}`;
+  const network = await setup(context, { overrides: { [path]: (route) => route.fulfill({ contentType: "application/pdf", body: "%PDF-1.4\nsynthetic invoice" }) } });
+  await page.goto("/employee/order-management");
+  await page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true }).click();
+  const card = page.locator(`#order-${order._id}`); await card.getByRole("button", { name: new RegExp(order.orderId) }).click();
+  const download = page.waitForEvent("download"); await card.getByRole("button", { name: "Invoice", exact: true }).click();
+  expect((await download).suggestedFilename()).toBe(`${order.orderId}.pdf`);
+  expect(network.requests.find((request) => request.path === path).authorization).toMatch(/^Bearer /);
+  expect(network.unknown).toEqual([]);
+});
+
+test("Employee invoice network failures show a retry message without claiming the invoice is absent", async ({ context, page }) => {
+  const order = orders[0], path = `/api/invoice/download/${order.orderId}`;
+  await setup(context, { overrides: { [path]: (route) => route.abort("failed") } });
+  await page.goto("/employee/order-management");
+  await page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true }).click();
+  const card = page.locator(`#order-${order._id}`); await card.getByRole("button", { name: new RegExp(order.orderId) }).click();
+  await card.getByRole("button", { name: "Invoice", exact: true }).click();
+  await expect(page.getByText("Could not download the invoice. Check your connection and try again.", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Invoice", exact: true })).toBeEnabled();
+  await expect(page).toHaveURL(/\/employee\/order-management$/);
 });

@@ -563,7 +563,7 @@ export default function OrderManagement() {
         }
       }
 
-      toast.error(reason || "No invoice is available yet");
+      toast.error(reason || "Could not download the invoice. Check your connection and try again.");
     } finally {
       setInvoiceId(null);
     }

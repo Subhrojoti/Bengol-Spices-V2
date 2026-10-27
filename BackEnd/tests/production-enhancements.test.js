@@ -228,7 +228,7 @@ test("store removal options preserve history; permanent deletion only for unused
   assert.equal((await call("/admin/store-management/S/remove", admin(), "POST", command)).data.alreadyProcessed, true);
   const archived = await Store.findOne({ consumerId: "S" }); assert.equal(archived.status, "INACTIVE"); assert.equal(archived.image?.url, undefined);
   assert.equal(await Order.countDocuments({ orderId: "O" }), 1); assert.equal(await Invoice.countDocuments({ orderId: "O" }), 1);
-  assert.equal((await call("/api/invoice/download/O", token(a))).status, 302);
+  assert.equal((await call("/api/invoice/download/O", token(a))).status, 200);
   await shop("EMPTY", a);
   const empty = await call("/admin/store-management/EMPTY/removal-preview", admin());
   const bad = { requestId: id(), confirmationToken: empty.data.confirmationToken, option: "PERMANENT", confirmIdentifier: "wrong" };

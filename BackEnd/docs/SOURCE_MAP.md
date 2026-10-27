@@ -1,12 +1,12 @@
 # Backend source map and review snapshot
 
-Updated 27 October 2026 including the local store GPS collision fix. Original baseline HEAD: `59354fc6f86731fd74f9099e4d6036690b8b2a2e`.
+Updated 27 October 2026 including the store GPS collision and invoice download fixes. Original baseline HEAD: `59354fc6f86731fd74f9099e4d6036690b8b2a2e`.
 See [backend context](../../BACKEND_CONTEXT.md) and [implementation report](PRODUCTION_ENHANCEMENTS.md).
 
 ## Offline validation
 
-- Parsed **121** first-party JS/MJS files, including test and documentation scripts.
-- Checked **446** relative imports: all files and static named/default exports resolve.
+- Parsed **122** first-party JS/MJS files, including test and documentation scripts.
+- Checked **458** relative imports: all files and static named/default exports resolve.
 - Extracted **143** registered method/path entries, including health.
 - This script imports no application code and connects to no services.
 - Runtime tests/build results and remaining live checks are recorded in the implementation report.
@@ -144,11 +144,11 @@ Local imports: [models/AgentIncentiveLedger.js](../models/AgentIncentiveLedger.j
 
 ### controllers/invoice.controller.js
 
-[controllers/invoice.controller.js](../controllers/invoice.controller.js), 110 lines. SHA-256: `57de49af284d8eabc208de4a285aad3b869ac5e7097bed6c5ab884c8a7852f2f`.
+[controllers/invoice.controller.js](../controllers/invoice.controller.js), 97 lines. SHA-256: `7bbe21baa9b68a9caf4ef0cc0cc306091b9b3aa21a55d6f3868edf30ee8d3b8e`.
 
-Exports: [downloadInvoice](../controllers/invoice.controller.js#L43).
+Exports: [downloadInvoice](../controllers/invoice.controller.js#L44).
 
-Local imports: [models/Invoice.js](../models/Invoice.js), [models/Order.js](../models/Order.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [utils/invoiceNumber.js](../utils/invoiceNumber.js), [utils/uploadPdf.js](../utils/uploadPdf.js), [services/invoice.service.js](../services/invoice.service.js).
+Local imports: [models/Invoice.js](../models/Invoice.js), [models/Order.js](../models/Order.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [utils/invoiceNumber.js](../utils/invoiceNumber.js), [utils/uploadPdf.js](../utils/uploadPdf.js), [utils/generateInvoicePdf.js](../utils/generateInvoicePdf.js), [services/invoice.service.js](../services/invoice.service.js).
 
 ### controllers/notification.controller.js
 
@@ -664,7 +664,7 @@ Package/built-in imports: `node:fs`, `node:path`, `node:zlib`, `node:readline`, 
 
 ### scripts/review-source.mjs
 
-[scripts/review-source.mjs](../scripts/review-source.mjs), 84 lines. SHA-256: `6f4cd86eccc47661e936bbcd7ad73e762aad753066c34c5b3caab962a90ce07f`.
+[scripts/review-source.mjs](../scripts/review-source.mjs), 84 lines. SHA-256: `348827ea6b620363a91681dac91231ad16ba1708cd8353966ae7744f117bea24`.
 
 Exports: none.
 
@@ -862,9 +862,19 @@ Local imports: [routes/auth.routes.js](../routes/auth.routes.js), [routes/events
 
 Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `express`, `mongoose`, `mongodb-memory-server`.
 
+### tests/invoice-download.test.js
+
+[tests/invoice-download.test.js](../tests/invoice-download.test.js), 104 lines. SHA-256: `3064e958ef90446dd9de5a822341256962e88957ac402e568e9c58d6bfef151f`.
+
+Exports: none.
+
+Local imports: [routes/auth.routes.js](../routes/auth.routes.js), [routes/invoice.routes.js](../routes/invoice.routes.js), [models/Invoice.js](../models/Invoice.js), [models/Order.js](../models/Order.js), [models/store.js](../models/store.js), [models/Employee.js](../models/Employee.js), [models/Agent.js](../models/Agent.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Counter.js](../models/Counter.js), [config/cloudinary.js](../config/cloudinary.js).
+
+Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `express`, `cors`, `mongoose`, `jsonwebtoken`, `node:stream`, `mongodb-memory-server`.
+
 ### tests/invoice-pdf.test.js
 
-[tests/invoice-pdf.test.js](../tests/invoice-pdf.test.js), 51 lines. SHA-256: `00b7d27c1bda75611d6e6dd839fd1b62cf3dfbeae88169f21229d3e0ca93e16e`.
+[tests/invoice-pdf.test.js](../tests/invoice-pdf.test.js), 71 lines. SHA-256: `0fdf1bb893d729617dde2b50946e1890b13cd2de25d3b7c044daf63adc60af69`.
 
 Exports: none.
 
@@ -874,7 +884,7 @@ Package/built-in imports: `node:test`, `node:assert/strict`, `node:fs/promises`,
 
 ### tests/production-enhancements.test.js
 
-[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 603 lines. SHA-256: `3518c0e840acb648bbb3cd341b3a72dbf1c631d88864402d65ef2687f6ca9f4c`.
+[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 603 lines. SHA-256: `933035fe5f2e6e674d261668fb6be814e2b47793205954d789fcb7625e997313`.
 
 Exports: none.
 
@@ -946,9 +956,11 @@ Exports: [LIVE_ORIGINS](../utils/frontendUrl.js#L18), [frontendOrigins](../utils
 
 ### utils/generateInvoicePdf.js
 
-[utils/generateInvoicePdf.js](../utils/generateInvoicePdf.js), 1123 lines. SHA-256: `1fe465112fb29c2245018986036c57297e04eb0441fcaae98599220cc9e68059`.
+[utils/generateInvoicePdf.js](../utils/generateInvoicePdf.js), 1134 lines. SHA-256: `cd5283328bdbdb4388e984e5c9fbc22a68c0c5fb36c865c7fe48c4cba1b5f363`.
 
-Exports: [generateInvoicePDFBuffer](../utils/generateInvoicePdf.js#L977).
+Exports: [generateInvoicePDFBuffer](../utils/generateInvoicePdf.js#L988).
+
+Local imports: [utils/uom.js](../utils/uom.js).
 
 Package/built-in imports: `pdfkit`, `fs`, `url`.
 

@@ -3,6 +3,7 @@ import Order from "../models/Order.js";
 import { mayReadStoreHistory } from "../services/storeAccess.service.js";
 import { invoiceFileName } from "../utils/invoiceNumber.js";
 import { isGuessableInvoiceUrl } from "../utils/uploadPdf.js";
+import { generateInvoicePDFBuffer } from "../utils/generateInvoicePdf.js";
 import {
   createInvoiceFromOrder,
   regenerateInvoicePDF,
@@ -50,6 +51,7 @@ export const downloadInvoice = async (req, res) => {
     }
 
     let invoice = await Invoice.findOne({ orderId });
+    const order = await Order.findOne({ orderId }).lean();
 
     /* An order is saved first and its invoice is made straight after. When
        that second step failed (the file store did not answer, the server
@@ -66,8 +68,6 @@ export const downloadInvoice = async (req, res) => {
       !invoice.pdfUrl ||
       isGuessableInvoiceUrl(invoice.pdfUrl, invoice.invoiceNumber)
     ) {
-      const order = await Order.findOne({ orderId });
-
       if (order && !invoice) {
         await createInvoiceFromOrder(order);
         invoice = await Invoice.findOne({ orderId });
@@ -80,28 +80,15 @@ export const downloadInvoice = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    if (!invoice.pdfUrl) {
-      return res.status(503).json({
-        message:
-          "The invoice file could not be prepared just now. Please try again in a moment.",
-      });
-    }
-
-    // 🔥 FIX: setting Content-Disposition here did nothing — a redirect
-    // means the browser only ever sees CLOUDINARY's response, never this
-    // one, so the header was silently ignored and the file likely opened
-    // inline instead of downloading with the intended filename.
-    // Cloudinary's fl_attachment flag makes Cloudinary's own response
-    // carry the download disposition, so insert it into the URL instead.
-    const downloadUrl = invoice.pdfUrl.includes("/upload/")
-      ? invoice.pdfUrl.replace(
-          "/upload/",
-          // BS/26-27/1 → BS-26-27-1: a slash would split the URL here
-          `/upload/fl_attachment:${invoiceFileName(invoice.invoiceNumber)}/`,
-        )
-      : invoice.pdfUrl; // fallback: unrecognized URL shape, redirect as-is (same as before)
-
-    return res.redirect(downloadUrl);
+    // Keep the download on the authenticated API origin. Redirecting a
+    // credentialed browser request to storage's wildcard-CORS response fails.
+    // Render the saved invoice with the current logo/template; this also avoids
+    // serving an old cached PDF or depending on storage delivery availability.
+    const pdf = await generateInvoicePDFBuffer(invoice, order);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.attachment(`${invoiceFileName(invoice.invoiceNumber || orderId)}.pdf`);
+    return res.send(pdf);
   } catch (error) {
     console.error("INVOICE DOWNLOAD ERROR:", error);
     res.status(500).json({ message: "Download failed" });

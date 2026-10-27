@@ -682,7 +682,7 @@ export const downloadInvoice = async (orderNo) => {
 
     return response;
   } catch (error) {
-    if (typeof window !== "undefined" && /^\/admin(?:\/|$)/.test(window.location.pathname)) reportAdminError("Download invoice failed", error);
+    if (typeof window !== "undefined" && /^\/(?:admin|employee)(?:\/|$)/.test(window.location.pathname)) reportAdminError("Download invoice failed", error);
     else console.error("Download invoice failed:", error);
     throw error;
   }
