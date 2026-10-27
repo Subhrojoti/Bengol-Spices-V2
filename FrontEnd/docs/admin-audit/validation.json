@@ -397,7 +397,7 @@
   },
   "invoiceDownloadFix": {
     "date": "2026-10-27",
-    "status": "local only; not committed, pushed or deployed",
+    "status": "pushed, deployed and verified",
     "baseCommit": "ca2f1a97d4a6e1b2538bb9587692703403acfc81",
     "scope": "Backend invoice response/template and shared Admin/Employee download feedback",
     "backendTests": {
@@ -417,9 +417,28 @@
     "pdfVisualReview": "Packet example and multi-page invoice logo/table/totals/footer inspected",
     "hsn": "Blank; no codes stored, owner declined for now",
     "productionBefore": "Normal Admin cookie sign-in reproduced browser TypeError on storage redirect",
-    "productionAfter": "Pending rollout; no real Employee password used",
+    "productionAfter": "Normal Admin login and live Orders Invoice button downloaded PDF; real Employee UI uses synthetic intercepted APIs",
     "businessMutations": false,
     "unrelatedProductSalesAndMobileEditsExcluded": true,
-    "record": "../../../BackEnd/docs/INVOICE_DOWNLOAD_FIX.md"
+    "record": "../../../BackEnd/docs/INVOICE_DOWNLOAD_FIX.md",
+    "release": {
+      "date": "2026-10-27",
+      "timezone": "Asia/Calcutta",
+      "applicationCommit": "5cf4f64849750c1b841b5f38b69abbb77e4530b8",
+      "pushed": true,
+      "deployed": true,
+      "backendFilesVerified": 140,
+      "websiteFilesVerified": 205,
+      "liveInvoiceButton": true,
+      "livePdfBytes": 122339,
+      "pdfLogoUnitsAndLayoutVisuallyReviewed": true,
+      "reportedOrderAndInvoiceUnchanged": true,
+      "productionSettingsUnchanged": true,
+      "hrProcessUnchanged": true,
+      "employeeDeployedUiSyntheticApiSmoke": true,
+      "realEmployeePasswordUsed": false,
+      "unrelatedFilesAndStagingPreserved": true,
+      "record": "../../../deploy/releases/2026-10-27-invoice-download.md"
+    }
   }
 }

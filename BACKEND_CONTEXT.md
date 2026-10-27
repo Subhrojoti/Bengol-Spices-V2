@@ -5,15 +5,19 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Invoice repair (27 October 2026, local; rollout pending):** downloads now return
+**Invoice repair deployed/verified `5cf4f64` (27 October 2026):** downloads now return
 PDF bytes from the authenticated API instead of redirecting credentialed requests
 to storage. Current rendering includes the supplied logo and saved packet units;
 financial records/calculations and access checks are unchanged. HSN remains blank
 at the owner's request. All 49 backend, nine frontend unit and 76 Admin/Employee
 browser tests pass; lint and the production build/prerender pass. See
-[invoice repair notes](BackEnd/docs/INVOICE_DOWNLOAD_FIX.md) for diagnosis,
-verification limits and rollout requirements. Do not infer production success
-until the rollout is recorded.
+[invoice repair notes](BackEnd/docs/INVOICE_DOWNLOAD_FIX.md) and
+[release evidence](deploy/releases/2026-10-27-invoice-download.md). Normal Admin
+sign-in and the live Orders Invoice button downloaded the reported PDF; its
+logo/units/layout were visually checked. All 140 backend and 205 website file
+hashes match the release. The reported order/invoice checksums and private
+settings are unchanged. Employee permissions/downloads pass isolated tests;
+production Employee UI smoke uses synthetic APIs, not a real employee password.
 
 **Employee frontend repair deployed/verified `d646056` (27 October 2026):** the earlier shared
 header cleanup removed the `UserRound` import while Employee's Profile menu still

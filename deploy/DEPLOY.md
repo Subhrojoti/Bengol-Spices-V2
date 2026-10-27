@@ -16,6 +16,12 @@ See [Building the mobile apps](#building-the-mobile-apps).
 
 ## Deploying
 
+Latest invoice repair: **27 October 2026**, application `5cf4f64`, backend and
+website deployed and verified. The live Orders Invoice button downloads a PDF
+directly from the API. See [release evidence](releases/2026-10-27-invoice-download.md)
+for backups, validation and verification limits. No nginx/mobile deployment or
+business-data migration was required.
+
 ```bash
 bash deploy/push.sh            # everything: API, website, web server rules
 ```

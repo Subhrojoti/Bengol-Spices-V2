@@ -1,6 +1,8 @@
 # Invoice download and PDF review - 27 October 2026
 
-Status: implemented and validated locally; production rollout is pending.
+Status: pushed, deployed and verified on 27 October 2026 (Asia/Calcutta).
+Application commit: `5cf4f64849750c1b841b5f38b69abbb77e4530b8`.
+See [release evidence](../../deploy/releases/2026-10-27-invoice-download.md).
 
 ## Report and diagnosis
 
@@ -63,8 +65,16 @@ not statutory tax classification or legal compliance.
   they never load live backend environment files. Production Employee login was
   not exercised with an employee's password. No production employee tokens were
   minted, and no business records were modified by diagnostics.
-- Normal Admin browser login reproduced the deployed failure. Production success
-  must be checked after rollout; a local test pass does not establish live state.
+- Normal Admin browser login reproduced the deployed failure before rollout.
+  After rollout, the API returned HTTP 200 PDF bytes on its own origin and the
+  live Orders Invoice button downloaded `ORD2026-0017.pdf` (122,339 bytes).
+  Its rendered page includes the logo, 40 packets and total 182.00 with no visible
+  table/footer clipping. Complete order/invoice checksums are unchanged after
+  those downloads. The test session was logged out normally.
+- All 140 backend files and 205 website files match the deployed application
+  release. Production settings are unchanged. Only bengol-api reloaded; the HR
+  API retained its PID and restart count. Deployed Employee login/profile/reload
+  UI checks also pass with synthetic intercepted APIs.
 
 ## Rollout and recovery
 
@@ -74,11 +84,13 @@ unrelated Product Sales and mobile edits. No database migration, account reset,
 tax-code backfill or bulk PDF rewrite is required. Backend rollback restores the
 redirect behavior and may reintroduce the browser download failure.
 
-Release candidate: `FrontEnd/.admin-audit.local/invoice-release/src/`, built from
-HEAD `ca2f1a97d4a6e1b2538bb9587692703403acfc81` plus only the eight invoice runtime/test
-files. The candidate is ignored/local, not an off-machine backup. Persistent
-source, tests and these notes remain in the working tree; this fix has not been
-committed, pushed or deployed. Rebuild from a scoped commit before rollout.
+The original isolated candidate was built from HEAD
+`ca2f1a97d4a6e1b2538bb9587692703403acfc81` plus only the eight invoice runtime/test
+files. All eight matched the scoped application commit; deployment source was
+then rebuilt from that commit in
+`FrontEnd/.admin-audit.local/invoice-release/src/`. This local ignored folder is
+not an off-machine backup. Source, tests and documentation are pushed to GitHub;
+the release record identifies protected API/database/website rollback backups.
 
 A synthetic PDF with the reported quantities/amounts (no real customer details)
 is saved at `output/pdf/invoice-layout-preview.pdf` for visual review. It is a
