@@ -5,11 +5,14 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Local backend hotfix (27 October 2026, not deployed):** removed the GPS-only
+**Latest backend hotfix (27 October 2026, deployed/verified `73c6f99`):** removed the GPS-only
 store duplicate rejection that blocks separate shops with equal captured
 coordinates. Existing phone, GPS validity and assigned-coverage checks remain.
 The screenshot error was reproduced before the fix; all 43 backend tests pass.
-Read [GPS fix notes](BackEnd/docs/STORE_GPS_REGISTRATION_FIX.md) before rollout.
+All 138 deployed backend file hashes match the release; authenticated read-only
+checks and API/database health pass. No app/website deployment or data migration
+was needed. Read [GPS fix notes](BackEnd/docs/STORE_GPS_REGISTRATION_FIX.md) and
+[release evidence](deploy/releases/2026-10-27-store-gps-hotfix.md) for recovery.
 
 **Latest verified website release:** `9d4754e` (26 October 2026), Admin store-photo
 preview. See [release evidence](deploy/releases/2026-10-26-store-photo-preview.md).
@@ -329,7 +332,7 @@ counter. Other counters do not have the same repair behavior.
   means default, not free. Read `/agent/store/locations` before replacing coverage.
 - Store creation requires image, GPS and RETAILER/WHOLESALER/DISTRIBUTOR/HORECA.
   Coordinates must be valid and within the configured India bounding box. The
-  local 27 October GPS hotfix permits separate stores at equal coordinates.
+  deployed 27 October GPS hotfix permits separate stores at equal coordinates.
   Phone duplicates are checked in the controller but
   the schema phone index is not unique. State+pincode must be assigned to this
   agent. It creates a random unique six-digit handover code and credits store
@@ -689,7 +692,7 @@ concurrency audit. Reproduce and choose scope before implementation.
 7. **Registration edges:** The Agent email unique index is still case-sensitive;
    current application lookup uses case-insensitive collation and new emails
    are normalized. Existing phone uniqueness remains enforced.
-   Store phone duplicates are checked without a unique DB index. The local
+   Store phone duplicates are checked without a unique DB index. The deployed
    27 October hotfix removes the incorrect GPS-only uniqueness check.
    Store upload ID is assigned only after early validations, so an early refusal
    can leave an upload orphaned. Verify multipart cleanup if editing forms.

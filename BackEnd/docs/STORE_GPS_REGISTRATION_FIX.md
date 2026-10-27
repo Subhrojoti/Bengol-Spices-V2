@@ -1,6 +1,8 @@
 # Store registration GPS collision fix — 27 October 2026
 
-Status: implemented and tested locally; not pushed or deployed.
+Status: **pushed, deployed and verified**, application commit `73c6f99`.
+See [release evidence](../../deploy/releases/2026-10-27-store-gps-hotfix.md) for
+backups, scope, source hashes, authenticated read-only smoke checks and rollback.
 
 ## Cause and evidence
 
@@ -43,7 +45,9 @@ refusals; and failed-upload cleanup. The first new acceptance test was observed
 failing with the exact production message before the controller change.
 
 The backend was not started locally and no live store/order/payment data was
-created, edited or deleted. Production checks so far were read-only.
+created, edited or deleted by verification. Initial production diagnostics were
+read-only; post-deployment authentication checks created/revoked only their own
+Admin sign-in session. The owner approved push/deploy after the 43 tests passed.
 
 For release, use an isolated commit/archive excluding unrelated mobile and
 Product Sales work. Back up the API/database, retain existing production settings,
