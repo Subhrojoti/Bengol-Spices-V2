@@ -206,22 +206,9 @@ export const createStore = async (req, res) => {
       throw new Error("Store already registered with this phone");
     }
 
-    // 🔥 FIX: two different stores should never share the exact same
-    // coordinate. A genuine GPS reading has enough natural precision/jitter
-    // that two real on-site visits will not match to this many decimal
-    // places — an exact match almost always means a stale, cached, or
-    // reused location was submitted instead of a fresh reading taken at
-    // this store.
-    const duplicateLocation = await Store.findOne({
-      "location.latitude": lat,
-      "location.longitude": lng,
-    });
-
-    if (duplicateLocation) {
-      throw new Error(
-        "This exact location is already registered to another store. Please make sure you are physically at this store before registering it.",
-      );
-    }
+    // GPS describes a position, not a unique shop. Separate stores can share
+    // the same reported coordinates, including stores in one building/market.
+    // Keep the phone duplicate check above and save the captured GPS unchanged.
 
     // ✅ CHECK AGENT LOCATION PERMISSION
     const agentId = req.user.agentId;

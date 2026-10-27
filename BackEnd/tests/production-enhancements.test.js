@@ -286,6 +286,61 @@ test("store creation accepts assigned pins with West Bangal/spacing variants and
   } finally { storage.restore(); }
 });
 
+test("distinct stores can share captured GPS with active or archived stores belonging to another agent", async () => {
+  const storage = storageFixture();
+  try {
+    const a = await person("A"), b = await person("B");
+    await AgentSalesLocation.create({ agentId: "B", state: "WEST BENGAL", pincodes: ["743503"], assignedByModel: "Admin" });
+    let index = 0;
+    for (const status of ["ACTIVE", "INACTIVE"]) {
+      const location = { latitude: 22.5 + index / 100, longitude: 88.3 };
+      await shop(`EXISTING-${status}`, a, { status, location });
+      const c = capture();
+      await createStore({ user: { agentId: b.agentId }, body: {
+        storeName: `Separate shop ${status}`, ownerName: "Different owner", phone: String(9000000000 + index),
+        state: "WEST BENGAL", city: "Kolkata", street: "Different shop in the same market", pincode: "743503",
+        ...location, storeType: "RETAILER",
+      }, file: { path: "https://example.invalid/shared-gps.png", filename: `synthetic-shared-${index}` } }, c.res);
+      assert.equal(c.result.code, 201, c.result.data.message);
+      const saved = await Store.findOne({ consumerId: c.result.data.consumerId }).lean();
+      assert.deepEqual(saved.location, location);
+      assert.equal(saved.registeredBy, "B");
+      assert.equal(saved.currentAgentId, "B");
+      index++;
+    }
+    assert.equal(await Store.countDocuments(), 4);
+    assert.equal(storage.calls.length, 0);
+  } finally { storage.restore(); }
+});
+
+test("shared GPS still enforces duplicate phones, valid coordinates and assigned pincodes without consuming IDs", async () => {
+  const storage = storageFixture();
+  try {
+    const a = await person("A"), b = await person("B");
+    await shop("EXISTING", a, { phone: "9000000000" });
+    await AgentSalesLocation.create({ agentId: "B", state: "WEST BENGAL", pincodes: ["743503"], assignedByModel: "Admin" });
+    const cases = [
+      [{ phone: " 9000000000 " }, /already registered with this phone/],
+      [{ latitude: 0, longitude: 0 }, /valid store location/],
+      [{ latitude: "not-a-coordinate" }, /valid store location/],
+      [{ latitude: 53 }, /outside India/],
+      [{ pincode: "743377" }, /Pincode 743377 is not assigned/],
+    ];
+    for (const [overrides, message] of cases) {
+      const c = capture();
+      await createStore({ user: { agentId: b.agentId }, body: {
+        storeName: "New shop", ownerName: "Owner", phone: "9000000001", state: "WEST BENGAL", city: "Kolkata",
+        street: "Test", pincode: "743503", latitude: 22.5, longitude: 88.3, storeType: "RETAILER", ...overrides,
+      }, file: { path: "https://example.invalid/refused.png", filename: "synthetic-refused" } }, c.res);
+      assert.equal(c.result.code, 400);
+      assert.match(c.result.data.message, message);
+    }
+    assert.equal(await Store.countDocuments(), 1);
+    assert.equal(await Counter.countDocuments(), 0);
+    assert.equal(storage.calls.length, cases.length);
+  } finally { storage.restore(); }
+});
+
 test("store coverage still rejects unassigned pins, different states and other agents; no IDs or stores consumed", async () => {
   const storage = storageFixture();
   try {

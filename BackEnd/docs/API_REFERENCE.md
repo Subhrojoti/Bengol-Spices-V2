@@ -1,6 +1,6 @@
 # Backend API reference
 
-Source snapshot: 26 October 2026, including the local Admin session follow-up. Full paths include server.js mounts.
+Source snapshot: 27 October 2026, including the local store GPS collision fix. Full paths include server.js mounts.
 Generated offline by `node BackEnd/scripts/review-source.mjs`; no API or production state is inferred.
 See [PRODUCTION_ENHANCEMENTS.md](PRODUCTION_ENHANCEMENTS.md) for request bodies, behavior and deployment requirements.
 

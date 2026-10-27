@@ -1,6 +1,6 @@
 # Backend source map and review snapshot
 
-Updated 26 October 2026 including the local Admin session follow-up. Original baseline HEAD: `59354fc6f86731fd74f9099e4d6036690b8b2a2e`.
+Updated 27 October 2026 including the local store GPS collision fix. Original baseline HEAD: `59354fc6f86731fd74f9099e4d6036690b8b2a2e`.
 See [backend context](../../BACKEND_CONTEXT.md) and [implementation report](PRODUCTION_ENHANCEMENTS.md).
 
 ## Offline validation
@@ -200,9 +200,9 @@ Local imports: [services/salesTarget.service.js](../services/salesTarget.service
 
 ### controllers/store.controller.js
 
-[controllers/store.controller.js](../controllers/store.controller.js), 384 lines. SHA-256: `11138bc5116a56c8f45c72d1b367c3f888beb96eef7d2bf2e418ec41bba97f3a`.
+[controllers/store.controller.js](../controllers/store.controller.js), 371 lines. SHA-256: `20c0726c49afdb0cf5d4279ca2e610341e1de3b37aa3b922a0479091f5540b89`.
 
-Exports: [getStoreCatalog](../controllers/store.controller.js#L32), [createStore](../controllers/store.controller.js#L97), [getMyStores](../controllers/store.controller.js#L323), [getAllStores](../controllers/store.controller.js#L361).
+Exports: [getStoreCatalog](../controllers/store.controller.js#L32), [createStore](../controllers/store.controller.js#L97), [getMyStores](../controllers/store.controller.js#L310), [getAllStores](../controllers/store.controller.js#L348).
 
 Local imports: [models/store.js](../models/store.js), [config/cloudinary.js](../config/cloudinary.js), [models/AgentTargetProgress.js](../models/AgentTargetProgress.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [models/Counter.js](../models/Counter.js), [models/Product.js](../models/Product.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/target.service.js](../services/target.service.js), [utils/publicError.js](../utils/publicError.js), [utils/salesLocation.js](../utils/salesLocation.js), [utils/pricing.js](../utils/pricing.js).
 
@@ -664,7 +664,7 @@ Package/built-in imports: `node:fs`, `node:path`, `node:zlib`, `node:readline`, 
 
 ### scripts/review-source.mjs
 
-[scripts/review-source.mjs](../scripts/review-source.mjs), 84 lines. SHA-256: `7dcff7d8fb01c9daed2513e99287a6b3021d0cd0a8de215e89a5ad90305ee45e`.
+[scripts/review-source.mjs](../scripts/review-source.mjs), 84 lines. SHA-256: `6f4cd86eccc47661e936bbcd7ad73e762aad753066c34c5b3caab962a90ce07f`.
 
 Exports: none.
 
@@ -874,7 +874,7 @@ Package/built-in imports: `node:test`, `node:assert/strict`, `node:fs/promises`,
 
 ### tests/production-enhancements.test.js
 
-[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 548 lines. SHA-256: `6c3a8f8fdcfd336619517bd884105686b09609d6f65cf1abecf581ea6167744b`.
+[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 603 lines. SHA-256: `3518c0e840acb648bbb3cd341b3a72dbf1c631d88864402d65ef2687f6ca9f4c`.
 
 Exports: none.
 
