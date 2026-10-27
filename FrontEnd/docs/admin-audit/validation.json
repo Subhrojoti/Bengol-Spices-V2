@@ -443,7 +443,7 @@
   },
   "storeOnlyTestCleanup": {
     "date": "2026-10-27",
-    "status": "local only; not committed, pushed or deployed",
+    "status": "pushed, deployed and verified",
     "baseCommit": "59939e9983cf587e289a02ed2b5f29f887d4c31b",
     "scope": "Admin store-only cancelled test-history cleanup; backend transaction and operation coordination",
     "backendTests": {
@@ -473,6 +473,30 @@
     "businessMutations": false,
     "unrelatedProductSalesAndMobileEditsExcluded": true,
     "unrelatedWorkingFilesAndStagingPreserved": true,
-    "record": "../../../BackEnd/docs/STORE_TEST_CLEANUP.md"
+    "record": "../../../BackEnd/docs/STORE_TEST_CLEANUP.md",
+    "release": {
+      "date": "2026-10-27",
+      "timezone": "Asia/Calcutta",
+      "applicationCommit": "215430d422d71b438f52b978cecbf8851f63d7d7",
+      "pushed": true,
+      "deployed": true,
+      "backendFilesVerified": 142,
+      "websiteFilesVerified": 205,
+      "normalAdminLivePreview": true,
+      "desktopAndPhoneReviewed": true,
+      "unauthenticatedReadAndDeleteRefused": true,
+      "businessMutationRequests": 0,
+      "liveInvoiceDownload": true,
+      "reportedStoreAlreadyAbsentBeforeDeployment": true,
+      "priorDeletionFileJobs": {
+        "DELETED": 4
+      },
+      "priorReceiptAndRecordCountsUnchanged": true,
+      "productionSettingsUnchanged": true,
+      "unrelatedFilesAndStagingPreserved": true,
+      "hrProcessUnchanged": true,
+      "testAdminSessionRevoked": true,
+      "record": "../../../deploy/releases/2026-10-27-store-test-cleanup.md"
+    }
   }
 }

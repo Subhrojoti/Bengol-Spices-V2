@@ -1,7 +1,9 @@
 # Individual test-store cleanup - 27 October 2026
 
-Status: implemented and tested locally. Not committed, pushed or deployed.
-No production record or uploaded file has been deleted for this change.
+Status: pushed, deployed and verified on 27 October 2026 (Asia/Calcutta).
+Application commit: `215430d422d71b438f52b978cecbf8851f63d7d7`.
+Deployment verification did not delete production records or uploaded files.
+See [release evidence](../../deploy/releases/2026-10-27-store-test-cleanup.md).
 
 ## Why this was added
 
@@ -51,8 +53,13 @@ without blocking it. Payment months with a closed/rewarded sales period also
 require review. Agent-wide progress is never silently deleted or guessed at.
 
 The screenshot's counts alone do not establish eligibility under all these
-checks. The actual store's new preview must be reviewed after deployment. No
-live eligibility or deletion claim was established by isolated test results.
+checks. Live verification found `CS2026-0051` already absent before rollout, with
+a completed deletion receipt dated 27 October at 09:06:57 UTC (14:36:57 IST) and
+four file jobs marked DELETED. The stored receipt lists one store, order, payment
+and invoice removed. The record checksums/counts and receipt count stayed
+unchanged during this deployment. No cause/actor of that prior cleanup is inferred.
+The deployed missing-store preview correctly returns 404. Live UI verification
+used another existing store and showed its active-order blocker without deleting.
 
 ## API and execution
 
@@ -101,9 +108,20 @@ activity on the selected test store before confirming, as the UI requires.
   access. Intentional injected storage/audit errors demonstrate rollback/retry.
 - Isolated build: `FrontEnd/.admin-audit.local/store-cleanup-release/src/`, based
   on `59939e9983cf587e289a02ed2b5f29f887d4c31b` plus only the ten affected runtime/
-  test files. Unrelated Product Sales/mobile edits are excluded and preserved.
+  test files. All ten matched the scoped release; deployment was rebuilt from
+  the application commit. Unrelated Product Sales/mobile edits are excluded and
+  preserved. All 142 backend and 205 website files match the deployed build.
+- Normal production Admin sign-in, the store-only review, initially empty typed
+  confirmations, disabled delete control, visible blocker, desktop/phone layout
+  and unauthenticated GET/POST refusals passed. No authenticated purge was sent.
+  The test session was revoked through normal logout; replay returned 401. The
+  initial probe could not find the desktop logout button after switching to the
+  phone viewport; using the existing logout API completed cleanup and verification.
+- API/database health, catalogue, HTTPS/HTTP2, Admin/Employee pages, expected
+  redirects/404 and the existing Orders Invoice button download pass. Private
+  settings are unchanged. Only bengol-api reloaded; the HR API stayed running.
 
-Deploy backend and Admin website together before use. Existing replica-set
+Backend and Admin website were deployed together. Existing replica-set
 transaction, audit/outbox collections/indexes and storage-delete permissions
 remain required; no new dependency, environment value or schema migration.
 Back up API, website and database through the established deployment flow.

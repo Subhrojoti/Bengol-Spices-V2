@@ -1,6 +1,6 @@
 # Permanent test-agent cleanup and invoice logo follow-up
 
-**27 October follow-up, local and not deployed:** individual stores now have a
+**27 October follow-up, deployed/verified `215430d`:** individual stores now have a
 separate cancelled-test-history cleanup preview/action that preserves the agent
 and other stores. See [STORE_TEST_CLEANUP.md](STORE_TEST_CLEANUP.md) for current
 scope, guards, test results and rollout requirements. The individual-store

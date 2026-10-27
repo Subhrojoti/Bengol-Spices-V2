@@ -16,6 +16,13 @@ See [Building the mobile apps](#building-the-mobile-apps).
 
 ## Deploying
 
+Latest store-cleanup release: **27 October 2026**, application `215430d`, backend
+and Admin website deployed and verified. Use the separate test-store review under
+Agents > Manage agents & stores > Stores > Delete / archive. See
+[release evidence](releases/2026-10-27-store-test-cleanup.md) for backups, live
+checks and the reported store's pre-existing deletion state. No nginx/mobile
+deployment or data migration was required.
+
 Latest invoice repair: **27 October 2026**, application `5cf4f64`, backend and
 website deployed and verified. The live Orders Invoice button downloads a PDF
 directly from the API. See [release evidence](releases/2026-10-27-invoice-download.md)
