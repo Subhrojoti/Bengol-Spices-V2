@@ -498,5 +498,74 @@
       "testAdminSessionRevoked": true,
       "record": "../../../deploy/releases/2026-10-27-store-test-cleanup.md"
     }
+  },
+  "adminOrdersWorkspace": {
+    "date": "2026-10-29",
+    "status": "local only; not committed, pushed or deployed",
+    "baseCommit": "9143f4b436b02c494c26e21a15b479259f27fc5b",
+    "scope": "Admin All orders workspace and four additive Admin-only read routes; legacy Employee/agent/delivery contracts retained",
+    "backendTests": {
+      "passed": 61,
+      "failed": 0
+    },
+    "frontendUnitTests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "fullChromeSuite": {
+      "passed": 92,
+      "failed": 0
+    },
+    "finalLayoutCases": {
+      "passed": 4,
+      "failed": 0,
+      "newDarkThemeCase": 1,
+      "recheckedViewports": [
+        390,
+        768,
+        1440
+      ]
+    },
+    "distinctBrowserCasesCovered": 93,
+    "adminLint": "passed",
+    "productionBuildAndPrerender": "passed; help-question fetch used existing browser fallback after timeout",
+    "visualReview": "Light desktop, dark desktop with expanded navigation, and phone",
+    "fixtureMeasurement": {
+      "orders": 1000,
+      "legacyBytes": 905661,
+      "pageBytes": 7288,
+      "legacyMilliseconds": 47.6307,
+      "pageMilliseconds": 11.2241,
+      "note": "One isolated sample; not production timings or a p50"
+    },
+    "businessMutations": false,
+    "unrelatedWorkingFilesAndStagingPreserved": true,
+    "record": "../../../BackEnd/docs/ADMIN_ORDERS_WORKSPACE.md",
+    "actionButtonColors": {
+      "date": "2026-10-29",
+      "scope": "Only invoice/confirm/cancel styles; layout and handlers unchanged",
+      "colors": {
+        "invoice": "blue",
+        "confirm": "green",
+        "cancel": "red"
+      },
+      "lightAndDarkVerified": true,
+      "whiteTextContrast": [
+        5.17,
+        5.48,
+        4.7
+      ],
+      "existingActionBrowserCase": "passed",
+      "adminLint": "passed",
+      "spaBuild": "passed",
+      "deployed": false
+    }
+  },
+  "agentStatusAlignment": {
+    "date": "2026-10-29",
+    "scope": "Frontend styling only; access rules and status values unchanged",
+    "lightAndDarkAlignment": "passed: equal heights of 26.75px and equal vertical centers",
+    "adminLint": "passed",
+    "deployed": false
   }
 }

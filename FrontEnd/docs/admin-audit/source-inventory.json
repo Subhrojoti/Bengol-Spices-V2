@@ -1,7 +1,7 @@
 {
   "note": "Static import reachability/signals, not proof of runtime coverage. Review includes shared frontend dependencies; changes are restricted to Admin behavior.",
-  "parsedFrontendModules": 155,
-  "reachableModules": 96,
+  "parsedFrontendModules": 158,
+  "reachableModules": 99,
   "modules": [
     {
       "file": "src/App.jsx",
@@ -49,8 +49,8 @@
     },
     {
       "file": "src/api/services.js",
-      "sha256": "830fdf6ea02b9a616cceed98ed81899d7a3c29a76543f622fb3adfa88dc9606d",
-      "lines": 1040,
+      "sha256": "bef21e8b249d7b54fbe0571c8b0353ac79651b9d56312fb7e25b43b0e3543b30",
+      "lines": 1045,
       "imports": [
         "axios",
         "./axiosInstance",
@@ -381,7 +381,7 @@
     },
     {
       "file": "src/config/adminRoutes.js",
-      "sha256": "a209e67edff233bd57bc300ffc0f4f3cf77515f6d00683c2af64ad0741412e9e",
+      "sha256": "a04c70075337129614fb6b4e744e292a3c050a053c735b52c598a95d2d8a582b",
       "lines": 133,
       "imports": [
         "react",
@@ -780,8 +780,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Agent/tabs/AgentManagement.jsx",
-      "sha256": "962031b19aac5baa370e632e91b7bbdffc526ba070c804c68130859ad466eed1",
-      "lines": 629,
+      "sha256": "3976c422a8132b2033af6e602c46f229c9d4a386d062fddf9e7e280d82ecd877",
+      "lines": 631,
       "imports": [
         "../../../../../utils/reportAdminError",
         "../../../../../utils/safeExternalUrl",
@@ -1173,9 +1173,63 @@
       }
     },
     {
+      "file": "src/pages/Admin/Tabs/Orders/AdminOrdersWorkspace.jsx",
+      "sha256": "46d4a2daed61b87edc99e048fbae2777504fb3e292da41edd845acb19250e3fd",
+      "lines": 130,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "@mui/material",
+        "lucide-react",
+        "sonner",
+        "./OrderManagement",
+        "./OrderFilterLookup",
+        "../../../../components/common/StatusPill",
+        "../../../../components/common/Pagination",
+        "../../../../components/common/ConfirmDialog",
+        "../../../../components/common/StorePhoto",
+        "../Delivery/DeliveryTrail",
+        "../../../../hooks/useLatestRequest",
+        "../../../../api/services",
+        "../../../../utils/orderWorkspace",
+        "../../../../utils/uom"
+      ],
+      "signals": {
+        "useEffect": 6,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Orders/OrderFilterLookup.jsx",
+      "sha256": "69f8c4d6eb81b2437a9efba94e3073e271c6ebff166f51881f87f2f3b1ebe96d",
+      "lines": 41,
+      "imports": [
+        "react",
+        "lucide-react",
+        "../../../../hooks/useLatestRequest",
+        "../../../../api/services"
+      ],
+      "signals": {
+        "useEffect": 3,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
       "file": "src/pages/Admin/Tabs/Orders/OrderManagement.jsx",
-      "sha256": "a1ff070a4adce96d291d16ebd53517cc1eaa1904257501cee3bf1ba41a916f19",
-      "lines": 1007,
+      "sha256": "0b5cd4dd815aec3eefde9bbb797202814a98860233e2452226b2f5f254db97fd",
+      "lines": 1005,
       "imports": [
         "../../../../utils/reportAdminError",
         "../../../../hooks/useLatestRequest",
@@ -1192,7 +1246,8 @@
         "../../../../api/services",
         "../../../../utils/csv",
         "../../../../utils/uom",
-        "../Delivery/DeliveryTrail"
+        "../Delivery/DeliveryTrail",
+        "../../../../utils/orderWorkspace"
       ],
       "signals": {
         "useEffect": 5,
@@ -2017,6 +2072,22 @@
         "setInterval": 0,
         "addEventListener": 0,
         "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/utils/orderWorkspace.js",
+      "sha256": "aa433b78f6222cfd0f27cd5e28c5d6de7ef3e5eea09e4d468aa54eeba462ab4c",
+      "lines": 22,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 1,
         "dangerouslySetInnerHTML": 0,
         "localStorage": 0
       }

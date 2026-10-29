@@ -33,17 +33,15 @@ import {
 import { downloadCsv, fileDate, sheetDate } from "../../../../utils/csv";
 import { quantityWithUnit } from "../../../../utils/uom";
 import DeliveryTrail from "../Delivery/DeliveryTrail";
+import { canConfirm, canCancel, openDue } from "../../../../utils/orderWorkspace";
 
 /* Mirrors the server's guards so the UI offers only what will succeed.
    Cancelling used to be offered on PLACED orders alone, although the API
    accepts anything that is not already delivered or cancelled. */
-const canConfirm = (o) => o?.status === "PLACED";
-const canCancel = (o) => !["DELIVERED", "CANCELLED"].includes(o?.status);
 
 /* What is still to be collected on an order. A cancelled order keeps the due
    it had when it was cancelled, but nobody will collect it; counting it made
    store dues and the outstanding total too high. */
-const openDue = (o) => (o?.status === "CANCELLED" ? 0 : Number(o?.dueAmount || 0));
 
 const n = (v) => Number(v || 0);
 const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
@@ -178,7 +176,7 @@ const Empty = ({ icon, title, hint }) => (
 
 /* ------------------------------------------------------------------ */
 
-const CancelDialog = ({ order, open, busy, onClose, onConfirm }) => {
+export const CancelDialog = ({ order, open, busy, onClose, onConfirm }) => {
   const [reason, setReason] = useState("");
   const [reasonFor, setReasonFor] = useState(order?.orderId);
   if (reasonFor !== order?.orderId) {

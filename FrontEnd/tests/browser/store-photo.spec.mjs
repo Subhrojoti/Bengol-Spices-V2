@@ -12,6 +12,7 @@ for (const section of ["order-management", "return-management", "payment-summary
   test(`${section}: store photo opens its original image without selecting the card`, async ({ context, page }) => {
     const network = await fixtures(context);
     await page.goto(`/admin/${section}`);
+    if (section === "order-management") await page.getByRole("button", { name: "By store", exact: true }).click();
     const trigger = page.getByRole("button", { name: "View store photo for Test Store 1", exact: true });
     await trigger.click();
     const dialog = page.getByRole("dialog", { name: "Store photo", exact: true });
@@ -32,6 +33,7 @@ test("store photo preview fits a phone and closes with its Close button", async 
   await page.setViewportSize({ width: 390, height: 844 });
   await fixtures(context);
   await page.goto("/admin/order-management");
+  await page.getByRole("button", { name: "By store", exact: true }).click();
   const trigger = page.getByRole("button", { name: "View store photo for Test Store 1", exact: true });
   await trigger.focus(); await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Store photo", exact: true });
@@ -49,6 +51,7 @@ test("store photo preview fits a phone and closes with its Close button", async 
 test("missing store photos keep the existing noninteractive fallback", async ({ context, page }) => {
   await fixtures(context, "");
   await page.goto("/admin/order-management");
+  await page.getByRole("button", { name: "By store", exact: true }).click();
   await expect(page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /View store photo/ })).toHaveCount(0);
 });
@@ -57,6 +60,7 @@ test("a failed original photo has a dismissible error and can be retried", async
   await fixtures(context);
   await context.route(photo, (route) => route.abort());
   await page.goto("/admin/order-management");
+  await page.getByRole("button", { name: "By store", exact: true }).click();
   const trigger = page.getByRole("button", { name: "View store photo for Test Store 1", exact: true });
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Store photo", exact: true });

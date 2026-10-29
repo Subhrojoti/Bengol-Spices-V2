@@ -327,6 +327,11 @@ export const getAllAgentOrders = async (options) => {
   return response.data;
 };
 
+export const getOrderWorkspace = async (params, options) => (await get("/admin/order-workspace", { ...options, params })).data;
+export const getOrderWorkspaceDetail = async (orderId, options) => (await get(`/admin/order-workspace/${encodeURIComponent(orderId)}`, options)).data;
+export const getOrderWorkspaceOptions = async (params, options) => (await get("/admin/order-workspace/options", { ...options, params })).data;
+export const exportOrderWorkspace = async (params, options) => axiosInstance.get("/admin/order-workspace/export", { ...options, params, responseType: "blob", timeout: 120000 });
+
 // CONFIRM ORDER
 export const confirmOrder = async (orderId) => {
   const response = await axiosInstance.put(`/agent/orders/${orderId}/confirm`);

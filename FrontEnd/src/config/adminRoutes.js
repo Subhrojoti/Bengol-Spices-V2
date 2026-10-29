@@ -20,7 +20,7 @@ const EmpCreation = lazy(() => import("../pages/Admin/Tabs/EmpCreation/EmpCreati
 const ProductCreation = lazy(() => import("../pages/Admin/Tabs/ProductCreation/ProductCreation"));
 const AllProducts = lazy(() => import("../pages/Admin/Tabs/AllProducts/AllProducts"));
 const Delivery = lazy(() => import("../pages/Admin/Tabs/Delivery/Delivery"));
-const OrderManagement = lazy(() => import("../pages/Admin/Tabs/Orders/OrderManagement"));
+const OrderManagement = lazy(() => import("../pages/Admin/Tabs/Orders/AdminOrdersWorkspace"));
 const ReturnManagement = lazy(() => import("../pages/Admin/Tabs/Returns/ReturnManagement"));
 const PaymentInfo = lazy(() => import("../pages/Admin/Tabs/PaymentInfo/PaymentInfo"));
 const Targets = lazy(() => import("../pages/Admin/Tabs/Targets/Targets"));

@@ -12,6 +12,7 @@ test("order confirmation, invoice download, cancellation validation and CSV pres
     [`/api/invoice/download/${order.orderId}`]: (route) => route.fulfill({ contentType: "application/pdf", body: "%PDF-1.4\nsynthetic" }),
   } });
   await page.goto("/admin/order-management");
+  await page.getByRole("button", { name: "By store", exact: true }).click();
   await page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true }).click();
   const card = page.locator(`#order-${order._id}`);
   await card.getByRole("button", { name: new RegExp(order.orderId) }).click();
@@ -238,6 +239,7 @@ for (const width of [390, 768, 1440]) test(`orders search and pagination remain 
   const network = await installFixtures(context);
   await page.setViewportSize({ width, height: 1000 });
   await page.goto("/admin/order-management");
+  await page.getByRole("button", { name: "By store", exact: true }).click();
   const search = page.getByLabel("Search stores, agents or orders");
   await search.fill("Test Store 950");
   await expect(page.getByText("Test Store 950", { exact: true })).toBeVisible();

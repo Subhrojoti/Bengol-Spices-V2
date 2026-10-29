@@ -395,9 +395,11 @@ export default function AgentManagement() {
                           {agent.phone || "—"}
                         </td>
 
-                        <td className="px-5 py-3.5">
-                          <StatusPill status={agent.status} />
-                          {agent.accessStatus && agent.accessStatus !== "ACTIVE" && <p className="mt-1 text-xs font-semibold text-rose-600">{agent.accessStatus}</p>}
+                        <td className="px-5 py-3.5 align-middle">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusPill status={agent.status} />
+                            {agent.accessStatus && agent.accessStatus !== "ACTIVE" && <span title={`Account access: ${agent.accessStatus}`} className="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-[12.5px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/20">{{ BLOCKED: "Blocked", DEACTIVATED: "Deactivated", DELETED: "Deleted" }[agent.accessStatus] || agent.accessStatus}</span>}
+                          </div>
                           {(agent.applicationVersion || 1) > 1 && <p className="mt-1 text-xs text-slate-500">Application #{agent.applicationVersion}</p>}
                         </td>
 

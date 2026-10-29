@@ -32,12 +32,17 @@ import {
 import { protect } from "../middleware/auth.js";
 import { isAdmin } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
+import { getWorkspaceOrders, getWorkspaceOrder, getWorkspaceOptions, exportWorkspace } from "../controllers/orderWorkspace.controller.js";
 
 const router = express.Router();
 import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview, executeRemoval, getManagedStores, getManagementAudit, getAgentPurgePreview, executeAgentPurge, getStorePurgePreview, executeStorePurge, getCleanupStatus, retryCleanup } from "../controllers/adminManagement.controller.js";
 
 // 🔒 All routes require login
 router.use(protect);
+router.get("/order-workspace", isAdmin, getWorkspaceOrders);
+router.get("/order-workspace/options", isAdmin, getWorkspaceOptions);
+router.get("/order-workspace/export", isAdmin, exportWorkspace);
+router.get("/order-workspace/:orderId", isAdmin, getWorkspaceOrder);
 router.get("/store-management", isAdmin, getManagedStores);
 router.post("/store-transfers/preview", isAdmin, getTransferPreview);
 router.post("/store-transfers", isAdmin, executeTransfer);

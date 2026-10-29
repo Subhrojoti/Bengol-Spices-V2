@@ -1,3 +1,4 @@
+import { workspaceFixture } from "./order-workspace-fixtures.mjs";
 // Synthetic DTOs only. Browser tests intercept every external request so no
 // production API, account, payment or customer record can be touched.
 export const tokenFor = (role = "ADMIN", extra = {}) => [
@@ -121,6 +122,10 @@ export async function installFixtures(context, { authenticated = true, delay = 4
     if (url.pathname === "/api/events/stream") return route.fulfill({ contentType: "text/event-stream", body: "event: ready\ndata: {}\n\n" });
     const override = overrides[url.pathname] || overrides[url.pathname.replace(/\/$/, "")];
     if (override) return override(route, entry);
+    if (url.pathname.startsWith("/admin/order-workspace")) {
+      const data = workspaceFixture(url, orders, stores, agents);
+      return typeof data === "string" ? route.fulfill({ contentType: "text/csv", body: data }) : route.fulfill({ json: data });
+    }
     const body = fixtureResponse(url.pathname, request.method());
     if (body === undefined) { unknown.push(entry); return route.fulfill({ status: 404, json: { success: false, message: "Missing synthetic fixture" } }); }
     await new Promise((resolve) => setTimeout(resolve, delay));

@@ -59,6 +59,64 @@ const rawOrder = async (code, store, agent, extra = {}) => {
   await Order.collection.insertOne(result); return result;
 };
 
+test("Admin order workspace filters globally, pages stably, counts other statuses and retains full legacy responses", async () => {
+  const a = await person("A"), s = await shop("S", a), statuses = ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
+  for (let i = 0; i < 70; i++) await rawOrder(`PAGE-${String(i).padStart(3, "0")}`, s, a, { status: statuses[i % 7], createdAt: new Date("2026-10-28T18:30:00Z") });
+  await rawOrder("EARLY", s, a, { status: "DELIVERED", createdAt: new Date("2026-10-28T18:29:59.999Z") });
+  const first = await call("/admin/order-workspace?from=2026-10-29&to=2026-10-29", admin());
+  assert.equal(first.status, 200); assert.equal(first.data.total, 70); assert.equal(first.data.orders.length, 25); assert.equal(first.data.counts.ALL, 70); assert.equal(first.data.counts.IN_TRANSIT, 30); assert(first.data.orders.every(o => !Object.hasOwn(o, "products")));
+  const second = await call("/admin/order-workspace?from=2026-10-29&to=2026-10-29&page=2", admin());
+  assert.equal(second.data.orders.length, 25); assert(!second.data.orders.some(o => first.data.orders.some(p => p.orderId === o.orderId)));
+  assert.deepEqual((await call("/admin/order-workspace?from=2026-10-29&to=2026-10-29", admin())).data.orders, first.data.orders);
+  const delivered = await call("/admin/order-workspace?status=DELIVERED&from=2026-10-29&to=2026-10-29&page=999&pageSize=10", admin());
+  assert.equal(delivered.data.total, 10); assert.equal(delivered.data.page, 1); assert.equal(delivered.data.counts.ALL, 70); assert(delivered.data.orders.every(o => o.status === "DELIVERED"));
+  const transit = await call("/admin/order-workspace?status=IN_TRANSIT&consumerId=S&agentId=A", admin()); assert.equal(transit.data.total, 30);
+  const old = await call("/agent/orders/all", admin()); assert.equal(old.data.orders.length, 71); assert(old.data.orders[0].products);
+});
+
+test("workspace search and lookups resolve current names, literal punctuation and stored legacy addresses", async () => {
+  const a = await person("A", { name: "Agent New Name" }), b = await person("B"), s = await shop("S", a, { storeName: "Shop [one] renamed", phone: "9998877665" }), other = await shop("OTHER", b);
+  await rawOrder("FIND", s, a); await rawOrder("OTHER", other, b);
+  for (const q of ["Agent New Name", "[one]", "FIND", s.phone]) { const response = await call(`/admin/order-workspace?q=${encodeURIComponent(q)}`, admin()); assert.equal(response.data.total, 1, q); assert.equal(response.data.orders[0].orderId, "FIND"); }
+  const options = await call("/admin/order-workspace/options?type=store&q=%5Bone%5D", admin()); assert.equal(options.data.options.length, 1); assert.equal(options.data.options[0].value, "S");
+  await Invoice.create({ orderId: "FIND", invoiceNumber: "WORKSPACE-1" });
+  const detail = await call("/admin/order-workspace/FIND", admin()); assert.equal(detail.data.order.invoiceNumber, "WORKSPACE-1"); assert.equal(detail.data.order.agentName, "Agent New Name"); assert.equal(detail.data.order.storeName, "Shop [one] renamed"); assert(detail.data.order.products); assert(!Object.hasOwn(detail.data.order, "documents"));
+  await Store.deleteOne({ consumerId: "S" }); const legacy = await call("/admin/order-workspace?q=FIND", admin()); assert.equal(legacy.data.orders[0].storeName, s.storeName);
+});
+
+test("workspace rejects non-Admin reads and invalid filters, including export requests", async () => {
+  const a = await person("A"); const staff = await Employee.create({ employeeId: "WORK-E", name: "Employee", email: "work@test.invalid", phone: "work-staff", password: "hash", status: "ACTIVE", permissions: { canGetAllOrders: true } });
+  const employee = jwt.sign({ role: "EMPLOYEE", id: String(staff._id), employeeId: staff.employeeId }, process.env.JWT_SECRET);
+  for (const path of ["/admin/order-workspace", "/admin/order-workspace/options?type=agent", "/admin/order-workspace/export", "/admin/order-workspace/MISSING"]) {
+    assert.equal((await call(path, token(a))).status, 403); assert.equal((await call(path, employee)).status, 403); assert.equal((await call(path, "")).status, 401);
+  }
+  for (const query of ["status=UNKNOWN", "page=-1", "page=1.5", "pageSize=1000", "from=2026-02-30", "from=2026-10-30&to=2026-10-01", "q=A&q=B", `q=${"a".repeat(101)}`]) assert.equal((await call(`/admin/order-workspace?${query}`, admin())).status, 400, query);
+  assert.equal((await call("/admin/order-workspace/options?type=wrong", admin())).status, 400);
+  const invalid = await fetch(origin + "/admin/order-workspace/export?status=UNKNOWN", { headers: { Authorization: `Bearer ${admin()}` } }); assert.equal(invalid.status, 400); assert.match(invalid.headers.get("content-type"), /application\/json/); assert.equal(invalid.headers.get("content-disposition"), null);
+  assert.equal((await call("/admin/order-workspace/MISSING", admin())).status, 404);
+});
+
+test("filtered CSV exports every matching row across batches with formula escaping and no data mutation", async () => {
+  const a = await person("A"), s = await shop("S", a);
+  for (let i = 0; i < 127; i++) await rawOrder(`EXPORT-${i}`, s, a, { status: "CANCELLED", dueAmount: 99, deliveryAddress: { storeName: "=1+1", ownerName: 'Owner, "quoted"', street: "Road" } });
+  await rawOrder("KEEP-OUT", s, a, { status: "DELIVERED" }); await Invoice.create({ orderId: "EXPORT-1", invoiceNumber: "CSV-1" });
+  const before = await Order.find().sort({ orderId: 1 }).lean();
+  const response = await fetch(origin + "/admin/order-workspace/export?status=CANCELLED&pageSize=10", { headers: { Authorization: `Bearer ${admin()}` } });
+  assert.equal(response.status, 200); assert.match(response.headers.get("content-type"), /text\/csv/); assert.equal(response.headers.get("cache-control"), "no-store");
+  const text = await response.text(); assert.equal(text.trim().split("\r\n").length, 128); assert(text.includes("'=1+1")); assert(text.includes('"Owner, ""quoted"""')); assert(text.includes("CSV-1")); assert(!text.includes("KEEP-OUT")); assert(!text.includes(",99,"));
+  assert.deepEqual(await Order.find().sort({ orderId: 1 }).lean(), before); assert.equal(await Counter.countDocuments(), 0);
+});
+
+test("paged workspace substantially reduces order payload versus the unchanged full-list API", async () => {
+  const a = await person("A"), s = await shop("S", a);
+  const sample = await rawOrder("SEED", s, a);
+  await Order.collection.insertMany(Array.from({ length: 999 }, (_, i) => ({ ...sample, _id: new mongoose.Types.ObjectId(), orderId: `MEASURE-${i}`, products: Array.from({ length: 4 }, () => ({ name: "Sample spice", quantity: 10, unitPrice: 10, totalPrice: 100, uom: "packet" })) })));
+  const measure = async path => { const start = performance.now(), response = await fetch(origin + path, { headers: { Authorization: `Bearer ${admin()}` } }), body = await response.text(); assert.equal(response.status, 200); return { bytes: Buffer.byteLength(body), milliseconds: performance.now() - start }; };
+  const before = await measure("/agent/orders/all"), after = await measure("/admin/order-workspace");
+  assert(after.bytes < before.bytes * 0.1);
+  console.log("ORDER_WORKSPACE_MEASUREMENT", JSON.stringify({ fixtureOrders: 1000, before, after, note: "Isolated fixture measurement; not production latency" }));
+});
+
 before(async () => {
   replica = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" }, binary: { version: "7.0.14" } });
   await mongoose.connect(replica.getUri(), { dbName: "isolated-enhancement-tests" });

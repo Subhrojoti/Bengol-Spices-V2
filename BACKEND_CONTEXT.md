@@ -5,6 +5,18 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Admin Orders workspace (29 October 2026, local; not deployed):** the owner
+approved the demo layout. Admin Orders now defaults to a paginated All orders
+view with global status/search/agent/store/India-date filters, compact rows,
+desktop details/mobile dialog and complete filtered CSV export. By store retains
+the original screen; Employee continues using that original component. Four
+new Admin-only read routes leave legacy reads and mutation contracts intact.
+All 61 backend, 12 frontend unit and 92 full browser regressions pass, plus four
+final layout/dark-theme cases; lint/build pass. Fixture response sizes fell from
+905,661 to 7,288 bytes at 1,000 orders (not a production measurement). Read
+[implementation notes](BackEnd/docs/ADMIN_ORDERS_WORKSPACE.md) and the original
+[organization proposal](FrontEnd/docs/admin-audit/ORDERS_ORGANIZATION_PLAN.md).
+
 **Store-only test cleanup deployed/verified `215430d` (27 October 2026):** the owner
 requested deletion of one test store with a cancelled order while keeping the
 agent and other stores. Added Admin-only preview/execute endpoints and a separate
