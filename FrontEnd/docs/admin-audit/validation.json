@@ -501,7 +501,7 @@
   },
   "adminOrdersWorkspace": {
     "date": "2026-10-29",
-    "status": "local only; not committed, pushed or deployed",
+    "status": "deployed and verified",
     "baseCommit": "9143f4b436b02c494c26e21a15b479259f27fc5b",
     "scope": "Admin All orders workspace and four additive Admin-only read routes; legacy Employee/agent/delivery contracts retained",
     "backendTests": {
@@ -558,7 +558,27 @@
       "existingActionBrowserCase": "passed",
       "adminLint": "passed",
       "spaBuild": "passed",
-      "deployed": false
+      "deployed": true
+    },
+    "release": {
+      "date": "2026-10-29",
+      "applicationCommit": "e023118846a043c0e0960c49bcb37fd576282714",
+      "pushed": true,
+      "deployed": true,
+      "backendFilesVerified": 145,
+      "websiteFilesVerified": 206,
+      "normalAdminSignIn": true,
+      "livePagedFiltersDetailsAndExport": true,
+      "liveInvoiceDownload": true,
+      "livePhoneAndLegacyByStore": true,
+      "liveBlockedBadge": true,
+      "unauthenticatedRoutesRefused": 4,
+      "businessMutationRequests": 0,
+      "productionSettingsUnchanged": true,
+      "unrelatedFilesAndStagingPreserved": true,
+      "hrProcessUnchanged": true,
+      "testAdminSessionRevoked": true,
+      "record": "../../../deploy/releases/2026-10-29-admin-orders-workspace.md"
     }
   },
   "agentStatusAlignment": {
@@ -566,6 +586,6 @@
     "scope": "Frontend styling only; access rules and status values unchanged",
     "lightAndDarkAlignment": "passed: equal heights of 26.75px and equal vertical centers",
     "adminLint": "passed",
-    "deployed": false
+    "deployed": true
   }
 }

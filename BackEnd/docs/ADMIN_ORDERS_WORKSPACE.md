@@ -1,7 +1,7 @@
 # Admin Orders workspace - 29 October 2026
 
-Status: implemented/tested locally, not committed, pushed or deployed. No live
-business record or settings were changed. Owner approved the generated concept
+Status: deployed and verified on 29 October 2026; application commit `e023118`.
+No live business record or settings were changed by verification. Owner approved the generated concept
 and asked for implementation using the current theme without unrelated redesign.
 
 29 October visual follow-up: the owner requested colorful order action buttons.
@@ -22,7 +22,7 @@ status, matching its height and vertical center. The badges wrap when needed.
 Access rules and status values are unchanged. Local synthetic light/dark browser
 checks confirmed equal 26.75px heights and centers; Admin lint passes. Preview
 crops: `output/orders-workspace/agent-status-alignment-{light,dark}.png`.
-This small visual change is also local and not deployed.
+This small visual change is included in the deployed release.
 
 Admin Orders defaults to All orders across stores, newest first with an ObjectId
 tie-breaker. Summary shortcuts and an always-available status control expose
@@ -136,3 +136,13 @@ tabs. Smoke-test normal Admin auth, list/detail/export, deep links and existing
 invoice/order flows with read-only production checks. Employee/agent/delivery
 legacy contracts remain available. A frontend rollback restores the old Admin
 entry; the additive read endpoints require no database rollback.
+
+Rollout completed after the owner's push/deploy request. The committed archive
+supplied both deployment targets. All 145 backend and 206 built website files
+match their deployed hashes. Normal Admin login, real list/details/filter reads,
+filtered CSV and invoice downloads, phone dialog, original By store screen and
+the live Blocked badge passed. All four new routes refuse unauthenticated reads.
+The verification sent zero business mutations and revoked its own Admin session.
+Private settings and the HR process stayed unchanged. Full recovery paths and
+scope are recorded in
+[release evidence](../../deploy/releases/2026-10-29-admin-orders-workspace.md).
