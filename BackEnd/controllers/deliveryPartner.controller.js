@@ -357,7 +357,7 @@ export const getMyAssignedOrders = async (req, res) => {
       .select(PARTNER_ORDER_FIELDS)
       // Without deliveryCode: the store owner reads it out at handover, and
       // showing it here let a partner confirm without visiting the store
-      .populate("store", "storeName address location")
+      .populate("store", "storeName ownerName phone address location image.url")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -602,7 +602,7 @@ async function fetchPartnerHistory(partnerId, { forPartner = false } = {}) {
     "delivery.partnerId": partnerId,
     status: "DELIVERED",
   })
-    .populate("store", "storeName address location")
+    .populate("store", "storeName ownerName phone address location image.url")
     .sort({ updatedAt: -1 });
 
   const returns = Return.find({

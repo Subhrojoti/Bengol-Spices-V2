@@ -194,7 +194,7 @@ export default function CreateOrderScreen() {
     if (cartProblem()) return;
     setSubmitting(true);
     try {
-      const session = await orderApi.createInitialPayment(payNowAmount);
+      const session = await orderApi.createInitialPayment(payNowAmount, buildOrderPayload());
       setRazorpaySession(session);
       setRazorpayVisible(true);
     } catch (e) {
@@ -260,7 +260,7 @@ export default function CreateOrderScreen() {
     if (cartProblem()) return;
     setSubmitting(true);
     try {
-      const session = await orderApi.createInitialPaymentQr(payNowAmount);
+      const session = await orderApi.createInitialPaymentQr(payNowAmount, buildOrderPayload());
       setQrSession(session);
       setQrVisible(true);
     } catch (e) {

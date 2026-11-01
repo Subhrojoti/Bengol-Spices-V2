@@ -1,4 +1,13 @@
 import crypto from "crypto";
+import { guardPartnerAssignment } from "../services/deliveryPartnerActivity.service.js";
+import { effectiveMinimum } from "../utils/orderMinimums.js";
+import { newOrderCredit, deliveredCredit } from "../utils/orderCredit.js";
+import { paymentTotals } from "../utils/paymentTotals.js";
+import DispatchMapping from "../models/DispatchMapping.js";
+import { agentCollectionReport } from "../services/agentCollectionReport.service.js";
+import { createInitialOrderRecords } from "../services/initialOrder.service.js";
+import { preflightInitialPayment } from "../services/orderPreflight.service.js";
+import { createInvoiceFromOrder, regenerateInvoicePDF } from "../services/invoice.service.js";
 import Counter from "../models/Counter.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import Employee from "../models/Employee.js";
@@ -7,7 +16,6 @@ import Order from "../models/Order.js";
 import Store from "../models/store.js";
 import Product from "../models/Product.js";
 import Invoice from "../models/Invoice.js";
-import { createInvoiceFromOrder } from "../services/invoice.service.js";
 import { createShiprocketOrder } from "../services/shiprocket.service.js";
 import Payment from "../models/Payment.js";
 import { createNotification } from "../services/notification.service.js";
@@ -235,11 +243,6 @@ export const reserveStock = async (lines) => {
 
 // PLACE ORDER (AGENT)
 export const placeOrder = async (req, res) => {
-  /* Tracked outside the try so the catch can hand stock back if anything
-     fails after it was taken — otherwise a crash between the reservation
-     and a saved order would quietly lose inventory. */
-  let reservedLines = [];
-
   try {
     const {
       consumerId,
@@ -380,6 +383,7 @@ export const placeOrder = async (req, res) => {
     /* Every line that maps to a real product, so stock can be taken for it
        once the whole order has passed validation. */
     const stockLines = [];
+    const minimumLines = new Map();
 
     for (const item of products) {
       // BASIC VALIDATION
@@ -445,6 +449,10 @@ export const placeOrder = async (req, res) => {
         });
       }
 
+      const productKey = String(productDoc._id);
+      const previousLine = minimumLines.get(productKey);
+      minimumLines.set(productKey, { product: productDoc, quantity: (previousLine?.quantity || 0) + Number(item.quantity) });
+
       /* =============================
          ENRICH DATA + RESOLVE TIERED PRICE
          ============================= */
@@ -488,6 +496,14 @@ export const placeOrder = async (req, res) => {
       totalAmount = roundRupees(totalAmount + item.totalPrice);
     }
 
+    // Validate combined quantities before stock reservation or payment recording.
+    for (const { product, quantity } of minimumLines.values()) {
+      const minimum = effectiveMinimum(product, storeType);
+      if (!Number.isFinite(quantity) || quantity < minimum) return res.status(400).json({
+        success: false, message: `${product.name}: minimum order is ${minimum} ${product.uom || "units"} for this store category.`,
+      });
+    }
+
     // The apps add up the cart with the same float error, so what they send
     // as "paid in full" is rounded the same way before it is compared.
     const paid = roundRupees(paidAmount);
@@ -527,17 +543,6 @@ export const placeOrder = async (req, res) => {
        unrelated reason never leaves stock held against an order that was
        not created.
        ============================= */
-
-    const reservation = await reserveStock(stockLines);
-
-    if (!reservation.ok) {
-      return res.status(400).json({
-        success: false,
-        message: reservation.message,
-      });
-    }
-
-    reservedLines = reservation.taken;
 
     /* =============================
        SAFE ORDER ID GENERATION
@@ -585,8 +590,7 @@ export const placeOrder = async (req, res) => {
        DUE DATE (7 DAYS)
        ============================= */
 
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 7);
+    const credit = newOrderCredit(storeType);
 
     /* =============================
        CREATE ORDER
@@ -602,7 +606,7 @@ export const placeOrder = async (req, res) => {
       paidAmount: paid,
       dueAmount,
       paymentMode: finalPaymentMode,
-      dueDate,
+      ...credit,
       orderLocation: {
         // 🔥 FIX: this is the bug behind delivery partners being sent to
         // the wrong place. It used to be whatever latitude/longitude the
@@ -616,6 +620,7 @@ export const placeOrder = async (req, res) => {
         longitude: store.location.longitude,
       },
       deliveryAddress: {
+        gstNumber: store.gstNumber || "",
         storeName: store.storeName,
         ownerName: store.ownerName,
         phone: store.phone,
@@ -625,6 +630,7 @@ export const placeOrder = async (req, res) => {
         pincode: store.address.pincode,
       },
       status: "PLACED",
+      invoicePolicy: "ON_CONFIRMATION",
       statusHistory: [
         {
           status: "PLACED",
@@ -644,11 +650,20 @@ export const placeOrder = async (req, res) => {
        the counter had crept past the numbers in use. The counter is caught
        up and the order saved under the next free number instead. */
     let order = null;
+    let initialPayment = null;
+    let invoice = null;
+    const paymentMethod = paymentMode === "ONLINE" || razorpay_payment_id || razorpay_order_id ? "RAZORPAY" : "CASH";
+    const awaitingVerification = needsVerification(paymentMethod);
     let placedByTwin = false;
 
     for (let attempt = 0; attempt < 5 && !order && !placedByTwin; attempt++) {
       try {
-        order = await Order.create(orderFields);
+        const records = await createInitialOrderRecords({ fields: orderFields, stockLines, storeType, paymentMethod, gateway: {
+          ...(razorpay_order_id && { razorpayOrderId: razorpay_order_id }),
+          ...(razorpay_payment_id && { razorpayPaymentId: razorpay_payment_id }),
+          ...(razorpay_signature && { razorpaySignature: razorpay_signature }),
+        } });
+        order = records.order; initialPayment = records.payment; invoice = records.invoice;
       } catch (createError) {
         /* Two copies of the same press arrived together, both found no
            order yet, and the other one saved first. */
@@ -670,10 +685,7 @@ export const placeOrder = async (req, res) => {
     }
 
     if (placedByTwin) {
-      // This copy placed nothing, so the stock it took goes back
-      await releaseStock(reservedLines);
-      reservedLines = [];
-
+      // The duplicate transaction committed no stock or financial changes.
       const first = await Order.findOne({
         agentId,
         clientRequestId: requestId,
@@ -692,56 +704,8 @@ export const placeOrder = async (req, res) => {
       );
     }
 
-    /* The order now owns the stock it reserved. Releasing it on a later
-       failure put stock back for goods that were still going out, and the
-       500 invited the agent to place the same order again. */
-    reservedLines = [];
-
-    /* Cash is recorded as waiting for the office to verify it; a payment
-       Razorpay confirmed needs no verifying. Until cash is approved the
-       agent is not credited for it (utils/paymentVerification.js). */
-    const paymentMethod =
-      paymentMode === "ONLINE" || razorpay_payment_id || razorpay_order_id
-        ? "RAZORPAY"
-        : "CASH";
-    const awaitingVerification = needsVerification(paymentMethod);
-
-    // ✅ Create payment entry for CASH / initial payment
-    try {
-      const payment = await Payment.create({
-        orderId: order.orderId,
-        consumerId: order.consumerId,
-        agentId: order.agentId,
-        amount: paid,
-        // 🔥 FIX: a partly-online ("MIXED") or QR payment carries a verified
-        // Razorpay reference but was being recorded as CASH, so cash
-        // reconciliation expected money the agent never held.
-        method: paymentMethod,
-        ...(awaitingVerification && {
-          verification: pendingVerification(agentId),
-        }),
-        // 🔥 FIX: attach the verified Razorpay reference here (when this
-        // is an online initial payment) so verifyPaymentAndPlaceOrder no
-        // longer needs to create a second, duplicate Payment record for
-        // this exact same transaction.
-        ...(razorpay_order_id && { razorpayOrderId: razorpay_order_id }),
-        ...(razorpay_payment_id && { razorpayPaymentId: razorpay_payment_id }),
-        ...(razorpay_signature && { razorpaySignature: razorpay_signature }),
-        collectedBy: {
-          id: agentId,
-          role: "AGENT",
-        },
-      });
-
-      if (awaitingVerification) announceCashToVerify(payment);
-    } catch (paymentError) {
-      // The order already records the amount paid; only the payment log
-      // entry is missing, and it needs adding by hand.
-      console.error(
-        `PAYMENT RECORD FAILED for placed order ${order.orderId} (₹${paid}):`,
-        paymentError,
-      );
-    }
+    // Order, payment, invoice metadata and stock have committed together.
+    if (awaitingVerification) announceCashToVerify(initialPayment);
 
     /* Tell every open admin/employee panel now, before the invoice PDF is
        built and uploaded, which can take a few seconds */
@@ -768,7 +732,7 @@ export const placeOrder = async (req, res) => {
        Auto Invoice Generation
        ============================= */
 
-    await createInvoiceFromOrder(order);
+    if (invoice && !invoice.pdfUrl) await regenerateInvoicePDF(invoice, order);
 
     /* =============================
        TARGET + COMMISSION + NOTIFICATION
@@ -811,16 +775,10 @@ export const placeOrder = async (req, res) => {
     console.error("PLACE ORDER ERROR:", error);
 
     // The order was never saved, so the stock it held must go back.
-    if (reservedLines.length) {
-      await releaseStock(reservedLines).catch((releaseError) =>
-        console.error("STOCK ROLLBACK FAILED:", releaseError),
-      );
-    }
-
     /* Only wording meant for the caller is sent. Whatever else went wrong
        is in the log above; its text (a database message, a line of code)
        used to be sent to the app as it was. */
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       success: false,
       message: error.expose
         ? error.message
@@ -1049,6 +1007,8 @@ export const getActiveOrders = async (req, res) => {
 export const confirmOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
+    const expectedRevision = req.body?.expectedRevision;
+    if (expectedRevision !== undefined && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) return res.status(400).json({ success: false, message: "Invalid order revision" });
 
     const order = await Order.findOne({ orderId });
 
@@ -1072,23 +1032,29 @@ export const confirmOrder = async (req, res) => {
        back to life as confirmed, and two people confirming together both
        succeeded and logged it twice. The filter only matches an order that
        is still PLACED. */
-    const confirmed = await Order.findOneAndUpdate(
-      { _id: order._id, status: "PLACED" },
+    const actor = await actorOf(req.user);
+    const mapping = await DispatchMapping.findOne({ agentId: order.agentId }).lean();
+    const existingPartner = order.delivery?.partnerId ? await DeliveryPartner.findOne({ _id: order.delivery.partnerId, status: "ACTIVE" }).select("name").lean() : null;
+    const partner = existingPartner || (mapping?.enabled !== false && mapping?.partnerId ? await DeliveryPartner.findOne({ _id: mapping.partnerId, status: "ACTIVE" }).select("name").lean() : null);
+    const now = new Date();
+    let invoice;
+    const confirmed = await mongoose.connection.transaction(async session => {
+      if (partner) await guardPartnerAssignment(partner._id, session);
+      const updated = await Order.findOneAndUpdate(
+      { _id: order._id, status: "PLACED", ...(expectedRevision !== undefined && { revision: expectedRevision }) },
       {
-        $set: { status: "CONFIRMED" },
+        $set: { status: partner ? "ASSIGNED" : "CONFIRMED", ...(partner && !existingPartner && { "delivery.partnerId": partner._id, "delivery.assignedAt": now, "delivery.assignedBy": actor.id }) },
+        ...(!partner && order.delivery?.partnerId && { $unset: { "delivery.partnerId": "", "delivery.assignedAt": "", "delivery.assignedBy": "" } }),
         $push: {
-          statusHistory: {
-            status: "CONFIRMED",
-            changedAt: new Date(),
-            changedBy: {
-              id: req.user.employeeId || req.user.id,
-              role: req.user.role, // VERY IMPORTANT
-            },
-          },
+          statusHistory: { $each: [{ status: "CONFIRMED", changedAt: now, changedBy: { id: actor.id, role: actor.role } }, ...(partner ? [{ status: "ASSIGNED", changedAt: now, changedBy: { id: actor.id, role: actor.role } }] : [])] },
+          ...(partner && !existingPartner && { assignmentHistory: { partnerId: partner._id, previousPartnerId: order.delivery?.partnerId || undefined, partnerName: partner.name, at: now, mode: "AUTO", by: actor } }),
         },
       },
-      { new: true },
-    );
+      { new: true, session },
+      );
+      if (updated?.invoicePolicy === "ON_CONFIRMATION") invoice = await createInvoiceFromOrder(updated, { session, generatePdf: false, throwOnError: true });
+      return updated;
+    });
 
     if (!confirmed) {
       return res.status(409).json({
@@ -1098,15 +1064,22 @@ export const confirmOrder = async (req, res) => {
       });
     }
 
+    if (invoice && !invoice.pdfUrl) await regenerateInvoicePDF(invoice, confirmed);
+    if (partner && !existingPartner) {
+      await recordDeliveryEvent({ orderId, action: "ASSIGNED", by: actor, partnerId: partner._id, partnerName: partner.name, note: "Assigned on order confirmation" });
+      await createNotification({ title: "New Order Assigned", message: `You have a new order (${orderId}) assigned`, recipientId: partner._id, recipientModel: "DeliveryPartner", meta: { orderId } }).catch(error => console.error("AUTO ASSIGN NOTIFICATION ERROR:", error.message));
+    }
     res.json({
       success: true,
       message: "Order confirmed successfully",
+      statusHistory: confirmed.statusHistory,
+      assignment: { assigned: Boolean(partner), partnerId: partner?._id || null, warning: partner ? null : "Order confirmed without a delivery partner. Assign an active partner in Dispatch." },
     });
   } catch (error) {
     console.error("CONFIRM ORDER ERROR:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      message: "Failed to confirm order",
+      message: error.status ? error.message : "Failed to confirm order",
     });
   }
 };
@@ -1325,8 +1298,11 @@ export const assignDeliveryPartner = async (req, res) => {
        stock already handed back) went out for delivery anyway. The filter
        only matches an order that can still be assigned. */
     const previousPartnerId = order.delivery?.partnerId || null;
+    const assigningActor = await actorOf(req.user);
 
-    const assigned = await Order.findOneAndUpdate(
+    const assigned = await mongoose.connection.transaction(async session => {
+      await guardPartnerAssignment(partner._id, session);
+      return Order.findOneAndUpdate(
       afterFailedAttempt
         ? {
             _id: order._id,
@@ -1348,6 +1324,7 @@ export const assignDeliveryPartner = async (req, res) => {
           },
         },
         $push: {
+          assignmentHistory: { partnerId: partner._id, previousPartnerId, partnerName: partner.name, at: new Date(), mode: "MANUAL", by: assigningActor },
           statusHistory: {
             status: "ASSIGNED",
             changedAt: new Date(),
@@ -1358,8 +1335,9 @@ export const assignDeliveryPartner = async (req, res) => {
           },
         },
       },
-      { new: true },
+      { new: true, session },
     );
+    });
 
     if (!assigned) {
       return res.status(409).json({
@@ -1387,10 +1365,10 @@ export const assignDeliveryPartner = async (req, res) => {
 
     /* The partner who could not deliver it still has the goods, and has to
        be told they are no longer theirs to deliver */
-    if (afterFailedAttempt && previousPartnerId) {
+    if (previousPartnerId) {
       await createNotification({
         title: "Order given to another partner",
-        message: `Order ${order.orderId} has been given to another delivery partner. Please return the goods to the office.`,
+        message: `Order ${order.orderId} has been given to another delivery partner.${afterFailedAttempt ? " Please return the goods to the office." : " It is no longer assigned to you."}`,
         recipientId: previousPartnerId,
         recipientModel: "DeliveryPartner",
         meta: { orderId: order.orderId },
@@ -1418,9 +1396,9 @@ export const assignDeliveryPartner = async (req, res) => {
     });
   } catch (error) {
     console.error("ASSIGN DELIVERY ERROR:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      message: "Failed to assign delivery partner",
+      message: error.status ? error.message : "Failed to assign delivery partner",
     });
   }
 };
@@ -1684,6 +1662,7 @@ export const updateDeliveryStatus = async (req, res) => {
     if (status === "DELIVERED") {
       update.$set["delivery.codeAttempts"] = 0;
       update.$set["delivery.deliveredAt"] = now;
+      Object.assign(update.$set, deliveredCredit(order, now));
       // Delivered after all: an earlier "could not deliver" report is closed
       update.$unset = {
         "delivery.codeLockedUntil": "",
@@ -1691,15 +1670,21 @@ export const updateDeliveryStatus = async (req, res) => {
       };
     }
 
-    const moved = await Order.findOneAndUpdate(
+    const moved = await mongoose.connection.transaction(async session => {
+      const result = await Order.findOneAndUpdate(
       {
         _id: order._id,
         status: order.status,
         "delivery.partnerId": order.delivery.partnerId,
       },
       update,
-      { new: true },
+      { new: true, session },
     );
+      if (result && status === "DELIVERED" && result.creditPolicy?.basis === "DELIVERY") {
+        await Invoice.updateOne({ orderId: result.orderId }, { $set: { dueDate: result.dueDate } }, { session });
+      }
+      return result;
+    });
 
     if (!moved) {
       return res.status(409).json({
@@ -1757,11 +1742,12 @@ export const collectPayment = async (req, res) => {
       typeof req.body.note === "string"
         ? req.body.note.trim().slice(0, 500) || undefined
         : undefined;
-    const method = req.body.method || "CASH";
+    const method = req.body.method ?? "CASH";
 
     /* 🔥 FIX: amount was used as sent. A negative amount passed every check
        below and was recorded — lowering the order's paid total and raising
        its due. A numeric string was concatenated rather than added. */
+    if (!["number", "string"].includes(typeof req.body.amount)) return res.status(400).json({ success: false, message: "Enter a valid positive amount" });
     const amount = Math.round(Number(req.body.amount) * 100) / 100;
 
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -1788,6 +1774,7 @@ export const collectPayment = async (req, res) => {
       amount,
       method,
       note,
+      clientRequestId: req.body.clientRequestId,
     });
 
     if (!result.ok) {
@@ -1804,6 +1791,8 @@ export const collectPayment = async (req, res) => {
       dueAmount: result.order.dueAmount,
       // "PENDING": it counts toward the agent's sales once the office verifies it
       paymentVerification: result.payment?.verification?.status || null,
+      paymentId: String(result.payment._id),
+      replayed: Boolean(result.replayed),
     });
   } catch (error) {
     console.error("COLLECT PAYMENT ERROR:", error);
@@ -1977,6 +1966,8 @@ export const getCompletePaymentSummary = async (req, res) => {
         paidAmount: order.paidAmount,
         dueAmount: order.dueAmount,
 
+        ...paymentTotals(orderPayments, order.paidAmount),
+
         paymentStatus: order.paymentStatus,
         orderStatus: order.status,
 
@@ -1993,6 +1984,10 @@ export const getCompletePaymentSummary = async (req, res) => {
           method: p.method,
           collectedAt: p.createdAt,
           collectedBy: p.collectedBy?.id,
+          collectorRole: p.collectedBy?.role || "AGENT",
+          collectorName: p.collectedBy?.name || null,
+          collectionKind: p.collectionKind || null,
+          verificationHistory: p.verification?.history || [],
           // PENDING / APPROVED / REJECTED for cash; null where none is needed
           verification: p.verification?.status || null,
         })),
@@ -2016,56 +2011,11 @@ export const getCompletePaymentSummary = async (req, res) => {
   }
 };
 
-// Agent Collection Performance (Admin / Employee with permission can see total collected amount by each agent in a date range)
+// All-time agent collections: recorded and verified eligibility share an explicit scope.
 export const getAgentCollectionPerformance = async (req, res) => {
-  try {
-    // 🔥 FIX: totalCollected now comes from each order's own paidAmount
-    // (authoritative, atomically maintained on the Order document) instead
-    // of summing the Payment collection directly. Summing Payment.amount
-    // could double-count a transaction if a stray/duplicate Payment record
-    // ever exists for an order (the exact bug just fixed in
-    // verifyPaymentAndPlaceOrder), inflating an agent's collected total.
-    const collected = await Order.aggregate([
-      {
-        $group: {
-          _id: "$agentId",
-          totalCollected: { $sum: "$paidAmount" },
-        },
-      },
-    ]);
-
-    // "transactions" is a genuine count of individual payment-collection
-    // events, which only the Payment log actually records — kept as is.
-    const transactionCounts = await Payment.aggregate([
-      {
-        $group: {
-          _id: "$agentId",
-          transactions: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const transactionMap = {};
-    transactionCounts.forEach((t) => {
-      transactionMap[t._id] = t.transactions;
-    });
-
-    const performance = collected.map((c) => ({
-      _id: c._id,
-      totalCollected: c.totalCollected,
-      transactions: transactionMap[c._id] || 0,
-    }));
-
-    res.json({
-      success: true,
-      data: performance,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to load performance",
-    });
-  }
+  res.setHeader("Cache-Control", "no-store");
+  try { res.json(await agentCollectionReport()); }
+  catch (error) { console.error("AGENT COLLECTION REPORT ERROR:", error.message); res.status(500).json({ success: false, message: "Failed to load performance" }); }
 };
 
 // CREATE SHIPMENT (DUMMY VERSION)
@@ -2143,9 +2093,12 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(400).json({ message: "No due amount left" });
     }
 
+    const amount = req.body.amount === undefined ? order.dueAmount : roundRupees(req.body.amount);
+    if (!Number.isFinite(amount) || amount < 1 || amount > order.dueAmount + 0.005) return res.status(400).json({ success: false, message: "Enter an amount from ₹1 up to the outstanding balance" });
+
     const razorpayOrder = await razorpayInstance.orders.create({
       // Razorpay needs whole paise: 14.29 * 100 is 1428.9999…, which it refuses
-      amount: Math.round(order.dueAmount * 100),
+      amount: Math.round(amount * 100),
       currency: "INR",
       receipt: order.orderId,
     });
@@ -2284,6 +2237,7 @@ export const verifyRazorpayPayment = async (req, res) => {
 // Initial Payment Razorpayment during placing order
 export const createOrderPayment = async (req, res) => {
   try {
+    if (!["number", "string"].includes(typeof req.body.amount)) return res.status(400).json({ success: false, message: "Enter a valid positive amount" });
     const amount = Number(req.body.amount);
 
     if (!Number.isFinite(amount) || amount < 1) {
@@ -2300,6 +2254,7 @@ export const createOrderPayment = async (req, res) => {
       });
     }
 
+    await preflightInitialPayment({ agentId: req.user.agentId, payload: req.body.orderPayload, amount });
     const razorpayOrder = await razorpayInstance.orders.create({
       // Whole paise only — see createRazorpayOrder
       amount: Math.round(amount * 100),
@@ -2315,6 +2270,7 @@ export const createOrderPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("CREATE ORDER PAYMENT ERROR:", error);
+    if (error.preflight) return res.status(error.status).json({ success: false, message: error.message });
     res.status(500).json({
       success: false,
       message: "Failed to create Razorpay order",
@@ -2497,6 +2453,7 @@ function qrExpiryTimestamp() {
 /* STEP 1a - CREATE QR FOR A NEW ORDER (initial payment) */
 export const createInitialPaymentQr = async (req, res) => {
   try {
+    if (!["number", "string"].includes(typeof req.body.amount)) return res.status(400).json({ success: false, message: "Enter a valid positive amount" });
     // A text or sub-rupee amount went straight to Razorpay, which refused it
     // and the agent only saw "Failed to generate QR code"
     const amount = roundRupees(req.body.amount);
@@ -2515,6 +2472,7 @@ export const createInitialPaymentQr = async (req, res) => {
       });
     }
 
+    await preflightInitialPayment({ agentId: req.user.agentId, payload: req.body.orderPayload, amount });
     const qrCode = await razorpayInstance.qrCode.create({
       type: "upi_qr",
       name: "Bengol Spices Order Payment",
@@ -2537,6 +2495,7 @@ export const createInitialPaymentQr = async (req, res) => {
     });
   } catch (error) {
     console.error("CREATE INITIAL QR ERROR:", error);
+    if (error.preflight) return res.status(error.status).json({ success: false, message: error.message });
     return res.status(500).json({
       success: false,
       message: "Failed to generate QR code",
@@ -2545,7 +2504,7 @@ export const createInitialPaymentQr = async (req, res) => {
 };
 
 /* STEP 1b - CREATE QR FOR COLLECTING A DUE AMOUNT */
-/* Always the FULL remaining due — no partial amount accepted from the app. */
+/* Omitted amount keeps the original full-due contract for existing clients. */
 export const createDuePaymentQr = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -2582,12 +2541,15 @@ export const createDuePaymentQr = async (req, res) => {
         .json({ success: false, message: "This order has no due amount" });
     }
 
+    const amount = req.body.amount === undefined ? order.dueAmount : roundRupees(req.body.amount);
+    if (!Number.isFinite(amount) || amount < 1 || amount > order.dueAmount + 0.005) return res.status(400).json({ success: false, message: "Enter an amount from ₹1 up to the outstanding balance" });
+
     const qrCode = await razorpayInstance.qrCode.create({
       type: "upi_qr",
       name: `Due Payment - ${order.orderId}`,
       usage: "single_use",
       fixed_amount: true,
-      payment_amount: Math.round(order.dueAmount * 100), // full due, in paise
+      payment_amount: Math.round(amount * 100),
       description: `Remaining balance for order ${order.orderId}`,
       close_by: qrExpiryTimestamp(),
       notes: {
@@ -2601,7 +2563,7 @@ export const createDuePaymentQr = async (req, res) => {
       success: true,
       qrCodeId: qrCode.id,
       imageUrl: qrCode.image_url,
-      amount: order.dueAmount,
+      amount,
     });
   } catch (error) {
     console.error("CREATE DUE QR ERROR:", error);

@@ -60,7 +60,9 @@ export default function RegisterScreen() {
         document,
       });
       toast.success("Application submitted", "We'll notify you once your account is approved.");
-      router.replace("/(auth)/login");
+      // Back to the sign-in screen already open underneath, not a second one on top
+      // (Back then returned to an earlier sign-in screen instead of leaving the app)
+      router.dismissTo("/(auth)/login");
     } catch (error) {
       toast.error("Couldn't submit application", getErrorMessage(error));
     } finally {

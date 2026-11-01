@@ -1,4 +1,6 @@
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { useState } from "react";
+import { MyCollections } from "@/components/payments/MyCollections";
 import { View, Text, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { History as HistoryIcon, MapPin } from "lucide-react-native";
@@ -15,9 +17,10 @@ import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { AssignedOrder, CompletedReturn } from "@/types/api";
 
-type Tab = "DELIVERIES" | "RETURNS";
+type Tab = "DELIVERIES" | "RETURNS" | "COLLECTIONS";
 
 export default function HistoryScreen() {
+  useRefetchOnFocus(["history"], ["collections"]);
   const [tab, setTab] = useState<Tab>("DELIVERIES");
   const { data, isLoading, isError, refetch, error } = useDeliveryHistory();
   const { pulling, onPull } = usePullToRefresh(refetch);
@@ -33,6 +36,7 @@ export default function HistoryScreen() {
           segments={[
             { value: "DELIVERIES", label: "Deliveries", count: deliveries.length },
             { value: "RETURNS", label: "Returns", count: returns.length },
+            { value: "COLLECTIONS", label: "Collections" },
           ]}
           value={tab}
           onChange={setTab}
@@ -40,7 +44,7 @@ export default function HistoryScreen() {
       </ScreenPadding>
 
       <View className="flex-1">
-        {isLoading ? (
+        {tab === "COLLECTIONS" ? <MyCollections /> : isLoading ? (
           <LoadingState message="Loading history…" />
         ) : isError ? (
           <ErrorState message={getErrorMessage(error, "Couldn't load your history.")} onRetry={refetch} />
@@ -81,16 +85,16 @@ function DeliveryHistoryRow({ order }: { order: AssignedOrder }) {
       onPress={() => router.push(`/deliveries/${order.orderId}`)}
       className="rounded-2xl border border-sand bg-white p-4 active:opacity-80"
     >
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-2">
-          <Text className="font-sans-bold text-sm text-ink" numberOfLines={1}>{order.store?.storeName ?? order.deliveryAddress.storeName}</Text>
+      <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+        <View className="max-w-full shrink">
+          <Text className="font-sans-bold text-sm text-ink" numberOfLines={2}>{order.store?.storeName ?? order.deliveryAddress.storeName}</Text>
           <Text className="mt-0.5 font-sans text-xs text-ink-500">{order.orderId} · {formatDate(order.delivery?.deliveredAt ?? order.updatedAt)}</Text>
         </View>
         <OrderStatusBadge status={order.status} />
       </View>
       <View className="mt-2 flex-row items-center gap-1.5">
         <MapPin size={12} color={colors.ink[500]} />
-        <Text className="flex-1 font-sans text-xs text-ink-500" numberOfLines={1}>
+        <Text className="flex-1 font-sans text-xs text-ink-500" numberOfLines={2}>
           {order.deliveryAddress.street}, {order.deliveryAddress.city}
         </Text>
       </View>
@@ -105,8 +109,8 @@ function DeliveryHistoryRow({ order }: { order: AssignedOrder }) {
 function ReturnHistoryRow({ item }: { item: CompletedReturn }) {
   return (
     <View className="rounded-2xl border border-sand bg-white p-4">
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-2">
+      <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+        <View className="max-w-full shrink">
           <Text className="font-sans-bold text-sm text-ink" numberOfLines={1}>{item.returnId}</Text>
           <Text className="mt-0.5 font-sans text-xs text-ink-500">Order {item.orderId} · {formatDate(item.updatedAt)}</Text>
         </View>

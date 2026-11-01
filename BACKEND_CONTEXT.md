@@ -5,6 +5,149 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Admin release recheck (1 November, local only):** reviewed all main Admin
+sections and critical workflows; added same-page retry after a collection-history
+read failure. No backend/API or production changes in this follow-up. See
+[review scope and validation](FrontEnd/docs/admin-audit/ADMIN_RELEASE_RECHECK_2026-11-01.md).
+
+**Leaderboard stability (1 November, local only):** reproduced ranking/medal
+changes for equal earnings when MongoDB group results arrived in another order.
+The shared Agent leaderboard now breaks earnings ties by agent ID before the
+limit. Earnings rules, API shape and clients remain unchanged; see
+[cause, regression coverage and scope](BackEnd/docs/LEADERBOARD_STABILITY_2026-11-01.md).
+Full backend suite: 91/91 pass, including both new stability regressions.
+
+**Admin Delivery tab overlap (1 November, local only):** contained Dispatch
+store-photo stacking beneath sticky section tabs without changing layout or
+backend behavior. Admin lint/build and 16 targeted browser checks pass; see the
+[Admin audit continuation guide](FrontEnd/docs/admin-audit/README.md).
+
+**Final Agent/Delivery phone QA (1 November, local only):** fixed Agent stale-401
+handling, malformed-date crashes, blank/full-balance collection behavior and Cash
+retry/lifecycle guards; clarified recorded-money and overlapping record labels.
+Rechecked both apps against the actual backend with disposable accounts/data,
+including draft edit → confirmation/invoice, Cash/UPI verification, original-
+Agent credit, handover, return completion and map scope. Agent 13/13 and Delivery
+9/9 regressions, both typechecks, Android JS exports and native config inspection
+pass. No signed AAB/APK or production deployment was performed. The backend
+release and signed-build camera/GPS checks remain prerequisites for rollout; see
+[final QA evidence and precise release limits](BackEnd/docs/MOBILE_RELEASE_QA_2026-11-01.md).
+
+**Delivery Partner Performance (1 November, local only):** corrected missing
+legacy previous-partner history and collector totals coupled to assignments.
+Added protected, paged per-partner orders/items, assignment details and links to
+existing delivery trails/Dispatch, retaining separate employee permissions and
+the current Admin design. No mobile/web-portal source changes or production
+business writes. Backend 89/89, Admin browser 143/143, frontend units 13/13 and
+lint/build pass; see
+[report behavior, access rules and final browser validation](BackEnd/docs/DELIVERY_PERFORMANCE_REVIEW_2026-11-01.md).
+No deployment has been performed.
+
+**Delivery Mobile App review (1 November, local only):** explicit collection
+amounts and safe retry recovery, collection-cache refresh, invalid-date handling,
+session-response guards, active map planning/order links, photo controls, action
+lifecycle guards and focused layout fixes. Backend behavior and web clients are
+unchanged. Typecheck, 8/8 offline regressions and Android JS export pass; connected
+phone checks used isolated synthetic business records. The resumed phone pass
+verified History/collections, return completion, notification date handling,
+profile/help navigation and chart-axis alignment. See the
+[review and precise validation limits](delivery-app/docs/DELIVERY_UI_REVIEW_2026-11-01.md).
+No production deployment or business writes were performed.
+
+**Agent Stores/Admin request UI (1 November, local only):** reorganized mobile
+store cards, highlighted existing map/correction actions, synchronized map/list
+selection, improved correction-form validation, pending-history checks and draft
+retry identifiers. Admin request review now has responsive comparisons, clearer
+reason/action controls and guarded loading/submission. No backend API behavior
+change. Agent Web/Delivery Web are unchanged. Read
+[UI changes and connected-phone validation](FrontEnd/docs/admin-audit/STORE_UI_AGENT_ADMIN_2026-11-01.md).
+Admin 136/136 browser checks, lint/build, Agent typecheck, validation tests and
+Android JS export pass. The physical phone used Expo Go and isolated business
+fixtures; no production app replacement or deployment was performed.
+
+**Delivery-partner test cleanup (1 November, local only):** owner requested a
+deletion option like test-agent cleanup and confirmed linked fake business records
+must also be removed. Added Admin preview/execute under Delivery Partner → Partner
+Approval → Delete test partner, recent receipts and retryable file deletion.
+Only reviewed cancelled test history is eligible; shared partners, active work,
+online payments and affected rewards/accounting block deletion. Stores, agents
+and unrelated records remain. Assignment transactions serialize with cleanup
+using a hidden partner activity counter. See
+[scope, safety and validation](BackEnd/docs/DELIVERY_PARTNER_TEST_CLEANUP_2026-11-01.md).
+Backend 87/87 and browser 132/132 pass, with Admin lint/build and offline import
+checks passing. No production account has been deleted or deployment performed.
+
+**Store Details/Admin follow-up (1 November, local only):** removed non-search
+request delays, retained inert cards during filtering, fixed whitespace searches
+stuck loading, reused date formatting, added bounded thumbnails with original
+previews and restored report position after paging. Mobile Target tabs/Delivery
+captions wrap. CSV formula guards and the frontend follow-redirects patch are
+included. No backend behavior changes or deployment. See
+[review, measurements and remaining security concerns](FrontEnd/docs/admin-audit/ADMIN_STORE_DETAILS_REVIEW_2026-11-01.md).
+Local three-run medians improved report readiness 21% and paging 53%; not live
+production measurements. Development-only minimatch alerts and the previously
+documented private identity-file migration remain open.
+
+**Admin smoothness/layout follow-up (1 November, local only):** bounded the Agent
+Performance chart and Delivery Performance cards with existing pagination;
+all-report totals, rankings, scales and collection history remain intact. Fixed
+mobile payment captions/search and scoped report paging scroll below sticky tabs.
+Existing lazy loading/paging/read cancellation remain. See
+[measurements and validation](FrontEnd/docs/admin-audit/ADMIN_SMOOTHNESS_2026-11-01.md).
+Large synthetic reports loaded 26%/19% faster in three-run local medians; these
+are laboratory figures. Browser 125/125, units 12/12, lint and SPA build pass.
+No backend behavior change or deployment was performed.
+
+**Admin bug review (1 November, local only):** fixed stale Orders lookup
+selection, Delivery tab URL/history state, pending store-code reveal lifecycle,
+cancelled extension drafts, cancelled-order active dues and missing verification
+amounts displayed as zero. No backend behavior/data changes. Read the
+[audit and validation notes](FrontEnd/docs/admin-audit/ADMIN_BUG_REVIEW_2026-11-01.md).
+Browser regressions 121/121, frontend units 12/12, lint and SPA build pass.
+No deployment has been performed for this review.
+
+**Agent Performance report correction (1 November, local only):** direct VPS
+source inspection found an older recorded-payment calculation behind newer
+verified-sales labels. The report now declares its basis, consistently scopes
+amounts/counts to non-cancelled orders and original sales agents, separates
+verification states and flags reconciliation problems. Older API responses are
+labelled Reported rather than assumed verified. Paise averages/live verification
+refresh are fixed. Stored payments, targets and incentives are unchanged.
+Read [report correction notes](BackEnd/docs/AGENT_PERFORMANCE_FIX_2026-11-01.md).
+Backend 83/83, browser 25/25 affected cases and frontend units 12/12 pass;
+lint/build pass. No production balance repair or deployment has been performed.
+
+**Store-report/Admin follow-up (31 October, local only):** fixed Agent-tab/photo
+stacking, added a minimal report-permission agent/email dropdown, store-to-orders
+links with filter-preserving Back controls, and Admin-only audited mapping revoke.
+Existing assignments remain intact; pause/save still works. Backend 81/81 and
+frontend units 12/12 pass, lint/build pass; 109/109 full browser regressions
+and 17/17 final affected navigation/workflow cases pass.
+See [follow-up notes](BackEnd/docs/ADMIN_STORE_REPORT_FOLLOWUP_2026-10-31.md).
+No production data, migration or deployment changes.
+
+**New ecosystem upgrade (31 October 2026; implementation in progress locally):**
+the owner supplied a cross-application brief covering store reports/approvals,
+partial collections, delivery-based credit, order editing, automatic dispatch,
+category minimums, optional GST, mobile GPS/maps and partner performance.
+The architecture review, existing-feature matrix, compatibility findings,
+pending questions and implementation/test plan are in
+[the upgrade plan](BackEnd/docs/ECOSYSTEM_UPGRADE_PLAN_2026-10-31.md).
+Both mobile baseline typechecks passed. Owner decisions are recorded in the
+plan. Owner delegated conservative follow-up decisions: existing minima remain
+the floor, old credit dates are preserved, free maps/manual stops are used.
+Local reporting, collections, credit, dispatch, store requests/GST/GPS and mobile
+map implementations are under test; read the plan's implementation checkpoint.
+Owner clarified the workflow: new orders remain editable drafts until office
+confirmation, which creates the invoice and locks agent editing. Existing issued
+invoices remain protected. This workflow is now implemented locally.
+The sole Agent Web exception uses saved dueDate in OverDuePayments.jsx. Delivery
+Web remains excluded. Final local backend tests (79), frontend units (12), full
+browser regressions (102) and final affected browser checks (40) pass; both native
+typechecks/Android bundles pass. Real-device acceptance remains pending because
+ADB shows no connected phone. Read [validation and continuation](BackEnd/docs/ECOSYSTEM_UPGRADE_VALIDATION_2026-10-31.md).
+No production migration or deployment has been performed.
+
 **Admin Orders workspace deployed/verified `e023118` (29 October 2026):** the owner
 approved the demo layout. Admin Orders now defaults to a paginated All orders
 view with global status/search/agent/store/India-date filters, compact rows,

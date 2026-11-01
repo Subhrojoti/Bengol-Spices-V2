@@ -40,6 +40,7 @@ const PanelNav = ({
   brandTitle,
   accent,
   expanded,
+  showGroupHeadings = true,
   profile,
   profilePath,
   onLogout,
@@ -48,9 +49,10 @@ const PanelNav = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { dark } = useThemeMode();
-  // In Admin, keep item positions stable as the rail expands under a pointer.
-  // Inserting headings on hover otherwise moves a different item under a click.
-  const stableGroups = basePath === "/admin";
+  const isAdmin = basePath === "/admin";
+  // Unpinned Admin keeps the same compact rows while hovering, so a heading
+  // cannot move another destination under the pointer. Pinned/mobile show groups.
+  const grouped = expanded && (!isAdmin || showGroupHeadings);
 
   // Every colour the rail sets in code, for the mode in force
   const tone = dark
@@ -115,6 +117,7 @@ const PanelNav = ({
         placement="right"
         arrow>
         <ListItemButton
+          aria-label={isAdmin ? item.label : undefined}
           onClick={() => go(`${basePath}/${item.path}`)}
           sx={{
             position: "relative",
@@ -155,6 +158,7 @@ const PanelNav = ({
             primary={item.label}
             sx={{
               m: 0,
+              ...(isAdmin && !expanded && { display: "none" }),
               opacity: expanded ? 1 : 0,
               whiteSpace: "nowrap",
               transition: "opacity 150ms ease",
@@ -220,8 +224,8 @@ const PanelNav = ({
       {/* NAV */}
       <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", py: 1 }}>
         {groups.map((group) => (
-          <Box key={group.name || "_"} sx={{ mb: 0.5 }}>
-            {(expanded || stableGroups) && group.name && (
+          <Box key={group.name || "_"} sx={{ mb: isAdmin && !grouped ? 0 : 0.5 }}>
+            {grouped && group.name && (
               <Typography
                 aria-hidden={!expanded}
                 sx={{
@@ -310,6 +314,7 @@ const PanelNav = ({
 
           <Tooltip title={expanded ? "" : "Logout"} placement="right" arrow>
             <ListItemButton
+              aria-label={isAdmin ? "Logout" : undefined}
               onClick={onLogout}
               sx={{
                 minHeight: 44,
@@ -333,6 +338,7 @@ const PanelNav = ({
                 primary="Logout"
                 sx={{
                   m: 0,
+                  ...(isAdmin && !expanded && { display: "none" }),
                   opacity: expanded ? 1 : 0,
                   whiteSpace: "nowrap",
                   transition: "opacity 150ms ease",

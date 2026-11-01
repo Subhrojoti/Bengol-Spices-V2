@@ -34,6 +34,9 @@ import { protect } from "../middleware/auth.js";
 import { isAdmin, isAgent, isDeliveryPartner } from "../middleware/role.js";
 import { reportCouldNotDeliver } from "../controllers/delivery.controller.js";
 import { checkPermission } from "../middleware/permission.js";
+import { getMobilePaymentHistory } from "../controllers/mobileCollections.controller.js";
+import { extendOrderDueDate } from "../controllers/orderCredit.controller.js";
+import { getOrderEditDetails, editPlacedOrder, getOrderModifications } from "../controllers/orderEditing.controller.js";
 
 const router = express.Router();
 
@@ -45,6 +48,12 @@ router.get("/store/:consumerId", protect, getOrdersByStoreConsumerId);
 router.get("/my-orders", protect, isAgent, getMyOrders);
 // One of the agent's own orders, without downloading the whole list
 router.get("/mine/:orderId", protect, isAgent, getMyOrder);
+router.get("/mine/:orderId/payments", protect, isAgent, getMobilePaymentHistory);
+router.get("/mine/:orderId/edit", protect, isAgent, getOrderEditDetails);
+router.put("/mine/:orderId/edit", protect, isAgent, storeOperation(editPlacedOrder));
+router.get("/mine/:orderId/modifications", protect, isAgent, getOrderModifications);
+router.get("/:orderId/modifications", protect, checkPermission("canGetAllOrders"), getOrderModifications);
+router.put("/:orderId/due-date", protect, checkPermission("canExtendDueDates"), storeOperation(extendOrderDueDate));
 // ADMIN / EMPLOYEE
 router.get("/all", protect, checkPermission("canGetAllOrders"), getAllOrders);
 
@@ -61,27 +70,27 @@ router.put(
   "/:orderId/confirm",
   protect,
   checkPermission("canConfirmOrders"),
-  confirmOrder,
+  storeOperation(confirmOrder),
 );
 router.put(
   "/:orderId/cancel",
   protect,
   checkPermission("canCancelOrders"),
-  cancelOrder,
+  storeOperation(cancelOrder),
 );
 //Assign Delivery Partner (Admin / Employee)
 router.put(
   "/:orderId/assign",
   protect,
   checkPermission("canAssignDelivery"),
-  assignDeliveryPartner,
+  storeOperation(assignDeliveryPartner),
 );
 //Deliver Status Update (Delivery Partner)
 router.put(
   "/:orderId/delivery-status",
   protect,
   isDeliveryPartner,
-  updateDeliveryStatus,
+  storeOperation(updateDeliveryStatus),
 );
 // The partner could not hand the order over, and says why (Delivery Partner)
 router.post(

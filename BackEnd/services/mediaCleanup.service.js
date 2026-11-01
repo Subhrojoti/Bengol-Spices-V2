@@ -6,10 +6,11 @@ import Invoice from "../models/Invoice.js";
 import Product from "../models/Product.js";
 import Employee from "../models/Employee.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
+import StoreChangeRequest from "../models/StoreChangeRequest.js";
 import { withLock } from "./payment.service.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const ownedFolder = /^(bengol_spices\/(agents|others|invoices|stores)\/)/;
+const ownedFolder = /^(bengol_spices\/(agents|others|invoices|stores|delivery_partners)\/)/;
 
 // Only files in our configured Cloudinary account and application folders.
 // Never fetch an arbitrary URL or infer deletion credentials from a browser request.
@@ -31,6 +32,7 @@ export const mediaAssetOf = (url) => {
 const mediaReferences = [
   [Agent, ["documents.aadhaar", "documents.pan", "documents.photo", "applicationHistory.documents.aadhaar", "applicationHistory.documents.pan", "applicationHistory.documents.photo"]],
   [Store, ["image.url"]], [Invoice, ["pdfUrl"]],
+  [StoreChangeRequest, ["before.image.url", "proposed.image.url"]],
   [Product, ["images.front.url", "images.back.url"]],
   [Employee, ["profilePic.url"]], [DeliveryPartner, ["documents.documentUrl"]],
 ];

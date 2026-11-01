@@ -68,6 +68,7 @@ export const fixtureResponse = (path, method = "GET") => {
     } };
   }
   if (path === "/admin/attention") return { success: true, data: {} };
+  if (path === "/agent/store/reports/agents") return { success: true, agents: agents.map(({ agentId, name, email }) => ({ agentId, name, email })) };
   if (path === "/agent/store/all") return { success: true, stores };
   if (path === "/agent/orders/all" || path === "/agent/orders/active") return { success: true, orders, data: orders };
   if (path === "/agent/orders/agent-collection-performance") return { success: true, data: [] };

@@ -71,14 +71,18 @@ const paymentSchema = new mongoose.Schema(
     razorpaySignature: String,
 
     note: String,
+    clientRequestId: String,
+    requestHash: String,
+    collectionKind: { type: String, enum: ["INITIAL", "INSTALMENT"] },
 
     collectedBy: {
       id: String,
       role: {
         type: String,
-        enum: ["AGENT"],
+        enum: ["AGENT", "DELIVERY_PARTNER"],
         default: "AGENT",
       },
+      name: String,
     },
 
     /* Cash (and anything else the gateway did not confirm) has to be
@@ -96,6 +100,8 @@ const paymentSchema = new mongoose.Schema(
 paymentSchema.index({ razorpayPaymentId: 1 }, { sparse: true });
 paymentSchema.index({ razorpayOrderId: 1 }, { sparse: true });
 paymentSchema.index({ createdAt: 1 });
+paymentSchema.index({ "collectedBy.role": 1, "collectedBy.id": 1, clientRequestId: 1 }, { unique: true, partialFilterExpression: { clientRequestId: { $type: "string" } } });
+paymentSchema.index({ "collectedBy.role": 1, "collectedBy.id": 1, createdAt: -1 });
 
 /* "What is waiting to be verified?" is asked by the dashboard and the
    verification screen. Sparse: gateway payments have no status. */

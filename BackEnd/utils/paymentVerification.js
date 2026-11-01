@@ -32,14 +32,14 @@ const IST_OFFSET = 330 * 60 * 1000;
 export const needsVerification = (method) => method !== "RAZORPAY";
 
 /** What a payment that has to be verified is recorded with. */
-export const pendingVerification = (agentId, at = new Date()) => ({
+export const pendingVerification = (agentId, at = new Date(), collector = null) => ({
   status: PENDING,
   history: [
     {
       status: PENDING,
       at,
-      by: { id: agentId || null, role: "AGENT", name: null },
-      note: "Recorded by the agent",
+      by: collector || { id: agentId || null, role: "AGENT", name: null },
+      note: collector?.role === "DELIVERY_PARTNER" ? "Recorded by the delivery partner" : "Recorded by the agent",
     },
   ],
 });

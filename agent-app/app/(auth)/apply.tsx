@@ -56,7 +56,9 @@ export default function ApplyAgentScreen() {
         pan: pan as PickedDocument,
       });
       toast.success("Application submitted", `Reference: ${result.agentId}. We'll email you once approved.`);
-      router.replace("/(auth)/login");
+      // Back to the sign-in screen already open underneath, not a second one on top
+      // (Back then returned to the screens this one was reached through)
+      router.dismissTo("/(auth)/login");
     } catch (error) {
       toast.error("Couldn't submit application", getErrorMessage(error));
     } finally {

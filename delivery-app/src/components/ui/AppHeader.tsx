@@ -24,17 +24,19 @@ export function AppHeader({ title, showBack = false }: { title: string; showBack
     <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
       <View className="flex-1 flex-row items-center gap-2">
         {showBack ? (
-          <IconButton onPress={() => router.back()} className="mr-1 bg-transparent">
+          <IconButton accessibilityLabel="Back" onPress={() => router.back()} className="mr-1 bg-transparent">
             <ChevronLeft size={24} color={colors.ink.DEFAULT} />
           </IconButton>
         ) : null}
-        <Text className="font-display-bold text-2xl text-ink" numberOfLines={1}>
+        {/* Shrinks to fit rather than running under the icons on a narrow
+            phone or with large text (an order number is the longest title) */}
+        <Text className="flex-1 font-display-bold text-2xl text-ink" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
           {title}
         </Text>
       </View>
 
       <View className="flex-row items-center gap-2.5">
-        <IconButton onPress={() => router.push("/notifications")} className="bg-white">
+        <IconButton accessibilityLabel="Notifications" onPress={() => router.push("/notifications")} className="bg-white">
           <View>
             <Bell size={20} color={colors.ink[700]} />
             {unreadCount > 0 ? (
@@ -45,7 +47,7 @@ export function AppHeader({ title, showBack = false }: { title: string; showBack
           </View>
         </IconButton>
 
-        <IconButton onPress={() => router.push("/profile")} className="overflow-hidden bg-maroon-700">
+        <IconButton accessibilityLabel="Profile" onPress={() => router.push("/profile")} className="overflow-hidden bg-maroon-700">
           <Text className="font-sans-bold text-xs text-white">{initials}</Text>
         </IconButton>
       </View>

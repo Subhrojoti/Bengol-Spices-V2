@@ -1,5 +1,29 @@
 # Admin frontend audit and continuation guide
 
+**Release recheck (1 November, local only):** fixed a failed collection-history
+page trapping Admin without Retry. Preserves report dates/page and existing UI;
+see [scope, full-run timeout investigation and final validation](ADMIN_RELEASE_RECHECK_2026-11-01.md).
+
+**Delivery tab overlap (1 November, local only):** store-photo buttons shared
+the sticky header's z-index and could paint above it while scrolling. The
+Delivery wrapper now isolates its stacking context, places content at z-0 and
+keeps sticky tabs at z-20. Layout, colors and business behavior are unchanged.
+New hit-testing regressions reproduced the failure before the fix at 390px and
+1440px; both now pass and confirm the original-photo modal remains usable.
+Admin lint, SPA build and all 16 targeted photo/Delivery Performance browser
+tests pass using synthetic intercepted requests. Screenshots inspected in
+`.admin-audit.local/delivery-tabs-{390,1440}.png`. No production deployment.
+
+**Delivery Performance follow-up (1 November, local only):** existing cards now
+open per-partner orders/items, assignment history and permission-controlled links
+to existing trails and Dispatch. Corrected backend history/collector aggregation;
+the Admin shell/theme is retained. See the
+[implementation and validation](../../../BackEnd/docs/DELIVERY_PERFORMANCE_REVIEW_2026-11-01.md).
+
+**Latest review (1 November 2026):** see [Store Details and Admin follow-up](ADMIN_STORE_DETAILS_REVIEW_2026-11-01.md)
+for current fixes, measurements, tests and dependency findings. The zero-advisory
+counts below describe the October snapshot, not the current registry audit.
+
 Audit date: **26 October 2026**. Starting repository HEAD: `efbebbf`.
 **Follow-up:** the owner authorized backend/Admin-only security fixes after this
 audit and explicitly excluded agent/delivery web versions. The CSS parser advisory

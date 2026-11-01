@@ -12,6 +12,7 @@ export function openInMaps(latitude: number, longitude: number, label?: string) 
   });
 
   Linking.openURL(url as string).catch(() => {
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
+    // No maps app and no browser either: nothing to open, and nothing to crash on
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`).catch(() => {});
   });
 }

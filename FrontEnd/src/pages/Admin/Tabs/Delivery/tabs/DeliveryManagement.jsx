@@ -68,7 +68,7 @@ const Stat = ({ label, value, icon, tint, ink }) => (
         <p className="text-lg font-semibold leading-none tabular-nums text-slate-900">
           {value}
         </p>
-        <p className="mt-1 truncate text-xs text-slate-400">{label}</p>
+        <p className="mt-1 whitespace-normal break-words text-xs leading-relaxed text-slate-400">{label}</p>
       </div>
     </div>
   </Card>

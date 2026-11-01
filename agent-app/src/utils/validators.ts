@@ -81,6 +81,7 @@ export const applyAgentSchema = z
 export type ApplyAgentForm = z.infer<typeof applyAgentSchema>;
 
 export const createStoreSchema = z.object({
+  gstNumber: z.string().trim().toUpperCase().refine(value => !value || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(value), "Enter a valid 15-character GST number"),
   storeName: z.string().trim().min(2, "Enter the store name"),
   ownerName: z.string().trim().min(2, "Enter the owner's name"),
   phone: z

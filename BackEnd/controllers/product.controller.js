@@ -4,6 +4,7 @@ import cloudinary from "../config/cloudinary.js";
 import { UNITS, isKnownUnit, normalizeUnit } from "../utils/uom.js";
 import { sanitizeDescription } from "../utils/sanitizeHtml.js";
 import { publicMessage } from "../utils/publicError.js";
+import { CATEGORY_MINIMUM_FIELDS, parseCategoryMinimums } from "../utils/orderMinimums.js";
 
 /* What the catalogue shows.
 
@@ -75,6 +76,13 @@ const EDITABLE_FIELDS = [
   "status",
 ];
 
+const categoryMinimums = (req, product) => {
+  if (req.user?.role !== "ADMIN" && Object.values(CATEGORY_MINIMUM_FIELDS).some(key => req.body[key] !== undefined)) {
+    throw new Error("Only Admin can change category minimum quantities");
+  }
+  return parseCategoryMinimums(req.body, product);
+};
+
 export const createProduct = async (req, res) => {
   let frontPublicId = null;
   let backPublicId = null;
@@ -119,6 +127,7 @@ export const createProduct = async (req, res) => {
     }
 
     const product = await Product.create({
+      ...categoryMinimums(req),
       name,
       title,
       // Only the formatting the editor offers is kept (utils/sanitizeHtml.js)
@@ -321,6 +330,7 @@ export const updateProduct = async (req, res) => {
       product.certificates = req.body.certificates.split(",");
     }
 
+    Object.assign(product, categoryMinimums(req, product));
     await product.save();
     imagesCommitted = true;
 

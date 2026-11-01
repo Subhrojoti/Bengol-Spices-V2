@@ -38,7 +38,7 @@ export default function Targets() {
         <div
           role="tablist"
           aria-label="Target sections"
-          className="inline-flex items-center gap-1 rounded-xl bg-slate-200/60 p-1">
+          className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-xl bg-slate-200/60 p-1">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const selected = active === tab.key;

@@ -108,7 +108,7 @@ export default function WalletScreen() {
                   <HeroStat icon={Clock} label="Pending" value={formatCurrency(summaryQuery.data.totalPending)} className="pl-4" />
                 </View>
               </HeroCard>
-              <SectionHeader title="Activity" subtitle="Incentives and payouts" right={<Pill label={`${historyQuery.data?.length ?? 0} entries`} />} />
+              <SectionHeader title="Activity" subtitle="Incentives and payouts" right={<Pill label={`${historyQuery.data?.length ?? 0} ${historyQuery.data?.length === 1 ? "entry" : "entries"}`} />} />
             </View>
           }
           ListEmptyComponent={<EmptyState icon={<ArrowUpRight size={22} color={colors.ink[500]} />} title="No wallet activity yet" />}

@@ -3,6 +3,7 @@ import Order from "../models/Order.js";
 import Counter from "../models/Counter.js";
 import Agent from "../models/Agent.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
+import { guardPartnerAssignment } from "../services/deliveryPartnerActivity.service.js";
 import { createNotification } from "../services/notification.service.js";
 import { withLock } from "../services/payment.service.js";
 import mongoose from "mongoose";
@@ -215,7 +216,11 @@ export const assignReturnPickup = async (req, res) => {
       note: `Pickup assigned to ${partner.name}`,
     });
 
-    await returnRequest.save();
+    await mongoose.connection.transaction(async session => {
+      await guardPartnerAssignment(partner._id, session);
+      const assigned = await Return.updateOne({ _id: returnRequest._id, status: "INITIATED" }, { $set: { pickup: returnRequest.pickup, status: "PICKUP_ASSIGNED" }, $push: { statusHistory: returnRequest.statusHistory[returnRequest.statusHistory.length - 1] } }, { session });
+      if (!assigned.matchedCount) throw Object.assign(new Error("This return changed. Refresh before assigning it again."), { status: 409 });
+    });
 
     /* The partner is told only once the assignment is saved, and a
        notification that cannot be written no longer fails the assignment.
@@ -241,9 +246,9 @@ export const assignReturnPickup = async (req, res) => {
     });
   } catch (error) {
     console.error("ASSIGN RETURN PICKUP ERROR:", error);
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       success: false,
-      message: "Failed to assign return pickup",
+      message: error.status ? error.message : "Failed to assign return pickup",
     });
   }
 };

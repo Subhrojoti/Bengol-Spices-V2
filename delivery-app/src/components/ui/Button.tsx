@@ -68,9 +68,11 @@ export function Button({
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       onPress={onPress}
       disabled={isDisabled}
-      className={`flex-row items-center justify-center gap-2 ${variantClasses[variant]} ${sizeClasses[size]} ${
+      className={`min-h-11 flex-row items-center justify-center gap-2 ${variantClasses[variant]} ${sizeClasses[size]} ${
         fullWidth ? "w-full" : ""
       } ${isDisabled ? "opacity-50" : ""} ${className ?? ""}`}
     >
@@ -79,7 +81,7 @@ export function Button({
       ) : (
         <>
           {icon}
-          <Text className={`font-sans-bold ${textSizeClasses[size]} ${textVariantClasses[variant]}`}>{label}</Text>
+          <Text className={`shrink text-center font-sans-bold ${textSizeClasses[size]} ${textVariantClasses[variant]}`}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -90,13 +92,17 @@ export function IconButton({
   onPress,
   children,
   className,
+  accessibilityLabel,
 }: {
   onPress?: () => void;
   children: ReactNode;
   className?: string;
+  accessibilityLabel?: string;
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       className={`h-10 w-10 items-center justify-center rounded-full active:bg-sand ${className ?? ""}`}
       hitSlop={8}

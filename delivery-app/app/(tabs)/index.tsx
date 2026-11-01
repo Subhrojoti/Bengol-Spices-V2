@@ -1,3 +1,4 @@
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { View, Text, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Package, Undo2, Clock3, Bell } from "lucide-react-native";
@@ -15,6 +16,7 @@ import { colors, gradients } from "@/theme/colors";
 import { getErrorMessage } from "@/api/client";
 
 export default function DashboardScreen() {
+  useRefetchOnFocus(["dashboard"]);
   const router = useRouter();
   const { data, isLoading, isError, isFetching, refetch, error } = useDashboard();
   const { data: partner } = useProfile();
@@ -36,7 +38,7 @@ export default function DashboardScreen() {
 
         <View className="flex-row items-center gap-2.5">
           <IconButton onPress={() => router.push("/notifications")} className="bg-white">
-            <View className="shrink pr-3">
+            <View>
               <Bell size={19} color={colors.ink[700]} />
               {unreadCount > 0 ? (
                 <View className="absolute -right-1 -top-1 h-4 w-4 items-center justify-center rounded-full bg-chili-600">

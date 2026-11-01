@@ -331,8 +331,8 @@
     },
     {
       "file": "src/components/layout/PanelLayout.jsx",
-      "sha256": "7913a66f06f6b09f3166a6093c6af848b2ba16a02e94a909785b61077f1d5c55",
-      "lines": 225,
+      "sha256": "c384a3e0a8c9c04346c878238674a847a7bcdf201e8aa0eb318fb3301fb9bd78",
+      "lines": 226,
       "imports": [
         "react",
         "@mui/material",
@@ -357,8 +357,8 @@
     },
     {
       "file": "src/components/layout/PanelNav.jsx",
-      "sha256": "607a1cd04148c5a4085927f8cec1d565a1d08f04485e6dd635e3d8625ed7778e",
-      "lines": 351,
+      "sha256": "d6ca23a3c37b63c49eb6bfb1ac80bca005acdbcdff9c61894a93eba85cff297a",
+      "lines": 357,
       "imports": [
         "@mui/material",
         "@mui/icons-material/Logout",

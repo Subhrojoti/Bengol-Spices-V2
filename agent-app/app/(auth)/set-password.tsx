@@ -31,7 +31,9 @@ export default function SetPasswordScreen() {
     try {
       await authApi.setPassword(extractToken(values.token), values.password);
       toast.success("Password set", "You can now sign in.");
-      router.replace("/(auth)/login");
+      // Back to the sign-in screen already open underneath, not a second one on top
+      // (Back then returned to the screens this one was reached through)
+      router.dismissTo("/(auth)/login");
     } catch (error) {
       toast.error("Couldn't set password", getErrorMessage(error));
     } finally {

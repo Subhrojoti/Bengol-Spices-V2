@@ -7,6 +7,7 @@ const schema = new mongoose.Schema({
   actor: { id: String, role: String, name: String },
   sourceAgentId: String,
   destinationAgentId: String,
+  sourcePartnerId: String,
   consumerIds: [String],
   details: mongoose.Schema.Types.Mixed,
   result: mongoose.Schema.Types.Mixed,

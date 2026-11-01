@@ -146,6 +146,7 @@ export default function useLiveOrders({ tokenKey, ordersPath, sessionKey }) {
       try {
         const payload = JSON.parse(data.join("\n"));
         if (type === "ORDER_PLACED" && payload.order) announce(payload.order);
+        if (type === "ORDER_UPDATED") window.dispatchEvent(new CustomEvent("live:order-placed", { detail: payload }));
 
         /* Cash recorded by an agent, or approved or rejected by someone at
            the office. No toast or chime: the screens that show it (cash

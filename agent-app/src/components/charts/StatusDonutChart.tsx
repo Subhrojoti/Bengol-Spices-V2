@@ -27,7 +27,7 @@ export function StatusDonutChart({ delivered, cancelled, returns }: { delivered:
         centerLabelComponent={() => (
           <View className="items-center">
             <Text className="font-display-bold text-2xl text-ink">{total}</Text>
-            <Text className="font-sans text-xs text-ink-500">Orders</Text>
+            <Text className="font-sans text-xs text-ink-500">Records</Text>
           </View>
         )}
       />

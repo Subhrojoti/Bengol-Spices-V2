@@ -38,6 +38,9 @@ const orderSchema = new mongoose.Schema(
     clientRequestId: {
       type: String,
     },
+    // Explicit opt-in for new drafts; legacy issued invoices are never edited.
+    invoicePolicy: { type: String, enum: ["ON_CONFIRMATION"] },
+    revision: { type: Number, default: 0 },
 
     /* =============================
        PRODUCTS ORDERED
@@ -118,8 +121,16 @@ const orderSchema = new mongoose.Schema(
 
     dueDate: {
       type: Date,
-      required: true,
+      required: function () { return this.creditPolicy?.basis !== "DELIVERY"; },
     },
+    creditPolicy: {
+      version: Number,
+      basis: { type: String, enum: ["DELIVERY"] },
+      days: Number,
+      startedAt: Date,
+    },
+    dueDateExtensions: [{ previousDueDate: Date, dueDate: Date, reason: String, at: Date, by: { id: String, role: String, name: String } }],
+    assignmentHistory: [{ partnerId: { type: mongoose.Schema.Types.ObjectId, ref: "DeliveryPartner" }, previousPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: "DeliveryPartner" }, partnerName: String, at: Date, mode: { type: String, enum: ["AUTO", "MANUAL"] }, by: { id: String, role: String, name: String } }],
 
     /* =============================
        ORDER STATUS
@@ -219,6 +230,7 @@ const orderSchema = new mongoose.Schema(
        ============================= */
 
     deliveryAddress: {
+      gstNumber: String,
       storeName: {
         type: String,
         required: true,

@@ -9,7 +9,7 @@ export const api = axios.create({
 
 api.interceptors.request.use(async (config) => {
   const token = await tokenStorage.get();
-  if (token) {
+  if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -33,13 +33,15 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
    out of any new sign-in. */
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     const config = error.config;
     const sentWithSession = Boolean(config?.headers?.Authorization);
     const isSignOut = /\/logout$/.test(config?.url ?? "");
 
     if (error.response?.status === 401 && sentWithSession && !isSignOut) {
-      unauthorizedHandler?.();
+      // A response from an old session cannot sign out a newer login.
+      const current = await tokenStorage.get().catch(() => null);
+      if (current && config?.headers?.Authorization === `Bearer ${current}`) unauthorizedHandler?.();
     }
     return Promise.reject(error);
   },

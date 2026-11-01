@@ -16,6 +16,19 @@ const get = (url, config = {}) => {
 
 const API_BASE_URL = "http://localhost:8000";
 
+export const getStoreReport = async (params, options = {}) => (await get("/agent/store/reports", { ...options, params })).data;
+export const getStoreReportAgents = async (options) => (await get("/agent/store/reports/agents", options)).data;
+export const revealStoreDeliveryCode = async (consumerId, options) => (await axiosInstance.post(`/agent/store/${encodeURIComponent(consumerId)}/delivery-code`, undefined, options)).data;
+export const extendOrderDueDate = async (orderId, body) => (await axiosInstance.put(`/agent/orders/${encodeURIComponent(orderId)}/due-date`, body)).data;
+export const getDispatchMappings = async (options) => (await get("/admin/dispatch-mappings", options)).data;
+export const saveDispatchMapping = async (body) => (await axiosInstance.put("/admin/dispatch-mappings", body)).data;
+export const revokeDispatchMapping = async (agentId, body) => (await axiosInstance.delete(`/admin/dispatch-mappings/${encodeURIComponent(agentId)}`, { data: body })).data;
+export const getDeliveryPerformance = async (params, options = {}) => (await get("/admin/delivery-performance", { ...options, params })).data;
+export const getPartnerOrders = async (partnerId, params, options = {}) => (await get(`/admin/delivery-performance/${encodeURIComponent(partnerId)}/orders`, { ...options, params })).data;
+export const getPartnerCollections = async (partnerId, params, options = {}) => (await get(`/admin/delivery-performance/${encodeURIComponent(partnerId)}/collections`, { ...options, params })).data;
+export const getStoreChanges = async (params, options = {}) => (await get("/agent/store/change-requests", { ...options, params })).data;
+export const reviewStoreChanges = async (requestId, body) => (await axiosInstance.put(`/agent/store/change-requests/${encodeURIComponent(requestId)}`, body)).data;
+
 export const agentRegistration = async (formData) => {
   const response = await axiosInstance.post("/agent/apply", formData, {
     headers: {
@@ -81,6 +94,8 @@ export const permanentlyDeleteAgent = async (agentId, body) => (await axiosInsta
 export const previewTestStoreDeletion = async (consumerId) => (await get(`/admin/store-management/${encodeURIComponent(consumerId)}/purge-preview`)).data;
 export const permanentlyDeleteTestStore = async (consumerId, body) => (await axiosInstance.post(`/admin/store-management/${encodeURIComponent(consumerId)}/purge`, body)).data;
 export const retryAgentFileCleanup = async (requestId) => (await axiosInstance.post(`/admin/data-cleanups/${encodeURIComponent(requestId)}/retry-media`)).data;
+export const previewDeliveryPartnerDeletion = async (partnerId, config) => (await axiosInstance.get(`/admin/delivery-partners/${encodeURIComponent(partnerId)}/purge-preview`, config)).data;
+export const permanentlyDeleteDeliveryPartner = async (partnerId, body) => (await axiosInstance.post(`/admin/delivery-partners/${encodeURIComponent(partnerId)}/purge`, body)).data;
 export const getManagementAudit = async (agentId, options) => (await get("/admin/management-audit", { ...options, params: agentId ? { agentId } : undefined })).data;
 
 export const getAgentProfile = async () => {
@@ -182,12 +197,12 @@ export const createOrder = async (payload) => {
   return response.data;
 };
 
-export const getStoreOrders = async (consumerId) => {
+export const getStoreOrders = async (consumerId, options) => {
   if (!consumerId) {
     throw new Error("consumerId is required to fetch store orders");
   }
 
-  const response = await get(`/agent/orders/store/${consumerId}`);
+  const response = await get(`/agent/orders/store/${encodeURIComponent(consumerId)}`, options);
 
   return response.data;
 };
@@ -333,8 +348,8 @@ export const getOrderWorkspaceOptions = async (params, options) => (await get("/
 export const exportOrderWorkspace = async (params, options) => axiosInstance.get("/admin/order-workspace/export", { ...options, params, responseType: "blob", timeout: 120000 });
 
 // CONFIRM ORDER
-export const confirmOrder = async (orderId) => {
-  const response = await axiosInstance.put(`/agent/orders/${orderId}/confirm`);
+export const confirmOrder = async (orderId, expectedRevision) => {
+  const response = await axiosInstance.put(`/agent/orders/${orderId}/confirm`, expectedRevision === undefined ? undefined : { expectedRevision });
   return response.data;
 };
 

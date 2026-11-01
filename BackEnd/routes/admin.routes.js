@@ -33,12 +33,24 @@ import { protect } from "../middleware/auth.js";
 import { isAdmin } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
 import { getWorkspaceOrders, getWorkspaceOrder, getWorkspaceOptions, exportWorkspace } from "../controllers/orderWorkspace.controller.js";
+import { getDispatchMappings, saveDispatchMapping, revokeDispatchMapping } from "../controllers/dispatchMapping.controller.js";
+import { getDeliveryPerformance, getPartnerOrders } from "../controllers/deliveryPerformance.controller.js";
+import { getPartnerCollections } from "../controllers/partnerCollections.controller.js";
 
 const router = express.Router();
+import { getDeliveryPartnerPurgePreview, executeDeliveryPartnerPurge } from "../controllers/adminManagement.controller.js";
 import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview, executeRemoval, getManagedStores, getManagementAudit, getAgentPurgePreview, executeAgentPurge, getStorePurgePreview, executeStorePurge, getCleanupStatus, retryCleanup } from "../controllers/adminManagement.controller.js";
 
 // 🔒 All routes require login
 router.use(protect);
+router.get("/delivery-partners/:partnerId/purge-preview", isAdmin, getDeliveryPartnerPurgePreview);
+router.post("/delivery-partners/:partnerId/purge", isAdmin, executeDeliveryPartnerPurge);
+router.get("/dispatch-mappings", isAdmin, getDispatchMappings);
+router.get("/delivery-performance", checkPermission("canGetAllDeliveryPartners"), getDeliveryPerformance);
+router.get("/delivery-performance/:partnerId/orders", checkPermission("canGetAllDeliveryPartners"), getPartnerOrders);
+router.get("/delivery-performance/:partnerId/collections", checkPermission("canGetAllDeliveryPartners"), getPartnerCollections);
+router.put("/dispatch-mappings", isAdmin, saveDispatchMapping);
+router.delete("/dispatch-mappings/:agentId", isAdmin, revokeDispatchMapping);
 router.get("/order-workspace", isAdmin, getWorkspaceOrders);
 router.get("/order-workspace/options", isAdmin, getWorkspaceOptions);
 router.get("/order-workspace/export", isAdmin, exportWorkspace);

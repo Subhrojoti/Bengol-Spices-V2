@@ -45,9 +45,11 @@ export function Button({ label, onPress, variant = "primary", size = "md", loadi
   const isDisabled = disabled || loading;
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       onPress={onPress}
       disabled={isDisabled}
-      className={`flex-row items-center justify-center gap-2 ${variantClasses[variant]} ${sizeClasses[size]} ${
+      className={`min-h-11 flex-row items-center justify-center gap-2 ${variantClasses[variant]} ${sizeClasses[size]} ${
         fullWidth ? "w-full" : ""
       } ${isDisabled ? "opacity-50" : ""} ${className ?? ""}`}
     >
@@ -56,7 +58,7 @@ export function Button({ label, onPress, variant = "primary", size = "md", loadi
       ) : (
         <>
           {icon}
-          <Text className={`font-sans-bold ${textSizeClasses[size]} ${textVariantClasses[variant]}`}>{label}</Text>
+          <Text className={`shrink text-center font-sans-bold ${textSizeClasses[size]} ${textVariantClasses[variant]}`}>{label}</Text>
         </>
       )}
     </Pressable>

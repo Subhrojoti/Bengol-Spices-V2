@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Image, Modal, Pressable, ActivityIndicator, Dimensions } from "react-native";
+import { View, Text, Image, Modal, Pressable, ActivityIndicator, ScrollView, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { X, CheckCircle2, QrCode as QrCodeIcon, RotateCw } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +14,13 @@ const POLL_INTERVAL_MS = 3000;
 // aspect ratio (width/height) used until the real image loads and reports
 // its actual dimensions, at which point it's corrected automatically.
 const DEFAULT_QR_ASPECT_RATIO = 0.56;
-const QR_WIDTH = Math.min(300, Dimensions.get("window").width - 80);
+/* The card is tall (a portrait image), so on a small phone, or with large
+   text, the screen could not hold it with the amount above and the
+   instructions below: they ran over the title and off the bottom. It is
+   kept to about half the screen's height, and the screen scrolls if what
+   is left still does not fit. */
+const qrWidthFor = (window: { width: number; height: number }, aspectRatio: number) =>
+  Math.max(160, Math.min(300, window.width - 80, Math.round(window.height * 0.5 * aspectRatio)));
 
 interface QrPaymentModalProps {
   visible: boolean;
@@ -37,6 +43,7 @@ export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, 
   const [confirming, setConfirming] = useState(false);
   const [confirmFailed, setConfirmFailed] = useState(false);
   const [aspectRatio, setAspectRatio] = useState(DEFAULT_QR_ASPECT_RATIO);
+  const QR_WIDTH = qrWidthFor(useWindowDimensions(), aspectRatio);
   // Set the moment a poll first reports the QR paid, so it is acted on once
   const paidHandledRef = useRef(false);
   const onPaidRef = useRef(onPaid);
@@ -118,7 +125,7 @@ export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, 
           </Pressable>
         </View>
 
-        <View className="flex-1 items-center justify-center px-8">
+        <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, paddingVertical: 16 }}>
           {paid ? (
             <View className="items-center">
               <View className="h-20 w-20 items-center justify-center rounded-full bg-cardamom-100">
@@ -178,7 +185,7 @@ export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, 
               {pollError ? <Text className="mt-2 text-center font-sans text-xs text-chili-600">{pollError}</Text> : null}
             </>
           )}
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );

@@ -52,6 +52,9 @@ export const downloadInvoice = async (req, res) => {
 
     let invoice = await Invoice.findOne({ orderId });
     const order = await Order.findOne({ orderId }).lean();
+    if (order?.invoicePolicy === "ON_CONFIRMATION" && !order.statusHistory?.some(entry => entry.status === "CONFIRMED")) {
+      return res.status(409).json({ message: "Invoice will be available after order confirmation" });
+    }
 
     /* An order is saved first and its invoice is made straight after. When
        that second step failed (the file store did not answer, the server

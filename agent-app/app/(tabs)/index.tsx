@@ -117,8 +117,8 @@ export default function OverviewScreen() {
               <TrendingUp size={160} color={colors.saffron[100]} />
             </View>
 
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-1.5">
+            <View className="flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+              <View className="max-w-full shrink flex-row items-center gap-1.5">
                 <Sparkles size={12} color={colors.gold.DEFAULT} />
                 <Eyebrow light>Total sales · last 30 days</Eyebrow>
               </View>
@@ -137,7 +137,7 @@ export default function OverviewScreen() {
 
             <View className="mt-5">
               <View className="flex-row items-center justify-between">
-                <Text className="font-sans text-xs text-saffron-100">Collected so far</Text>
+                <Text className="font-sans text-xs text-saffron-100">Collections recorded</Text>
                 <Text className="font-sans-bold text-xs text-white">{collectedPct}%</Text>
               </View>
               <View className="mt-2 h-2 overflow-hidden rounded-full" style={styles.track}>
@@ -155,14 +155,14 @@ export default function OverviewScreen() {
             </View>
 
             <View className="flex-row items-center">
-              <HeroStat icon={HandCoins} label="Collected" value={formatCurrency(summary.totalCollected)} className="pr-4" />
+              <HeroStat icon={HandCoins} label="Recorded" value={formatCurrency(summary.totalCollected)} className="pr-4" />
               <HeroDivider vertical />
               <HeroStat icon={Wallet2} label="Due" value={formatCurrency(summary.totalDue)} className="pl-4" />
             </View>
           </HeroCard>
 
           <View className="mt-4 flex-row gap-2.5">
-            <QuickAction icon={CirclePlus} label="Add Store" onPress={() => router.push("/(tabs)/stores/create")} />
+            <QuickAction icon={CirclePlus} label="Add Store" onPress={() => router.push("/new-store")} />
             <QuickAction icon={Trophy} label="Leaderboard" onPress={() => router.push("/leaderboard")} />
             <QuickAction icon={Undo2} label="Returns" onPress={() => router.push("/returns")} />
             <QuickAction icon={HelpCircle} label="Help" onPress={() => router.push("/help")} />
@@ -212,7 +212,7 @@ export default function OverviewScreen() {
             <PerformanceLineChart data={data.monthly.map((m) => ({ month: m.month, sales: m.sales }))} />
           </Card>
 
-          <SectionHeader title="Sales Status" subtitle="Delivered, cancelled and returned" />
+          <SectionHeader title="Sales Status" subtitle="Delivery and return records; an order can appear in both" />
           <Card className="relative mb-4 overflow-hidden">
             <View className="absolute -bottom-6 -right-6 opacity-[0.05]" pointerEvents="none">
               <ShoppingBag size={140} color={colors.maroon[900]} />

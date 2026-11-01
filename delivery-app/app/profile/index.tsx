@@ -82,7 +82,13 @@ export default function ProfileScreen() {
               <InfoRow icon={<User size={14} color={colors.saffron[700]} />} label="Full Name" value={partner.name} />
               <InfoRow icon={<Phone size={14} color={colors.saffron[700]} />} label="Phone" value={partner.phone} />
               {partner.email ? <InfoRow icon={<Mail size={14} color={colors.saffron[700]} />} label="Email" value={partner.email} /> : null}
-              <InfoRow icon={<IdCard size={14} color={colors.saffron[700]} />} label={partner.documents.idType.replace(/_/g, " ")} value={partner.documents.idNumber} />
+              {/* Only the last four characters: the full Aadhaar or licence
+                  number on screen could be read by anyone looking at the phone */}
+              <InfoRow
+                icon={<IdCard size={14} color={colors.saffron[700]} />}
+                label={partner.documents.idType.replace(/_/g, " ")}
+                value={`•••• ${String(partner.documents.idNumber ?? "").slice(-4)}`}
+              />
               <InfoRow
                 icon={<MapPin size={14} color={colors.saffron[700]} />}
                 label="Address"

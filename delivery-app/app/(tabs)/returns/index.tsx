@@ -1,3 +1,4 @@
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { View, Text, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Undo2, MapPin } from "lucide-react-native";
@@ -14,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const STATUS_ORDER: Record<string, number> = { PICKUP_ASSIGNED: 0, PICKED_UP: 1, RECEIVED_AT_WAREHOUSE: 2 };
 
 export default function ReturnsScreen() {
+  useRefetchOnFocus(["returns"]);
   const { data, isLoading, isError, refetch, error } = useAssignedReturns();
   const { pulling, onPull } = usePullToRefresh(refetch);
 
@@ -51,9 +53,9 @@ function ReturnRow({ item }: { item: AssignedReturn }) {
       onPress={() => router.push(`/returns/${item.returnId}`)}
       className="rounded-2xl border border-sand bg-white p-4 active:opacity-80"
     >
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-2">
-          <Text className="font-sans-bold text-sm text-ink" numberOfLines={1}>
+      <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+        <View className="max-w-full shrink">
+          <Text className="font-sans-bold text-sm text-ink" numberOfLines={2}>
             {item.storeDetails?.storeName ?? "Store"}
           </Text>
           <Text className="mt-0.5 font-sans text-xs text-ink-500">{item.returnId} · Order {item.orderId}</Text>
@@ -63,7 +65,7 @@ function ReturnRow({ item }: { item: AssignedReturn }) {
       {item.pickupLocation ? (
         <View className="mt-2 flex-row items-start gap-1.5">
           <MapPin size={12} color={colors.ink[500]} />
-          <Text className="flex-1 font-sans text-xs text-ink-500" numberOfLines={1}>
+          <Text className="flex-1 font-sans text-xs text-ink-500" numberOfLines={2}>
             {item.pickupLocation.address}
           </Text>
         </View>

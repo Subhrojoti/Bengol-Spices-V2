@@ -1,0 +1,55 @@
+{
+  "methodology": "Three cold local Chrome contexts, 4x CPU, synthetic 1,000 stores, 25 per page, 40ms API. No production traffic; photos excluded from timing.",
+  "before": [
+    {
+      "readyMs": 2185.8862,
+      "nextMs": 993.2084999999997,
+      "retainedWhileSearching": 0,
+      "unknown": []
+    },
+    {
+      "readyMs": 1661.3854000000001,
+      "nextMs": 987.6546000000008,
+      "retainedWhileSearching": 0,
+      "unknown": []
+    },
+    {
+      "readyMs": 2007.9034000000001,
+      "nextMs": 970.8551000000007,
+      "retainedWhileSearching": 0,
+      "unknown": []
+    }
+  ],
+  "after": [
+    {
+      "readyMs": 1829.9768,
+      "nextMs": 461.0689000000002,
+      "retainedWhileSearching": 25,
+      "unknown": []
+    },
+    {
+      "readyMs": 1590.1623999999997,
+      "nextMs": 471.8708999999999,
+      "retainedWhileSearching": 25,
+      "unknown": []
+    },
+    {
+      "readyMs": 1524.6203000000005,
+      "nextMs": 447.7414000000008,
+      "retainedWhileSearching": 25,
+      "unknown": []
+    }
+  ],
+  "medians": {
+    "readyMs": {
+      "before": 2007.9034000000001,
+      "after": 1590.1623999999997,
+      "reductionPercent": 20.804835531430466
+    },
+    "nextMs": {
+      "before": 987.6546000000008,
+      "after": 461.0689000000002,
+      "reductionPercent": 53.316787063007666
+    }
+  }
+}

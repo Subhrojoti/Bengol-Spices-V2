@@ -172,7 +172,15 @@ export const getLeaderboard = async ({ from, to, limit = 10 }) => {
   // 🏆 FINAL LEADERBOARD
   // =========================
   const leaderboard = Object.values(map)
-    .sort((a, b) => (b.earnedAmount || 0) - (a.earnedAmount || 0)) // 🔥 FIX: defensive fallback (belt-and-suspenders alongside the map-init fix above)
+    .sort((a, b) => {
+      const earningsDifference = (b.earnedAmount || 0) - (a.earnedAmount || 0);
+      if (earningsDifference) return earningsDifference;
+      // MongoDB $group has no guaranteed order. Break earnings ties by the
+      // immutable agent ID before limiting so refreshes keep the same ranks.
+      const aId = String(a.agentId);
+      const bId = String(b.agentId);
+      return aId < bId ? -1 : aId > bId ? 1 : 0;
+    })
     .slice(0, limit)
     .map((agent, index) => {
       const agentInfo = agentMap[agent.agentId] || {};

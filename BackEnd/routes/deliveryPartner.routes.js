@@ -17,6 +17,9 @@ import { isDeliveryPartner } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
 import { limitLoginAttempts } from "../middleware/loginLimiter.js";
 import { limitApplications } from "../middleware/rateLimit.js";
+import { getMobilePaymentHistory, collectDeliveryPayment } from "../controllers/mobileCollections.controller.js";
+import { storeOperation } from "../services/storeOperation.service.js";
+import { getPartnerCollections } from "../controllers/partnerCollections.controller.js";
 
 const router = express.Router();
 
@@ -36,6 +39,9 @@ router.get(
   getAllDeliveryPartners,
 );
 router.get("/orders", protect, isDeliveryPartner, getMyAssignedOrders);
+router.get("/collections", protect, isDeliveryPartner, getPartnerCollections);
+router.get("/orders/:orderId/payments", protect, isDeliveryPartner, getMobilePaymentHistory);
+router.post("/orders/:orderId/payments", protect, isDeliveryPartner, storeOperation(collectDeliveryPayment));
 router.get(
   "/dashboard",
   protect,

@@ -73,3 +73,11 @@ test("CSV reports preserve numeric totals, quotes and formula protection", () =>
   ]);
   assert.equal(csv, 'Store,Amount\r\n"\'=HYPERLINK(""https://example.invalid"")",-25.5\r\n"Store, ""A""",100\r\n\'@unsafe,');
 });
+
+test("CSV guards line-feed and full-width formula initiators without changing numeric cells", () => {
+  for (const value of ["\n=1+1", "＝1+1", "＋1+1", "－1+1", "＠SUM(1)"]) {
+    const result = toCsv([{ header: "Value", value: row => row }], [value]);
+    assert.equal(result, `Value\r\n${value.includes("\n") ? `"'${value}"` : `'${value}`}`);
+  }
+  assert.equal(toCsv([{ header: "Value", value: row => row }], [-12.5, "Ordinary store"]), "Value\r\n-12.5\r\nOrdinary store");
+});

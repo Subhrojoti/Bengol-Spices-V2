@@ -111,6 +111,10 @@ const productSchema = new mongoose.Schema(
       default: 1,
       min: 1,
     },
+    retailerMinOrderQty: { type: Number, min: 1 },
+    wholesalerMinOrderQty: { type: Number, min: 1 },
+    distributorMinOrderQty: { type: Number, min: 1 },
+    horecaMinOrderQty: { type: Number, min: 1 },
 
     /* =============================
        CERTIFICATIONS

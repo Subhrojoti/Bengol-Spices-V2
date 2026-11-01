@@ -28,7 +28,7 @@ import { useChartChrome } from "../../../../../theme/useChartChrome";
 const BAR = "#2a78d6";
 
 const n = (v) => Number(v || 0);
-const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
+const inr = (v) => `₹${n(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const inrCompact = (v) => {
   const val = n(v);
   const abs = Math.abs(val);
@@ -62,7 +62,7 @@ const Stat = ({ label, value, hint, icon, tint, ink }) => (
   </Card>
 );
 
-const ChartTooltip = ({ active, payload, label }) => {
+const ChartTooltip = ({ active, payload, label, verified }) => {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
 
@@ -72,7 +72,7 @@ const ChartTooltip = ({ active, payload, label }) => {
         {label}
       </p>
       <div className="flex items-center gap-2 text-[14px]">
-        <span className="text-slate-500">Collected</span>
+        <span className="text-slate-500">{verified ? "Eligible collected" : "Reported"}</span>
         <span className="ml-auto font-semibold tabular-nums text-slate-900">
           {inr(row.totalCollected)}
         </span>
@@ -100,6 +100,7 @@ const Skeleton = () => (
 
 export default function AgentPerformance() {
   const [data, setData] = useState([]);
+  const [calculation, setCalculation] = useState(null);
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -113,6 +114,7 @@ export default function AgentPerformance() {
       const res = await getAgentPerformance({ signal: request.signal });
       if (!request.current()) return;
       setData(Array.isArray(res?.data) ? res.data : []);
+      setCalculation(res?.calculation || null);
       setStatus("ready");
     } catch (err) {
       if (!request.current()) return;
@@ -126,6 +128,13 @@ export default function AgentPerformance() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    const refresh = () => load(true);
+    const events = ["live:cash-verification", "live:order-placed", "focus"];
+    events.forEach(event => window.addEventListener(event, refresh));
+    return () => events.forEach(event => window.removeEventListener(event, refresh));
+  }, [load]);
+  const verified = calculation === "VERIFIED_ELIGIBLE_V2";
 
   // Grid lines, axis labels and hover highlight, for light or dark
   const CHROME = useChartChrome();
@@ -144,6 +153,13 @@ export default function AgentPerformance() {
       transactions,
       perAgent: data.length ? collected / data.length : 0,
       top,
+      recorded: data.reduce((sum, row) => sum + n(row.recordedAmount), 0),
+      pending: data.reduce((sum, row) => sum + n(row.pendingVerificationAmount), 0),
+      rejected: data.reduce((sum, row) => sum + n(row.rejectedAmount), 0),
+      excluded: data.reduce((sum, row) => sum + n(row.excludedVerifiedAmount), 0),
+      unreconciled: data.reduce((sum, row) => sum + n(row.unreconciledOrders), 0),
+      attribution: data.reduce((sum, row) => sum + n(row.attributionMismatchCount), 0),
+      deferred: data.reduce((sum, row) => sum + n(row.deferredVerifiedAmount), 0),
     };
   }, [data]);
 
@@ -156,8 +172,9 @@ export default function AgentPerformance() {
     [data],
   );
 
-  // The chart above shows every agent; only the table below it is paged
-  const [pager, pagerTop] = usePagination(ranked);
+  // Keep both views bounded; totals and the chart scale still use all agents.
+  const [pager, pagerTop] = usePagination(ranked, { panelScroll: true });
+  const [chartPager, chartTop] = usePagination(ranked, { panelScroll: true });
 
   if (status === "loading") return <Skeleton />;
 
@@ -195,32 +212,32 @@ export default function AgentPerformance() {
     );
   }
 
-  const chartHeight = Math.max(ranked.length * 46 + 40, 180);
+  const chartHeight = Math.max(chartPager.pageItems.length * 46 + 40, 180);
 
   return (
     <div className="space-y-5">
       {/* ===== KPIs ===== */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
-          label="Total Collected"
+          label={verified ? "Eligible collected" : "Reported collections"}
           value={inr(totals.collected)}
-          hint={`across ${data.length} agent${data.length === 1 ? "" : "s"}`}
+          hint={`${verified ? "Verified eligible collections" : "Reported collection totals"} · all time`}
           icon={<IndianRupee size={17} />}
           tint="#eaf1fc"
           ink="#2a78d6"
         />
         <Stat
-          label="Transactions"
+          label={verified ? "Eligible transactions" : "Reported transactions"}
           value={n(totals.transactions).toLocaleString("en-IN")}
-          hint="payments collected"
+          hint={verified ? "Payment records contributing to eligible collections" : "Recorded payment records"}
           icon={<Receipt size={17} />}
           tint="#e6f7f0"
           ink="#12805a"
         />
         <Stat
           label="Average per Agent"
-          value={inr(Math.round(totals.perAgent))}
-          hint="total divided by agents"
+          value={inr(totals.perAgent)}
+          hint={`Across ${data.length} agents with orders, including zero collections`}
           icon={<Users size={17} />}
           tint="#f0edfd"
           ink="#5b4bc4"
@@ -235,8 +252,13 @@ export default function AgentPerformance() {
         />
       </div>
 
+      {verified ? <div className="space-y-1 text-xs text-slate-500"><p>All time · Recorded {inr(totals.recorded)} · Pending verification {inr(totals.pending)} · Not verified {inr(totals.rejected)} · Excluded for returns {inr(totals.excluded)}</p><p>Cancelled orders are excluded. Collections are credited to the original sales agent. Only eligible verified payments count toward collected sales and incentives.</p>{totals.deferred > 0 && <p>{inr(totals.deferred)} has a missing or future collection/counting date and is not included yet.</p>}</div> : <p role="status" className="text-xs text-amber-700">Verification and cancellation exclusions are not confirmed for these figures. Review Payment Info before treating them as verified collections.</p>}
+      {verified && totals.unreconciled > 0 && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{totals.unreconciled} orders have inconsistent order/payment totals. Their payments are excluded from eligible collections until reviewed in Payment Info.</p>}
+      {verified && totals.attribution > 0 && <p role="alert" className="text-xs text-amber-700">{totals.attribution} payment records have agent links that differ from their order. This report credits the original order agent; those stored links need review.</p>}
+
       {/* ===== RANKED BARS ===== */}
       <Card className="p-5">
+        <div ref={chartTop} className="scroll-mt-32">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-[16px] font-semibold leading-tight text-slate-800">
@@ -255,12 +277,13 @@ export default function AgentPerformance() {
 
         <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
-            data={ranked}
+            data={chartPager.pageItems}
             layout="vertical"
             margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
             <CartesianGrid horizontal={false} stroke={CHROME.grid} />
             <XAxis
               type="number"
+              domain={[Math.min(0, n(ranked.at(-1)?.totalCollected)), Math.max(0, n(ranked[0]?.totalCollected))]}
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 12, fill: CHROME.axis }}
@@ -275,18 +298,21 @@ export default function AgentPerformance() {
               tick={{ fontSize: 12, fill: CHROME.axis }}
             />
             <Tooltip
-              content={<ChartTooltip />}
+              content={<ChartTooltip verified={verified} />}
               cursor={{ fill: CHROME.cursor }}
             />
             <Bar
               dataKey="totalCollected"
-              name="Collected"
+              name={verified ? "Eligible collected" : "Reported"}
               fill={BAR}
               radius={[0, 4, 4, 0]}
               maxBarSize={26}
+              isAnimationActive={false}
             />
           </BarChart>
         </ResponsiveContainer>
+        </div>
+        <Pagination {...chartPager.controls} label="chart agents" className="mt-4 border-t border-slate-200 pt-3" />
       </Card>
 
       {/* ===== TABLE ===== */}
@@ -299,10 +325,10 @@ export default function AgentPerformance() {
                   Agent ID
                 </th>
                 <th className="px-5 py-3 text-right text-[12px] font-bold uppercase tracking-wide text-slate-500">
-                  Collected
+                  {verified ? "Eligible collected" : "Reported"}
                 </th>
                 <th className="px-5 py-3 text-right text-[12px] font-bold uppercase tracking-wide text-slate-500">
-                  Transactions
+                  {verified ? "Eligible transactions" : "Reported transactions"}
                 </th>
                 <th className="px-5 py-3 text-right text-[12px] font-bold uppercase tracking-wide text-slate-500">
                   Average per Txn
@@ -318,17 +344,14 @@ export default function AgentPerformance() {
                   </td>
                   <td className="px-5 py-3 text-right text-[14px] font-semibold tabular-nums text-slate-900">
                     {inr(agent.totalCollected)}
+                    {verified && <span className="mt-1 block text-xs font-normal text-slate-500">Recorded {inr(agent.recordedAmount)} · Pending {inr(agent.pendingVerificationAmount)}{n(agent.rejectedAmount) > 0 ? ` · Not verified ${inr(agent.rejectedAmount)}` : ""}{n(agent.unreconciledOrders) > 0 ? ` · ${agent.unreconciledOrders} orders need review` : ""}</span>}
                   </td>
                   <td className="px-5 py-3 text-right text-[14px] tabular-nums text-slate-600">
                     {n(agent.transactions).toLocaleString("en-IN")}
                   </td>
                   <td className="px-5 py-3 text-right text-[14px] tabular-nums text-slate-600">
                     {n(agent.transactions)
-                      ? inr(
-                          Math.round(
-                            n(agent.totalCollected) / n(agent.transactions),
-                          ),
-                        )
+                      ? inr(n(agent.totalCollected) / n(agent.transactions))
                       : "—"}
                   </td>
                 </tr>

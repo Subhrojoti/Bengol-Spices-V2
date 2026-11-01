@@ -3,8 +3,10 @@ import OperationLock from "../models/OperationLock.js";
 import GatewayPayment from "../models/GatewayPayment.js";
 import Order from "../models/Order.js";
 import Payment from "../models/Payment.js";
+import Invoice from "../models/Invoice.js";
+import mongoose from "mongoose";
 import { razorpayInstance } from "../config/razorpay.js";
-import { updateInvoiceAfterPayment } from "./invoice.service.js";
+import { regenerateInvoicePDF } from "./invoice.service.js";
 import { updateTargetProgress } from "./target.service.js";
 import { syncAfterSale } from "./salesTarget.service.js";
 import { publish } from "./liveEvents.js";
@@ -111,81 +113,61 @@ export const applyDuePayment = async ({
   razorpayPaymentId,
   razorpaySignature,
   nextPaymentMode,
+  collector,
+  clientRequestId,
 }) => {
+  const actor = collector || { id: agentId, role: "AGENT" };
+  if (!["AGENT", "DELIVERY_PARTNER"].includes(actor.role) || !actor.id) return refuse(403, "Invalid payment collector");
+  if (!["number", "string"].includes(typeof amount)) return refuse(400, "Enter a valid positive amount");
+  amount = roundRupees(amount);
+  if (!Number.isFinite(amount) || amount <= 0) return refuse(400, "Enter a valid positive amount");
+  if (actor.role === "DELIVERY_PARTNER" && !["CASH", "UPI"].includes(method)) return refuse(400, "Delivery partners may collect Cash or UPI only");
+  if (clientRequestId !== undefined && (typeof clientRequestId !== "string" || !/^[A-Za-z0-9_-]{16,100}$/.test(clientRequestId))) return refuse(400, "Invalid payment request identifier");
+  if (clientRequestId) await Payment.init();
+  const requestHash = crypto.createHash("sha256").update(JSON.stringify({ orderId, amount, method, note: note || "" })).digest("hex");
   const locked = await withLock(`order-payment:${orderId}`, async () => {
-    const order = await Order.findOne({ orderId });
-
-    if (!order) return refuse(404, "Order not found");
-
-    if (!(await managesStore(order.consumerId, agentId))) {
-      return refuse(403, "You are not allowed to collect payment for this order");
-    }
-
-    if (order.status === "CANCELLED") {
-      return refuse(400, "This order was cancelled");
-    }
-
-    if (order.dueAmount <= 0) return refuse(400, "No due amount remaining");
-
-    if (amount > order.dueAmount + 0.005) {
-      return refuse(400, "Amount exceeds due amount");
-    }
-
-    /* Less than ₹1 only when it clears the whole remaining due. A due under
-       ₹1 (₹100.50 ordered, ₹100 paid) could otherwise never be collected:
-       cash was refused below ₹1 and Razorpay and UPI QR start at ₹1. */
-    if (amount < 1 && Math.abs(amount - order.dueAmount) > 0.005) {
-      return refuse(400, "Enter a valid amount of at least ₹1");
-    }
-
     const unverified = needsVerification(method);
-
-    const payment = await Payment.create({
-      orderId: order.orderId,
-      consumerId: order.consumerId,
-      agentId: order.agentId,
-      amount,
-      method,
-      note,
-      ...(razorpayOrderId && { razorpayOrderId }),
-      ...(razorpayPaymentId && { razorpayPaymentId }),
-      ...(razorpaySignature && { razorpaySignature }),
-      collectedBy: {
-        id: agentId,
-        role: "AGENT",
-      },
-      ...(unverified && { verification: pendingVerification(agentId) }),
-    });
-
-    // Rounded to paise, so 141 − 14 − 127 lands on exactly 0 and completes
-    order.paidAmount = roundRupees(order.paidAmount + amount);
-    order.dueAmount = Math.max(0, roundRupees(order.dueAmount - amount));
-
-    if (order.dueAmount === 0) {
-      order.paymentStatus = "COMPLETED";
-    }
-
-    if (nextPaymentMode) {
-      order.paymentMode = nextPaymentMode(order.paymentMode);
-    }
-
-    try {
-      await order.save();
-    } catch (error) {
-      // The order was not updated, so the payment must not stay recorded
-      await Payment.deleteOne({ _id: payment._id }).catch((cleanupError) =>
-        console.error("PAYMENT ROLLBACK FAILED:", cleanupError),
-      );
+    let result;
+    try { result = await mongoose.connection.transaction(async session => {
+      const order = await Order.findOne({ orderId }).session(session);
+      if (!order) return refuse(404, "Order not found");
+      const authorised = actor.role === "AGENT" ? await managesStore(order.consumerId, actor.id)
+        : String(order.delivery?.partnerId) === String(actor.id) && ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(order.status);
+      if (!authorised) return refuse(403, "You are not allowed to collect payment for this order");
+      let previous;
+      if (clientRequestId) previous = await Payment.findOne({ "collectedBy.id": actor.id, "collectedBy.role": actor.role, clientRequestId }).session(session);
+      else if (razorpayPaymentId) previous = await Payment.findOne({ razorpayPaymentId }).session(session);
+      if (previous) {
+        if (previous.orderId !== orderId || (clientRequestId && previous.requestHash !== requestHash) || previous.amount !== amount || previous.method !== method) return refuse(409, "This payment request identifier was already used with different details");
+        return { ok: true, order, payment: previous, replayed: true };
+      }
+      if (order.status === "CANCELLED") return refuse(400, "This order was cancelled");
+      if (order.dueAmount <= 0) return refuse(400, "No due amount remaining");
+      if (amount > order.dueAmount + 0.005) return refuse(400, "Amount exceeds due amount");
+      if (amount < 1 && Math.abs(amount - order.dueAmount) > 0.005) return refuse(400, "Enter a valid amount of at least ₹1");
+      const [payment] = await Payment.create([{
+        orderId, consumerId: order.consumerId, agentId: order.agentId, amount, method, note,
+        ...(clientRequestId && { clientRequestId, requestHash }), collectionKind: "INSTALMENT",
+        ...(razorpayOrderId && { razorpayOrderId }), ...(razorpayPaymentId && { razorpayPaymentId }), ...(razorpaySignature && { razorpaySignature }),
+        collectedBy: actor, ...(unverified && { verification: pendingVerification(actor.id, new Date(), actor) }),
+      }], { session });
+      order.paidAmount = roundRupees(order.paidAmount + amount);
+      order.dueAmount = Math.max(0, roundRupees(order.dueAmount - amount));
+      order.paymentStatus = order.dueAmount === 0 ? "COMPLETED" : "PENDING";
+      if (nextPaymentMode) order.paymentMode = nextPaymentMode(order.paymentMode);
+      await order.save({ session });
+      await Invoice.updateOne({ orderId }, { $set: { paidAmount: order.paidAmount, dueAmount: order.dueAmount, status: order.dueAmount === 0 ? "PAID" : "PARTIAL" },
+        $push: { payments: { amount, method, paymentId: razorpayPaymentId, paymentRecordId: payment._id, date: payment.createdAt } },
+      }, { session });
+      return { ok: true, order, payment };
+    }); } catch (error) {
+      if (error.code === 11000 && clientRequestId) return refuse(409, "This payment request identifier is already recorded. Refresh its history before retrying.");
       throw error;
     }
-
-    // Both catch and log their own errors; the payment itself is recorded
-    await updateInvoiceAfterPayment({
-      orderId: order.orderId,
-      amount,
-      paymentId: razorpayPaymentId,
-      method,
-    });
+    if (!result.ok || result.replayed) return result;
+    const { order, payment } = result;
+    const invoice = await Invoice.findOne({ orderId });
+    if (invoice) await regenerateInvoicePDF(invoice, order);
 
     /* Cash waiting to be verified earns the agent nothing yet: the
        collection target and the sales target are credited when the office
@@ -206,7 +188,7 @@ export const applyDuePayment = async ({
       announceCashToVerify(payment);
     }
 
-    return { ok: true, order, payment };
+    return result;
   });
 
   if (locked.busy) {

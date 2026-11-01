@@ -34,7 +34,9 @@ export default function ResetPasswordScreen() {
     try {
       await authApi.resetPassword(extractToken(values.token), values.password, values.confirmPassword);
       toast.success("Password reset", "Sign in with your new password.");
-      router.replace("/(auth)/login");
+      // Back to the sign-in screen already open underneath, not a second one on top
+      // (Back then returned to the screens this one was reached through)
+      router.dismissTo("/(auth)/login");
     } catch (error) {
       toast.error("Couldn't reset password", getErrorMessage(error));
     } finally {
@@ -102,7 +104,7 @@ export default function ResetPasswordScreen() {
 
           <View className="mt-6 flex-row justify-center">
             <Text className="font-sans text-sm text-ink-500">Link expired? </Text>
-            <Pressable onPress={() => router.navigate("/(auth)/forgot-password")} hitSlop={6}>
+            <Pressable onPress={() => router.dismissTo("/(auth)/forgot-password")} hitSlop={6}>
               <Text className="font-sans-bold text-sm text-saffron-700">Request a new one</Text>
             </Pressable>
           </View>

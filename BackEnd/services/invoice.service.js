@@ -1,5 +1,6 @@
 import Invoice from "../models/Invoice.js";
 import Order from "../models/Order.js";
+import Payment from "../models/Payment.js";
 import { generateInvoiceNumber } from "../utils/invoiceNumber.js";
 import { generateInvoicePDFBuffer } from "../utils/generateInvoicePdf.js";
 import {
@@ -13,17 +14,20 @@ import {
    (SAFE + NO DUPLICATE)
 ============================= */
 
-export const createInvoiceFromOrder = async (order) => {
+export const createInvoiceFromOrder = async (order, { session = null, generatePdf = true, throwOnError = false, initialPayment = null } = {}) => {
   try {
+    if (order.invoicePolicy === "ON_CONFIRMATION" && !order.statusHistory?.some(entry => entry.status === "CONFIRMED")) {
+      throw Object.assign(new Error("Invoice will be available after order confirmation"), { status: 409 });
+    }
     // ✅ Prevent duplicate invoice
-    let existingInvoice = await Invoice.findOne({ orderId: order.orderId });
+    let existingInvoice = await Invoice.findOne({ orderId: order.orderId }).session(session);
 
     if (existingInvoice) {
       console.log("⚠️ Invoice already exists, skipping creation");
       return existingInvoice;
     }
 
-    const invoiceNumber = await generateInvoiceNumber();
+    const invoiceNumber = await generateInvoiceNumber(new Date(), session);
 
     let totalGST = 0;
     const items = order.products.map((item) => {
@@ -46,7 +50,8 @@ export const createInvoiceFromOrder = async (order) => {
       };
     });
 
-    const invoice = await Invoice.create({
+    const payments = initialPayment ? [initialPayment] : await Payment.find({ orderId: order.orderId }).sort({ createdAt: 1, _id: 1 }).session(session);
+    const [invoice] = await Invoice.create([{
       invoiceNumber,
       orderId: order.orderId,
 
@@ -57,6 +62,7 @@ export const createInvoiceFromOrder = async (order) => {
       },
 
       buyer: {
+        gstin: order.deliveryAddress.gstNumber || "",
         name: order.deliveryAddress.storeName,
         phone: order.deliveryAddress.phone,
         address: order.deliveryAddress.street,
@@ -68,17 +74,19 @@ export const createInvoiceFromOrder = async (order) => {
       totalGST,
       paidAmount: order.paidAmount,
       dueAmount: order.dueAmount,
+      payments: payments.map(payment => ({ amount: payment.amount, method: payment.method, paymentRecordId: payment._id, paymentId: payment.razorpayPaymentId, date: payment.createdAt })),
 
       status: order.dueAmount === 0 ? "PAID" : "PARTIAL",
       dueDate: order.dueDate,
-    });
+    }], { ...(session && { session }) });
 
     // ✅ Generate PDF immediately
-    await regenerateInvoicePDF(invoice, order);
+    if (generatePdf) await regenerateInvoicePDF(invoice, order);
 
     return invoice;
   } catch (error) {
     console.error("❌ CREATE INVOICE ERROR:", error);
+    if (throwOnError) throw error;
   }
 };
 

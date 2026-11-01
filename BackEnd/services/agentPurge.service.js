@@ -1,6 +1,9 @@
+import OrderModification from "../models/OrderModification.js";
 import mongoose from "mongoose";
 import Agent from "../models/Agent.js";
 import Store from "../models/store.js";
+import StoreChangeRequest from "../models/StoreChangeRequest.js";
+import DispatchMapping from "../models/DispatchMapping.js";
 import Order from "../models/Order.js";
 import Payment from "../models/Payment.js";
 import Return from "../models/Return.js";
@@ -48,6 +51,8 @@ const purgePlan = async (agentId, session = null) => {
   const gateways = await load(GatewayPayment, { $or: [{ agentId }, { orderId: { $in: orderIds } }] }, session);
   const invoices = await load(Invoice, { orderId: { $in: orderIds } }, session);
   const delivery = await load(DeliveryEvent, { orderId: { $in: orderIds } }, session);
+  const orderModifications = await load(OrderModification, { orderId: { $in: orderIds } }, session);
+  const storeChanges = await load(StoreChangeRequest, { $or: [{ agentId }, { consumerId: { $in: consumerIds } }] }, session);
   const assignedTargets = await load(Target, { assignedAgentIds: agentId }, session);
   const exclusiveTargets = assignedTargets.filter((t) => t.assignedAgentIds.length === 1);
   const sharedTargets = assignedTargets.filter((t) => t.assignedAgentIds.length > 1);
@@ -63,6 +68,9 @@ const purgePlan = async (agentId, session = null) => {
   if (gateways.some((g) => g.status === "PROCESSING")) conflicts.push("A gateway payment is still processing. Resolve it in Payment Issues before cleanup.");
 
   const entries = [
+    ["storeChanges", StoreChangeRequest, storeChanges],
+    ["orderModifications", OrderModification, orderModifications],
+    ["dispatchMappings", DispatchMapping, await load(DispatchMapping, { agentId }, session)],
     ["agents", Agent, [agent]], ["stores", Store, stores], ["orders", Order, orders],
     ["payments", Payment, payments], ["returns", Return, returns], ["invoices", Invoice, invoices],
     ["deliveryEvents", DeliveryEvent, delivery], ["gatewayPayments", GatewayPayment, gateways],
@@ -80,7 +88,7 @@ const purgePlan = async (agentId, session = null) => {
     ] }, session)],
   ];
   const exclusions = new Map(entries.map(([, model, rows]) => [model.modelName, ids(rows)]));
-  const urls = [...Object.values(agent.documents || {}), ...(agent.applicationHistory || []).flatMap((a) => Object.values(a.documents || {})), ...stores.map((s) => s.image?.url), ...invoices.map((i) => i.pdfUrl)].filter((v) => typeof v === "string" && v);
+  const urls = [...Object.values(agent.documents || {}), ...(agent.applicationHistory || []).flatMap((a) => Object.values(a.documents || {})), ...stores.map((s) => s.image?.url), ...storeChanges.flatMap(change => [change.before?.image?.url, change.proposed?.image?.url]), ...invoices.map((i) => i.pdfUrl)].filter((v) => typeof v === "string" && v);
   if (urls.some((url) => /^https:\/\/res\.cloudinary\.com\//.test(url) && !mediaAssetOf(url))) conflicts.push("Some Cloudinary files cannot be matched to this server's storage account. Review storage settings and file references before deleting this agent.");
   const candidates = urls.map(mediaAssetOf).filter(Boolean);
   for (const invoice of invoices) if (invoice.invoiceNumber && mediaAssetOf(invoice.pdfUrl)) {

@@ -1,4 +1,6 @@
+import { OrderChanges } from "@/components/payments/OrderChanges";
 import { useState } from "react";
+import { OrderPayments } from "@/components/payments/OrderPayments";
 import { View, Text, Image, ScrollView, RefreshControl, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
@@ -9,6 +11,7 @@ import { Badge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useOrder } from "@/hooks/useOrders";
 import { useInitiateReturn, useMyReturns } from "@/hooks/useReturns";
+import { returnApi } from "@/api/return.api";
 import { useInvoiceDownload } from "@/hooks/useInvoiceDownload";
 import { formatCurrency } from "@/utils/currency";
 import { formatQuantity } from "@/utils/uom";
@@ -54,7 +57,7 @@ export default function OrderDetailScreen() {
      looked at and the order is still on its way, it is kept up to date. */
   const focused = useIsFocused();
   const { data: order, isLoading, isError, refetch, error } = useOrder(orderId, { live: focused });
-  const { data: returns } = useMyReturns();
+  const { data: returns, refetch: refetchReturns } = useMyReturns();
   const { downloadInvoice, downloading } = useInvoiceDownload();
   const initiateReturn = useInitiateReturn();
 
@@ -94,6 +97,21 @@ export default function OrderDetailScreen() {
       setReasonError(null);
       toast.success("Return requested", `Return ${result.returnId} has been initiated.`);
     } catch (e) {
+      /* The request may have gone through with its answer lost, or been
+         sent twice by the phone (the second copy is refused as "already
+         initiated"). An open return for this order means it did. */
+      const opened = await returnApi
+        .getMyReturns()
+        .then((list) => list.find((r) => r.orderId === order.orderId && r.status !== "CANCELLED" && r.reason === trimmed))
+        .catch(() => undefined);
+      if (opened) {
+        void refetchReturns();
+        setReturnModalVisible(false);
+        setReason("");
+        setReasonError(null);
+        toast.success("Return requested", `Return ${opened.returnId} has been initiated.`);
+        return;
+      }
       toast.error("Couldn't request return", getErrorMessage(e));
     }
   };
@@ -129,8 +147,8 @@ export default function OrderDetailScreen() {
           ) : null}
 
           <Card>
-            <View className="flex-row items-start justify-between">
-              <View>
+            <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+              <View className="max-w-full shrink">
                 <Text className="font-display-bold text-lg text-ink">{order.orderId}</Text>
                 <Text className="mt-0.5 font-sans text-xs text-ink-500">{formatDateTime(order.createdAt)}</Text>
               </View>
@@ -156,6 +174,7 @@ export default function OrderDetailScreen() {
             ) : null}
           </Card>
 
+          {order.status === "PLACED" && order.invoicePolicy === "ON_CONFIRMATION" && <Button label="Edit order" variant="outline" onPress={() => router.push(`/orders/${order.orderId}/edit`)} />}
           <Card>
             <View className="mb-3 flex-row items-center gap-2">
               <Package size={16} color={colors.ink[700]} />
@@ -195,8 +214,10 @@ export default function OrderDetailScreen() {
             {payment && payment.awaiting > 0 ? <SummaryRow label="Cash awaiting verification" value={formatCurrency(payment.awaiting)} tone="warning" /> : null}
             {payment && payment.notVerified > 0 ? <SummaryRow label="Cash not verified" value={formatCurrency(payment.notVerified)} tone="danger" /> : null}
             <SummaryRow label="Due" value={formatCurrency(order.dueAmount)} tone={order.dueAmount > 0 ? "danger" : undefined} />
-            <SummaryRow label="Due Date" value={formatDateTime(order.dueDate)} />
+            <SummaryRow label="Due Date" value={order.dueDate ? formatDateTime(order.dueDate) : order.creditPolicy ? `${order.creditPolicy.days} days after delivery` : "—"} />
             <SummaryRow label="Payment Mode" value={order.paymentMode} />
+            <OrderPayments orderId={order.orderId} />
+            {(order.revision || 0) > 0 && <OrderChanges orderId={order.orderId} />}
 
             {payment && payment.notVerified > 0 ? (
               <View className="mt-2 rounded-xl bg-chili-100 p-3">
@@ -212,7 +233,7 @@ export default function OrderDetailScreen() {
               </View>
             ) : null}
 
-            <Button label="Invoice" variant="outline" icon={<FileDown size={15} color={colors.ink.DEFAULT} />} onPress={() => downloadInvoice(order.orderId)} loading={downloading} fullWidth className="mt-3" />
+            <Button label={order.invoicePolicy === "ON_CONFIRMATION" && !order.statusHistory?.some(step => step.status === "CONFIRMED") ? "Invoice after confirmation" : "Invoice"} disabled={order.invoicePolicy === "ON_CONFIRMATION" && !order.statusHistory?.some(step => step.status === "CONFIRMED")} variant="outline" icon={<FileDown size={15} color={colors.ink.DEFAULT} />} onPress={() => downloadInvoice(order.orderId)} loading={downloading} fullWidth className="mt-3" />
 
             {/* A cancelled order keeps its due amount, but the backend refuses
                 payment for it, so the button only led to an error */}
@@ -236,8 +257,8 @@ export default function OrderDetailScreen() {
 
               {existingReturn ? (
                 <>
-                  <View className="flex-row items-start justify-between">
-                    <View className="flex-1 pr-2">
+                  <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+                    <View className="max-w-full shrink">
                       <Text className="font-sans-bold text-sm text-ink">{existingReturn.returnId}</Text>
                       <Text className="mt-0.5 font-sans text-xs text-ink-500">Requested {formatDateTime(existingReturn.createdAt)}</Text>
                     </View>

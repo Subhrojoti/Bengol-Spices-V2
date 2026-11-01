@@ -84,6 +84,7 @@ const describe = (payment, order, agent) => ({
   method: payment.method,
   agentNote: payment.note || null,
   collectedAt: payment.createdAt,
+  collector: { id: payment.collectedBy?.id || "", role: payment.collectedBy?.id ? payment.collectedBy.role || "AGENT" : "UNKNOWN", name: payment.collectedBy?.name || null },
 
   status: payment.verification?.status || null,
   decidedAt: payment.verification?.decidedAt || null,
@@ -261,12 +262,12 @@ export const getCashPayment = async (paymentId) => {
 
 /* ── the two decisions ────────────────────────────────────────────── */
 
-const tell = (agentId, title, message, meta) =>
+const tell = (agentId, title, message, meta, recipientModel = "Agent") =>
   createNotification({
     title,
     message,
     recipientId: agentId,
-    recipientModel: "Agent",
+    recipientModel,
     type: "SYSTEM",
     meta,
   }).catch(() => {
@@ -274,7 +275,8 @@ const tell = (agentId, title, message, meta) =>
        reason to report it as failed. createNotification has logged it. */
   });
 
-const collectorOf = (payment) => payment.collectedBy?.role === "AGENT" && payment.collectedBy.id ? payment.collectedBy.id : payment.agentId;
+const collectorOf = (payment) => payment.collectedBy?.id || payment.agentId;
+const collectorModel = (payment) => payment.collectedBy?.role === "DELIVERY_PARTNER" ? "DeliveryPartner" : "Agent";
 
 const announce = (payment) =>
   publish(
@@ -405,6 +407,7 @@ const approveCashPaymentUnlocked = async ({ paymentId, note, actor, now = new Da
       ? `${inr(payment.amount)} you collected for order ${payment.orderId} on ${day(payment.createdAt)} has been verified and now counts toward your sales.`
       : `${inr(payment.amount)} you collected for order ${payment.orderId} on ${day(payment.createdAt)} has been verified. It was a due from an earlier month, so it does not count toward a sales target.`,
     { kind: "CASH_VERIFICATION", status: APPROVED, orderId: payment.orderId, paymentId: String(payment._id) },
+    collectorModel(payment),
   );
   announce(payment);
 
@@ -446,6 +449,7 @@ const rejectCashPaymentUnlocked = async ({ paymentId, reason, actor, now = new D
     "Cash payment not verified",
     `${inr(payment.amount)} you recorded for order ${payment.orderId} on ${day(payment.createdAt)} was not verified: ${why} It does not count toward your sales until this is settled with the office.`,
     { kind: "CASH_VERIFICATION", status: REJECTED, orderId: payment.orderId, paymentId: String(payment._id) },
+    collectorModel(payment),
   );
   announce(payment);
 

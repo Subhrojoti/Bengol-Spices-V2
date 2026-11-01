@@ -59,6 +59,10 @@ const employeeSchema = new mongoose.Schema(
       canManageDeliveryPartners: { type: Boolean, default: false },
       // Approve or reject the cash agents record, before it counts as a sale
       canVerifyPayments: { type: Boolean, default: false },
+      canViewStoreReports: { type: Boolean, default: false },
+      canViewDeliveryCodes: { type: Boolean, default: false },
+      canReviewStoreChanges: { type: Boolean, default: false },
+      canExtendDueDates: { type: Boolean, default: false },
       // NOTE: canGetAllDeliveryPartners is declared once, above. It used to
       // appear a second time here, which silently overwrote the first
       // declaration (duplicate object key).

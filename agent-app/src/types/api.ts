@@ -62,6 +62,8 @@ export interface LeaderboardEntry {
 export type StoreType = "RETAILER" | "WHOLESALER" | "DISTRIBUTOR" | "HORECA";
 
 export interface Store {
+  gstNumber?: string;
+  detailsVersion?: number;
   _id: string;
   consumerId: string;
   storeName: string;
@@ -147,6 +149,8 @@ export interface StatusHistoryEntry {
 }
 
 export interface Order {
+  invoicePolicy?: "ON_CONFIRMATION";
+  revision?: number;
   _id: string;
   orderId: string;
   consumerId: string;
@@ -156,7 +160,8 @@ export interface Order {
   totalAmount: number;
   paidAmount: number;
   dueAmount: number;
-  dueDate: string;
+  dueDate: string | null;
+  creditPolicy?: { version: number; basis: "DELIVERY"; days: number; startedAt?: string };
   // 🔥 "QR" added alongside the existing modes for the new QR payment feature.
   paymentMode: "CASH" | "ONLINE" | "QR" | "MIXED";
   status: OrderStatus;

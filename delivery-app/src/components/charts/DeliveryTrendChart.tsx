@@ -65,6 +65,7 @@ export function DeliveryTrendChart({ data }: { data: MonthlyPoint[] }) {
           yAxisThickness={0}
           xAxisThickness={1}
           xAxisColor={colors.sand.dark}
+          xAxisLength={chartWidth}
           noOfSections={4}
           isAnimated
           animationDuration={600}

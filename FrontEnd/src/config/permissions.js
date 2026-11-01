@@ -21,6 +21,9 @@ export const PERMISSION_GROUPS = [
     group: "People",
     items: [
       { key: "canManageAgents", label: "Manage Agents" },
+      { key: "canViewStoreReports", label: "View Store Reports" },
+      { key: "canViewDeliveryCodes", label: "View Delivery Verification Codes" },
+      { key: "canReviewStoreChanges", label: "Review Store Change Requests" },
       { key: "canAssignLocations", label: "Assign Locations" },
       { key: "canPayoutIncentives", label: "Manage Incentives" },
       { key: "canGetAllDeliveryPartners", label: "View Delivery Partners" },
@@ -36,6 +39,7 @@ export const PERMISSION_GROUPS = [
     items: [
       { key: "canViewDashboardSummary", label: "View Dashboard Summary" },
       { key: "canSeePaymentInfo", label: "View Payment Info" },
+      { key: "canExtendDueDates", label: "Extend Payment Due Dates" },
       { key: "canVerifyPayments", label: "Verify Cash Payments" },
       { key: "canSetTargets", label: "Manage Daily Targets" },
       { key: "canManageNotifications", label: "Manage Notifications" },

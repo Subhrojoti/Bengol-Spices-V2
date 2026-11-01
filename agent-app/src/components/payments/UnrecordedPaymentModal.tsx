@@ -1,4 +1,4 @@
-import { View, Text, Modal, Alert } from "react-native";
+import { View, Text, Modal, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RotateCw, TriangleAlert } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
@@ -45,7 +45,8 @@ export function UnrecordedPaymentModal({ visible, amount, reference, pending, pr
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={confirmGiveUp}>
       <SafeAreaView className="flex-1 bg-cream" edges={["top", "bottom"]}>
-        <View className="flex-1 items-center justify-center px-8">
+        {/* Scrolls on a small phone or with large text, so "Try again" is never off the screen */}
+        <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, paddingVertical: 16 }}>
           <View className="h-20 w-20 items-center justify-center rounded-full bg-saffron-100">
             <TriangleAlert size={38} color={colors.saffron[700]} />
           </View>
@@ -65,7 +66,7 @@ export function UnrecordedPaymentModal({ visible, amount, reference, pending, pr
 
           <Button label="Try again" icon={<RotateCw size={15} color={colors.white} />} onPress={onRetry} loading={busy} fullWidth size="lg" className="mt-5" />
           <Button label="Close" variant="ghost" onPress={confirmGiveUp} disabled={busy} fullWidth className="mt-2" />
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );

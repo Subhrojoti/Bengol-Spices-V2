@@ -587,5 +587,27 @@
     "lightAndDarkAlignment": "passed: equal heights of 26.75px and equal vertical centers",
     "adminLint": "passed",
     "deployed": true
+  },
+  "adminSidebarSpacing": {
+    "date": "2026-10-29",
+    "status": "local only; not committed, pushed or deployed",
+    "scope": "Admin rail spacing and icon alignment; pinned/mobile grouping retained",
+    "before": {
+      "groupStep": 77.75,
+      "itemStep": 46,
+      "iconCenterX": 26
+    },
+    "after": {
+      "everyNavigationStep": 46,
+      "iconCenterX": 35.5
+    },
+    "lightAndDarkChecked": true,
+    "hoverClickPositionsStable": true,
+    "pinnedAndMobileNavigation": "passed",
+    "existingEmployeeNavigationCase": "passed",
+    "adminLint": "passed",
+    "spaBuild": "passed",
+    "unrelatedFilesAndStagingPreserved": true,
+    "record": "SIDEBAR_SPACING.md"
   }
 }

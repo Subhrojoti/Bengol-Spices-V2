@@ -14,8 +14,18 @@ import {
   getSalesLocations,
 } from "../controllers/agent.controller.js";
 import { checkPermission } from "../middleware/permission.js";
+import { getStoreReport, getStoreReportAgents, revealStoreDeliveryCode } from "../controllers/storeReports.controller.js";
+import { submitStoreChanges, listStoreChanges, reviewStoreChanges } from "../controllers/storeChanges.controller.js";
 
 const router = express.Router();
+
+router.get("/reports", protect, checkPermission("canViewStoreReports"), getStoreReport);
+router.get("/reports/agents", protect, checkPermission("canViewStoreReports"), getStoreReportAgents);
+router.post("/:consumerId/delivery-code", protect, checkPermission("canViewDeliveryCodes"), revealStoreDeliveryCode);
+router.get("/change-requests", protect, checkPermission("canReviewStoreChanges"), listStoreChanges);
+router.put("/change-requests/:requestId", protect, checkPermission("canReviewStoreChanges"), reviewStoreChanges);
+router.get("/:consumerId/change-requests", protect, isAgent, listStoreChanges);
+router.post("/:consumerId/change-requests", protect, isAgent, upload.single("image"), submitStoreChanges);
 
 // 🔥 DIRECT STORE CREATION (NO OTP)
 router.post("/register", protect, isAgent, agentStoreCreation, upload.single("image"), createStore);

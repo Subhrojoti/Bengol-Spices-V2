@@ -59,6 +59,7 @@ export function YearlyComparisonChart({ data }: { data: YearPoint[] }) {
           yAxisThickness={0}
           xAxisThickness={1}
           xAxisColor={colors.sand.dark}
+          xAxisLength={chartWidth}
           isAnimated
           animationDuration={600}
         />

@@ -1,7 +1,7 @@
 import reportAdminError from "../../../../utils/reportAdminError";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { Autocomplete, TextField } from "@mui/material";
+import { Autocomplete, TextField, Dialog } from "@mui/material";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -97,6 +97,7 @@ const fieldSx = (theme) => {
 export default function AssignLocation() {
   const [agents, setAgents] = useState([]);
   const [coverage, setCoverage] = useState([]);
+  const [pinLookup, setPinLookup] = useState("");
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [suggested, setSuggested] = useState([]);
@@ -913,11 +914,11 @@ export default function AssignLocation() {
 
                           <div className="flex flex-wrap gap-1.5">
                             {(row.pincodes || []).map((pin) => (
-                              <span
+                              <button type="button" onClick={() => setPinLookup(String(pin))} aria-label={`View agents covering pincode ${pin}`}
                                 key={pin}
-                                className="rounded-md bg-slate-100 px-2 py-0.5 text-[12.5px] tabular-nums text-slate-600">
+                                className="rounded-md bg-slate-100 px-2 py-0.5 text-[12.5px] tabular-nums text-blue-600 hover:bg-blue-50 hover:underline">
                                 {pin}
-                              </span>
+                              </button>
                             ))}
                           </div>
 
@@ -949,6 +950,7 @@ export default function AssignLocation() {
       </div>
 
       {/* ===== CONFIRM ===== */}
+      <Dialog open={Boolean(pinLookup)} onClose={() => setPinLookup("")} fullWidth maxWidth="sm"><div className="bg-white p-5"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold text-slate-900">Agents covering {pinLookup}</h3><button aria-label="Close pincode lookup" onClick={() => setPinLookup("")} className="rounded-lg border border-slate-200 p-2"><X size={16} /></button></div><div className="mt-4 space-y-2">{[...new Set(coverage.filter(row => (row.pincodes || []).some(pin => String(pin).trim() === pinLookup)).map(row => row.agentId))].map(id => <div key={id} className="rounded-lg border border-slate-200 p-3 text-sm"><p className="font-medium text-slate-800">{agents.find(a => a.agentId === id)?.name || id}</p><p className="text-xs text-slate-500">{id}</p></div>)}</div></div></Dialog>
       <ConfirmDialog
         open={confirmOpen}
         busy={saving}

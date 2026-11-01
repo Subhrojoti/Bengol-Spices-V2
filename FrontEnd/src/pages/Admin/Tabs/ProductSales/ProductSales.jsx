@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import useLatestRequest from "../../../../hooks/useLatestRequest";
 import {
   Bar,
@@ -11,6 +12,7 @@ import {
 } from "recharts";
 import {
   AlertCircle,
+  ArrowLeft,
   Download,
   HandCoins,
   Hourglass,
@@ -269,8 +271,65 @@ export default function ProductSales() {
   const [to, setTo] = useState(initial.to);
   const [groupBy, setGroupBy] = useState(initial.groupBy);
   const [measure, setMeasure] = useState("collected");
-  const [agentId, setAgentId] = useState("");
   const [productId, setProductId] = useState("");
+
+  /* The agent being looked at lives in the address (?agent=BS2026-001).
+     Opening one from the "By agent" table adds a step to the browser's
+     history, so the browser's own Back (or a mouse's back button) returns
+     to every agent, as the Back button on the page does. It used to be a
+     plain value on the page: there was no way back but the agent box, and
+     the browser's Back left Product Sales altogether. Choosing an agent in
+     the box is a change of filter and adds no step. */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const agentId = searchParams.get("agent") || "";
+
+  const setAgentId = useCallback(
+    (id, { fromTable = false } = {}) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (id) next.set("agent", id);
+          else next.delete("agent");
+          return next;
+        },
+        fromTable ? { state: { fromAgentTable: true } } : { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const pageTop = useRef(null);
+  // The "By agent" table's heading (the pager's own ref is a callback, with
+  // no element to scroll to)
+  const agentTableTop = useRef(null);
+  const openedFromTable = useRef(false);
+  const scrollToTable = useRef(false);
+
+  const openAgent = (id) => {
+    openedFromTable.current = true;
+    setAgentId(id, { fromTable: true });
+    // The agent's figures start at the top of the page, not at the table
+    pageTop.current?.scrollIntoView({ block: "start" });
+  };
+
+  const backToAllAgents = () => {
+    // One step back in the browser when the agent was opened from the
+    // table, so the browser's Back does not then return to the agent
+    if (location.state?.fromAgentTable) navigate(-1);
+    else setAgentId("");
+  };
+
+  // Leaving an agent opened from the table, by either Back: return to the table
+  const previousAgent = useRef(agentId);
+  useEffect(() => {
+    if (previousAgent.current && !agentId && openedFromTable.current) {
+      openedFromTable.current = false;
+      scrollToTable.current = true;
+    }
+    previousAgent.current = agentId;
+  }, [agentId]);
 
   const [agents, setAgents] = useState([]);
   const [report, setReport] = useState(null);
@@ -384,6 +443,17 @@ export default function ProductSales() {
     resetKey: `${from}|${to}|${productId}`,
   });
 
+  /* Back at the table only once the report for every agent has arrived:
+     the figures above the table change length when it does. The table
+     keeps the page it was on. */
+  useEffect(() => {
+    if (!scrollToTable.current || !report || report.agentId) return;
+    scrollToTable.current = false;
+    requestAnimationFrame(() =>
+      agentTableTop.current?.scrollIntoView({ block: "start" }),
+    );
+  }, [report]);
+
   const agentName =
     agentOptions.find((a) => a.agentId === agentId)?.name || agentId;
   const productName = products.find((p) => p.productId === productId)?.name;
@@ -426,7 +496,32 @@ export default function ProductSales() {
   const who = agentId ? agentName : "All agents";
 
   return (
-    <div className="min-h-screen space-y-4 bg-slate-50 px-5 pb-10 pt-5 lg:px-8 lg:pt-6">
+    <div
+      ref={pageTop}
+      className="min-h-screen scroll-mt-24 space-y-4 bg-slate-50 px-5 pb-10 pt-5 lg:px-8 lg:pt-6">
+      {/* ===== ONE AGENT: the way back to every agent ===== */}
+      {agentId && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={backToAllAgents}
+            className="group inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50">
+            <ArrowLeft
+              size={15}
+              className="transition-transform group-hover:-translate-x-0.5"
+            />
+            Back to all agents
+          </button>
+          <span className="text-[13.5px] text-slate-500">
+            Showing{" "}
+            <span className="font-semibold text-slate-800">{agentName}</span>
+            <span className="ml-2 font-mono text-[12.5px] text-slate-500">
+              {agentId}
+            </span>
+          </span>
+        </div>
+      )}
+
       {/* ===== FILTERS — one row above everything they change ===== */}
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -815,7 +910,9 @@ export default function ProductSales() {
           {/* ===== BY AGENT (business view only) ===== */}
           {!agentId && (
             <Card className="overflow-hidden">
-              <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+              <div
+                ref={agentTableTop}
+                className="flex scroll-mt-24 items-center gap-3 border-b border-slate-100 px-5 py-4">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
                   <Users size={16} />
                 </span>
@@ -847,14 +944,14 @@ export default function ProductSales() {
                     {agentPager.pageItems.map((a) => (
                       <tr
                         key={a.agentId}
-                        onClick={() => setAgentId(a.agentId)}
+                        onClick={() => openAgent(a.agentId)}
                         className="cursor-pointer border-b border-slate-100 transition last:border-0 hover:bg-slate-50/70">
                         <td className="px-5 py-3">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setAgentId(a.agentId);
+                              openAgent(a.agentId);
                             }}
                             className="text-left">
                             <span className="font-semibold text-slate-900">

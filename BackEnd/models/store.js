@@ -33,6 +33,8 @@ const storeSchema = new mongoose.Schema(
       index: true,
       trim: true,
     },
+    gstNumber: { type: String, trim: true, uppercase: true },
+    detailsVersion: { type: Number, default: 0 },
 
     // ✅ STRUCTURED ADDRESS (NEW)
     address: {
@@ -63,6 +65,9 @@ const storeSchema = new mongoose.Schema(
     location: {
       latitude: { type: Number, required: true },
       longitude: { type: Number, required: true },
+      accuracy: Number,
+      capturedAt: Date,
+      photoTakenAt: Date,
     },
 
     storeType: {

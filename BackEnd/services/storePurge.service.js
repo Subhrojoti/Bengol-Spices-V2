@@ -1,4 +1,6 @@
+import OrderModification from "../models/OrderModification.js";
 import Store from "../models/store.js";
+import StoreChangeRequest from "../models/StoreChangeRequest.js";
 import Order from "../models/Order.js";
 import Payment from "../models/Payment.js";
 import Return from "../models/Return.js";
@@ -43,6 +45,8 @@ const purgePlan = async (consumerId, session = null) => {
   ] }, session);
   const invoices = await load(Invoice, { orderId: { $in: orderIds } }, session);
   const delivery = await load(DeliveryEvent, { orderId: { $in: orderIds } }, session);
+  const storeChanges = await load(StoreChangeRequest, { consumerId }, session);
+  const orderModifications = await load(OrderModification, { consumerId }, session);
   const notifications = await load(Notification, { $or: [
     { "meta.consumerId": consumerId }, { "meta.orderId": { $in: orderIds } },
     { "meta.returnId": { $in: returns.map((r) => r.returnId) } },
@@ -85,9 +89,9 @@ const purgePlan = async (consumerId, session = null) => {
   const closedPeriods = await load(AgentSalesPeriod, { agentId, month: { $in: months }, $or: [{ closedAt: { $ne: null } }, { incentiveEarnedAt: { $ne: null } }] }, session);
   if (closedPeriods.length) blockers.push("Payments overlap a closed or rewarded sales month. Review that accounting before cleanup.");
 
-  const entries = [["stores", Store, [store]], ["orders", Order, orders], ["payments", Payment, payments], ["returns", Return, returns], ["invoices", Invoice, invoices], ["deliveryEvents", DeliveryEvent, delivery], ["gatewayPayments", GatewayPayment, gateways], ["notifications", Notification, notifications]];
+  const entries = [["orderModifications", OrderModification, orderModifications], ["stores", Store, [store]], ["storeChanges", StoreChangeRequest, storeChanges], ["orders", Order, orders], ["payments", Payment, payments], ["returns", Return, returns], ["invoices", Invoice, invoices], ["deliveryEvents", DeliveryEvent, delivery], ["gatewayPayments", GatewayPayment, gateways], ["notifications", Notification, notifications]];
   const exclusions = new Map(entries.map(([, model, rows]) => [model.modelName, ids(rows)]));
-  const urls = [store.image?.url, ...invoices.map((invoice) => invoice.pdfUrl)].filter((url) => typeof url === "string" && url);
+  const urls = [store.image?.url, ...storeChanges.flatMap(change => [change.before?.image?.url, change.proposed?.image?.url]), ...invoices.map((invoice) => invoice.pdfUrl)].filter((url) => typeof url === "string" && url);
   if (urls.some((url) => /^https:\/\/res\.cloudinary\.com\//.test(url) && !mediaAssetOf(url))) blockers.push("Some Cloudinary files cannot be matched to this storage account. Review file references before cleanup.");
   const candidates = urls.map(mediaAssetOf).filter(Boolean);
   for (const invoice of invoices) {

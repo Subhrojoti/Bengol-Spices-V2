@@ -1,4 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { OrderCollections } from "@/components/payments/OrderCollections";
+import { StorePhotoViewer } from "@/components/StorePhotoViewer";
 import { View, Text, ScrollView, RefreshControl, Alert, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -18,6 +20,7 @@ import { LOCATION_HELP, formatDistance, isAtStore, readLocation, type Fix } from
 import { getErrorMessage } from "@/api/client";
 import { toast } from "@/utils/toast";
 import { colors } from "@/theme/colors";
+import { deliveryPoint } from "@/utils/deliveryView";
 import type { OrderStatus } from "@/types/api";
 
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -51,12 +54,17 @@ const FALLBACK_REASONS: Record<string, string> = {
   OTHER: "Other",
 };
 
-export default function DeliveryDetailScreen() {
-  const router = useRouter();
+export default function DeliveryDetailRoute() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
+  return <DeliveryDetailScreen key={orderId} orderId={orderId} />;
+}
+function DeliveryDetailScreen({ orderId }: { orderId: string }) {
+  const router = useRouter();
+  const mounted = useRef(true), actionRunning = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const { data: orders, isLoading, isError, refetch, error } = useAssignedOrders();
   const { data: rules } = useDeliveryRules();
-  const { data: history } = useDeliveryHistory();
+  const { data: history, isPending: historyLoading, isError: historyError, error: historyProblem, refetch: refetchHistory } = useDeliveryHistory();
   const updateStatus = useUpdateDeliveryStatus();
   const reportFailure = useReportCouldNotDeliver();
   const { pulling, onPull } = usePullToRefresh(refetch);
@@ -91,7 +99,7 @@ export default function DeliveryDetailScreen() {
   // from the History tab, or if the active list hasn't refetched yet.
   const order = orders?.find((o) => o.orderId === orderId) ?? history?.deliveredOrders.find((o) => o.orderId === orderId);
 
-  const storePoint = order?.store?.location ?? order?.orderLocation ?? null;
+  const storePoint = order ? deliveryPoint(order) : null;
   const report = order?.delivery?.couldNotDeliver;
   const waived = Boolean(order?.delivery?.locationWaiver?.at);
   const reasons = rules?.couldNotDeliverReasons ?? FALLBACK_REASONS;
@@ -99,8 +107,36 @@ export default function DeliveryDetailScreen() {
   const mustBeAtStore = Boolean(rules?.locationRequired) && !waived;
   const carrying = order?.status === "SHIPPED" || order?.status === "OUT_FOR_DELIVERY";
 
+  /* Did the step go through after all? On a weak signal the phone can send
+     a step a second time by itself: the first copy goes through, and the
+     second is refused because the order has already moved on (or the answer
+     to the first never arrives). The partner was then shown an error for a
+     step that had worked. The order is read again before any error is shown. */
+  const stepWentThrough = async (orderId: string, status: OrderStatus) => {
+    try {
+      if (status === "DELIVERED") {
+        const { data } = await refetchHistory();
+        return Boolean(data?.deliveredOrders.some((o) => o.orderId === orderId && o.status === "DELIVERED"));
+      }
+      const { data } = await refetch();
+      return data?.find((o) => o.orderId === orderId)?.status === status;
+    } catch {
+      return false;
+    }
+  };
+
+  const deliveryConfirmed = () => {
+    setCodeModalVisible(false);
+    setCode("");
+    setCodeError(null);
+    toast.success("Marked as DELIVERED");
+    // Once DELIVERED, this order leaves the active list — staying on this
+    // screen would show "couldn't find this delivery" on the next refetch.
+    router.back();
+  };
+
   const closeCodeModal = () => {
-    if (updateStatus.isPending) return;
+    if (updateStatus.isPending || actionRunning.current) return;
     setCodeModalVisible(false);
     setCode("");
     setCodeError(null);
@@ -108,37 +144,41 @@ export default function DeliveryDetailScreen() {
 
   const submitDeliveryCode = async () => {
     // One check at a time: the keyboard's Done key can be pressed again
-    if (!order || updateStatus.isPending) return;
+    if (!order || updateStatus.isPending || actionRunning.current) return;
     if (code.length !== CODE_LENGTH) {
       setCodeError(`Enter all ${CODE_LENGTH} digits of the delivery code.`);
       return;
     }
+    actionRunning.current = true;
     try {
       await updateStatus.mutateAsync({ orderId: order.orderId, status: "DELIVERED", deliveryCode: code, location: fix ?? undefined });
-      setCodeModalVisible(false);
-      setCode("");
-      setCodeError(null);
-      toast.success("Marked as DELIVERED");
-      // Once DELIVERED, this order leaves the active list — staying on this
-      // screen would show "couldn't find this delivery" on the next refetch.
-      router.back();
+      if (!mounted.current) return;
+      deliveryConfirmed();
     } catch (e) {
+      const completed = await stepWentThrough(order.orderId, "DELIVERED");
+      if (!mounted.current) return;
+      if (completed) {
+        deliveryConfirmed();
+        return;
+      }
       // Shown inside the sheet: a toast would sit behind it. The message says
       // how many tries are left, how long the delivery is locked for, or how
       // far from the store the phone is.
       setCodeError(getErrorMessage(e, "Couldn't confirm the delivery. Please try again."));
       setCode("");
       // Ready for the next try without having to tap the box again
-      setTimeout(() => codeInput.current?.focus(), 150);
-    }
+      setTimeout(() => { if (mounted.current) codeInput.current?.focus(); }, 150);
+    } finally { actionRunning.current = false; }
   };
 
   /* "Mark as Delivered": the phone's position first, then the store's code. */
   const startDelivery = async () => {
-    if (!order || locating) return;
-
+    if (!order || locating || actionRunning.current) return;
+    actionRunning.current = true;
     setLocating(true);
     const result = await readLocation();
+    actionRunning.current = false;
+    if (!mounted.current) return;
     setLocating(false);
 
     const tryAgain = { text: "Try again", onPress: () => void startDelivery() };
@@ -194,7 +234,7 @@ export default function DeliveryDetailScreen() {
   };
 
   const handleUpdateStatus = () => {
-    if (!order) return;
+    if (!order || actionRunning.current) return;
     const nextStatus = NEXT_STATUS[order.status];
     if (!nextStatus) return;
 
@@ -210,17 +250,27 @@ export default function DeliveryDetailScreen() {
       {
         text: "Confirm",
         onPress: async () => {
+          if (actionRunning.current || !mounted.current) return;
+          actionRunning.current = true;
           // Where this step was taken, if the phone can say quickly. It is
           // never a reason to hold the step up.
           setLocating(true);
           const result = await readLocation(6000);
+          if (!mounted.current) { actionRunning.current = false; return; }
           setLocating(false);
           try {
             await updateStatus.mutateAsync({ orderId: order.orderId, status: nextStatus, location: result.ok ? result.fix : undefined });
+            if (!mounted.current) return;
             toast.success(`Marked as ${nextStatus.replace(/_/g, " ")}`);
           } catch (e) {
+            const completed = await stepWentThrough(order.orderId, nextStatus);
+            if (!mounted.current) return;
+            if (completed) {
+              toast.success(`Marked as ${nextStatus.replace(/_/g, " ")}`);
+              return;
+            }
             toast.error("Couldn't update status", getErrorMessage(e));
-          }
+          } finally { actionRunning.current = false; }
         },
       },
     ]);
@@ -234,12 +284,12 @@ export default function DeliveryDetailScreen() {
   };
 
   const closeFailSheet = () => {
-    if (reportFailure.isPending || locating) return;
+    if (reportFailure.isPending || locating || actionRunning.current) return;
     setFailVisible(false);
   };
 
   const submitFailure = async () => {
-    if (!order) return;
+    if (!order || actionRunning.current) return;
     const note = failNote.trim();
     if (!failReason) {
       setFailError("Choose what happened.");
@@ -250,17 +300,20 @@ export default function DeliveryDetailScreen() {
       return;
     }
 
+    actionRunning.current = true;
     setLocating(true);
     const result = await readLocation(6000);
+    if (!mounted.current) { actionRunning.current = false; return; }
     setLocating(false);
 
     try {
       await reportFailure.mutateAsync({ orderId: order.orderId, reason: failReason, note, location: result.ok ? result.fix : undefined });
+      if (!mounted.current) return;
       setFailVisible(false);
       toast.success("Reported to the office", "They will tell you what to do next.");
     } catch (e) {
-      setFailError(getErrorMessage(e, "Couldn't send the report. Please try again."));
-    }
+      if (mounted.current) setFailError(getErrorMessage(e, "Couldn't send the report. Please try again."));
+    } finally { actionRunning.current = false; }
   };
 
   // Only while the order can still be delivered; a finished one needs no code
@@ -271,10 +324,10 @@ export default function DeliveryDetailScreen() {
     <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
       <AppHeader title={orderId ?? "Delivery"} showBack />
 
-      {isLoading ? (
+      {!order && (isLoading || historyLoading) ? (
         <LoadingState message="Loading delivery…" />
-      ) : isError || !order ? (
-        <ErrorState message={isError ? getErrorMessage(error, "Couldn't load this delivery.") : "Couldn't find this delivery."} onRetry={refetch} />
+      ) : !order ? (
+        <ErrorState message={isError ? getErrorMessage(error, "Couldn't load this delivery.") : historyError ? getErrorMessage(historyProblem) : "Couldn't find this delivery."} onRetry={() => { void refetch(); void refetchHistory(); }} />
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 14 }}
@@ -304,8 +357,8 @@ export default function DeliveryDetailScreen() {
           ) : null}
 
           <Card>
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1 pr-2">
+            <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+              <View className="max-w-full shrink">
                 <Text className="font-display-bold text-lg text-ink">{order.orderId}</Text>
                 <Text className="mt-0.5 font-sans text-xs text-ink-500">{formatDateTime(order.createdAt)}</Text>
               </View>
@@ -314,7 +367,7 @@ export default function DeliveryDetailScreen() {
 
             <View className="mt-4 flex-row items-center gap-2">
               <Store size={14} color={colors.ink[500]} />
-              <Text className="font-sans-semibold text-sm text-ink-700">{order.deliveryAddress.storeName}</Text>
+              <Text className="flex-1 font-sans-semibold text-sm text-ink-700">{order.deliveryAddress.storeName}</Text>
             </View>
             <View className="mt-1.5 flex-row items-start gap-2">
               <MapPin size={14} color={colors.ink[500]} />
@@ -324,8 +377,9 @@ export default function DeliveryDetailScreen() {
             </View>
             <View className="mt-1.5 flex-row items-center gap-2">
               <Phone size={14} color={colors.ink[500]} />
-              <Text className="font-sans text-xs text-ink-500">{order.deliveryAddress.phone}</Text>
+              <Text className="font-sans text-xs text-ink-500">{order.store?.phone || order.deliveryAddress.phone}</Text>
             </View>
+            <StorePhotoViewer url={order.store?.image?.url} name={order.store?.storeName || order.deliveryAddress.storeName} />
 
             {awaitingDelivery ? (
               <View className="mt-4 flex-row items-center gap-2.5 rounded-2xl border border-saffron-600/25 bg-saffron-50 px-4 py-3">
@@ -343,17 +397,17 @@ export default function DeliveryDetailScreen() {
             ) : null}
 
             <Button
-              label="Navigate to Store"
+              label={storePoint ? "Navigate to Store" : "Store location unavailable"}
+              disabled={!storePoint}
               variant="outline"
               icon={<Navigation size={15} color={colors.ink.DEFAULT} />}
-              onPress={() => openInMaps(order.orderLocation.latitude, order.orderLocation.longitude, order.deliveryAddress.storeName)}
+              onPress={() => storePoint && openInMaps(storePoint.latitude, storePoint.longitude, order.store?.storeName || order.deliveryAddress.storeName)}
               fullWidth
               className="mt-3"
             />
           </Card>
 
-          {/* What is in the parcel. No prices or payment: a delivery partner
-              carries goods, not money. */}
+          {/* Parcel contents stay separate from collection records. */}
           <Card>
             <View className="mb-3 flex-row items-center gap-2">
               <Package size={16} color={colors.ink[700]} />
@@ -404,6 +458,7 @@ export default function DeliveryDetailScreen() {
               fullWidth
             />
           ) : null}
+          <OrderCollections key={order.orderId} orderId={order.orderId} />
         </ScrollView>
       )}
 
@@ -519,6 +574,7 @@ export default function DeliveryDetailScreen() {
                   return (
                     <Pressable
                       key={key}
+                      disabled={busy}
                       onPress={() => {
                         setFailReason(key);
                         if (failError) setFailError(null);
@@ -547,7 +603,7 @@ export default function DeliveryDetailScreen() {
                   placeholderTextColor={colors.ink[300]}
                   multiline
                   maxLength={NOTE_MAX}
-                  editable={!reportFailure.isPending}
+                  editable={!busy}
                   accessibilityLabel="Note for the office"
                   className="min-h-[64px] py-3 font-sans text-sm text-ink"
                   style={{ textAlignVertical: "top" }}

@@ -17,9 +17,11 @@ interface ImagePickerFieldProps {
    * needing proof it was taken on the spot, e.g. a store photo at
    * creation time. Defaults to "library" (existing behavior). */
   mode?: "camera" | "library";
+  required?: boolean;
+  disabled?: boolean;
 }
 
-export function ImagePickerField({ label, uri, onChange, error, mode = "library" }: ImagePickerFieldProps) {
+export function ImagePickerField({ label, uri, onChange, error, mode = "library", required = true, disabled = false }: ImagePickerFieldProps) {
   const [busy, setBusy] = useState(false);
 
   const accept = (asset: ImagePicker.ImagePickerAsset) => {
@@ -32,6 +34,7 @@ export function ImagePickerField({ label, uri, onChange, error, mode = "library"
   };
 
   const pick = async () => {
+    if (disabled || busy) return;
     setBusy(true);
     try {
       if (mode === "camera") {
@@ -71,11 +74,13 @@ export function ImagePickerField({ label, uri, onChange, error, mode = "library"
     <View className="mb-4">
       <Text className="mb-1.5 font-sans-semibold text-sm text-ink-700">
         {label}
-        <Text className="text-chili-600"> *</Text>
+        {required && <Text className="text-chili-600"> *</Text>}
       </Text>
       <Pressable
         onPress={pick}
-        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={busy || disabled}
         className={`flex-row items-center gap-3 rounded-xl border p-3.5 ${
           error ? "border-chili-600" : uri ? "border-cardamom-600 bg-cardamom-100" : "border-dashed border-sand-dark bg-white"
         }`}

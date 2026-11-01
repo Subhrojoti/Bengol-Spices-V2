@@ -32,6 +32,8 @@ const deliveryPartnerSchema = new mongoose.Schema(
     // Logins issued before this moment are no longer accepted
     passwordChangedAt: Date,
     sessionVersion: { type: Number, default: 0 },
+    // Serializes new assignments against permanent test-account cleanup.
+    activityVersion: { type: Number, default: 0, select: false },
 
     address: {
       state: {

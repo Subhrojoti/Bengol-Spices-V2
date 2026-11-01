@@ -1,4 +1,5 @@
 import reportAdminError from "../../../../utils/reportAdminError";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@mui/material";
 import { toast } from "sonner";
@@ -27,6 +28,14 @@ import ConfirmDialog from "../../../../components/common/ConfirmDialog";
 import Pagination from "../../../../components/common/Pagination";
 import StatusPill from "../../../../components/common/StatusPill";
 import usePagination from "../../../../hooks/usePagination";
+
+const collectorLabel = row => {
+  const collector = row?.collector;
+  if (collector?.role === "DELIVERY_PARTNER") return `delivery partner ${collector.name || collector.id}`;
+  if (collector?.id) return collector.name || (collector.id === row.agentId ? row.agentName : null) || collector.id;
+  if (collector) return "an unrecorded collector";
+  return row?.agentName || row?.agentId || "an unrecorded collector";
+};
 
 /* =====================================================================
    CASH VERIFICATION
@@ -128,7 +137,7 @@ const Tile = ({ label, value, hint, icon, tint, ink }) => (
         <p className="text-lg font-semibold leading-none tabular-nums text-slate-900">
           {value}
         </p>
-        <p className="mt-1 truncate text-xs text-slate-400">{label}</p>
+        <p className="mt-1 break-words text-xs leading-snug text-slate-400">{label}</p>
       </div>
     </div>
     <p className="mt-2 text-[12px] tabular-nums text-slate-400">{hint}</p>
@@ -243,7 +252,7 @@ export default function CashVerification() {
     return rows.filter((row) => {
       if (agentId && row.agentId !== agentId) return false;
       if (!q) return true;
-      return [row.orderId, row.agentName, row.agentId, row.order?.storeName, row.order?.city]
+      return [row.orderId, row.agentName, row.agentId, row.collector?.name, row.collector?.id, row.order?.storeName, row.order?.city]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q));
     });
@@ -582,7 +591,7 @@ export default function CashVerification() {
                           type="checkbox"
                           checked={selected.has(row.id)}
                           onChange={() => toggle(row.id)}
-                          aria-label={`Select ${inr(row.amount)} from ${row.agentName || row.agentId}`}
+                          aria-label={`Select ${inr(row.amount)} from ${collectorLabel(row)}`}
                           className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-blue-600"
                         />
                       )}
@@ -628,6 +637,7 @@ export default function CashVerification() {
                       <p className="font-mono text-[12px] tabular-nums text-slate-500">
                         {row.agentId}
                       </p>
+                      {row.collector && <p className="mt-1 text-[11px] text-slate-500">Collector: {row.collector.role === "DELIVERY_PARTNER" ? "Delivery partner" : row.collector.role === "AGENT" ? "Agent" : "Not recorded"} · {row.collector.name || row.collector.id || "Unknown collector"}</p>}
                     </td>
 
                     <td className="px-3 py-3.5 text-right">
@@ -667,7 +677,7 @@ export default function CashVerification() {
                       {row.reason && <p className="text-rose-700">Rejected: {row.reason}</p>}
                       {row.note && <p className="text-slate-600">{row.note}</p>}
                       {row.agentNote && (
-                        <p className="text-slate-500">Agent: {row.agentNote}</p>
+                        <p className="text-slate-500">Collector note: {row.agentNote}</p>
                       )}
                       {pending && (
                         <p className="text-slate-400">
@@ -708,7 +718,7 @@ export default function CashVerification() {
                         <button
                           type="button"
                           onClick={() => setRecord({ open: true, row })}
-                          aria-label={`History of ${inr(row.amount)} from ${row.agentName || row.agentId}`}
+                          aria-label={`History of ${inr(row.amount)} from ${collectorLabel(row)}`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12.5px] font-semibold text-slate-700 transition hover:bg-slate-50">
                           <History size={12} />
                           History
@@ -763,8 +773,8 @@ export default function CashVerification() {
           acting.kind === "bulk"
             ? `Approve ${plural(chosen.length, "payment", "payments")}, ${inr(chosenTotal)}?`
             : acting.kind === "reject"
-              ? `Reject ${inr(acted?.amount)} from ${acted?.agentName || acted?.agentId}?`
-              : `Approve ${inr(acted?.amount)} from ${acted?.agentName || acted?.agentId}?`
+              ? `Reject ${inr(acted?.amount)} from ${collectorLabel(acted)}?`
+              : `Approve ${inr(acted?.amount)} from ${collectorLabel(acted)}?`
         }
         description={
           acting.kind === "reject"

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { View, Text, Image, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Plus, Search, Phone, MapPin, Store as StoreIcon, FileText, PackagePlus, Warehouse, Truck, Navigation, UtensilsCrossed } from "lucide-react-native";
+import { Plus, Search, Phone, MapPin, Store as StoreIcon, FileText, PackagePlus, Warehouse, Truck, Navigation, UtensilsCrossed, Map, ChevronRight, PencilLine } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button, IconButton } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { LoadingState, ErrorState, EmptyState } from "@/components/ui/States";
@@ -17,6 +17,7 @@ import { openInMaps } from "@/utils/maps";
 import { sizedImage } from "@/utils/image";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
+import { validStoreLocation } from "@/utils/storeCorrection";
 
 const STORE_TYPE_LABEL: Record<Store["storeType"], string> = {
   RETAILER: "Retailer",
@@ -61,10 +62,7 @@ export default function MyStoresScreen() {
     if (q) {
       list = list.filter(
         (s) =>
-          s.storeName.toLowerCase().includes(q) ||
-          s.ownerName.toLowerCase().includes(q) ||
-          s.consumerId.toLowerCase().includes(q) ||
-          s.address.city.toLowerCase().includes(q),
+          [s.storeName, s.ownerName, s.consumerId, s.phone, s.address?.city, s.address?.pincode].some(value => String(value || "").toLowerCase().includes(q)),
       );
     }
     return list;
@@ -72,11 +70,9 @@ export default function MyStoresScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
-      <View className="flex-row items-center justify-between px-5 pb-1 pt-2">
-        <Text className="font-display-bold text-2xl text-ink">My Stores</Text>
-        <IconButton onPress={() => router.push("/(tabs)/stores/create")} className="bg-saffron-600">
-          <Plus size={20} color={colors.white} />
-        </IconButton>
+      <View className="flex-row items-center justify-between gap-3 px-5 pb-3 pt-2">
+        <View className="min-w-0 flex-1"><Text className="font-display-bold text-2xl text-ink">My Stores</Text><Text className="mt-0.5 font-sans text-xs text-ink-500">Orders, directions and store details</Text></View>
+        <Button label="Add store" size="sm" icon={<Plus size={16} color={colors.white} />} onPress={() => router.push("/new-store")} />
       </View>
 
       {isLoading ? (
@@ -91,10 +87,14 @@ export default function MyStoresScreen() {
           refreshing={pulling}
           onRefresh={onPull}
           ListHeaderComponent={
-            stores && stores.length > 0 ? (
               <View className="mb-1 gap-3">
+                <Pressable accessibilityRole="button" accessibilityLabel="Open stores map" onPress={() => router.push("/store-map")} className="flex-row items-center gap-3 rounded-2xl border border-cardamom-100 bg-cardamom-100 p-4 active:opacity-80">
+                  <View className="h-11 w-11 items-center justify-center rounded-xl bg-white"><Map size={23} color={colors.cardamom[700]} /></View>
+                  <View className="min-w-0 flex-1"><Text className="font-sans-bold text-base text-cardamom-700">View stores on map</Text><Text className="mt-1 font-sans text-xs leading-4 text-cardamom-700">See your store locations and get directions</Text></View><ChevronRight size={19} color={colors.cardamom[700]} />
+                </Pressable>
+                {stores && stores.length > 0 && <>
                 <Input
-                  placeholder="Search stores by name, owner, city…"
+                  placeholder="Search name, phone, city or store ID"
                   value={query}
                   onChangeText={setQuery}
                   leftIcon={<Search size={16} color={colors.ink[500]} />}
@@ -110,8 +110,9 @@ export default function MyStoresScreen() {
                   value={typeFilter}
                   onChange={setTypeFilter}
                 />
+                <Text className="font-sans text-xs text-ink-500">{filtered.length} of {stores.length} stores</Text>
+                </>}
               </View>
-            ) : null
           }
           ListEmptyComponent={
             stores && stores.length > 0 ? (
@@ -121,7 +122,7 @@ export default function MyStoresScreen() {
                 icon={<StoreIcon size={26} color={colors.ink[500]} />}
                 title="No stores yet"
                 subtitle="Create your first store to start placing orders for it."
-                action={<Button label="Create Store" onPress={() => router.push("/(tabs)/stores/create")} />}
+                action={<Button label="Create Store" onPress={() => router.push("/new-store")} />}
               />
             )
           }
@@ -132,8 +133,14 @@ export default function MyStoresScreen() {
   );
 }
 
+function StoreImage({ url }: { url?: string }) {
+  const [photoFailed, setPhotoFailed] = useState(false);
+  return url && !photoFailed ? <Image source={{ uri: sizedImage(url, 64) }} onError={() => setPhotoFailed(true)} className="h-16 w-16 rounded-2xl border border-sand-dark" /> : <View className="h-16 w-16 items-center justify-center rounded-2xl bg-saffron-50"><StoreIcon size={28} color={colors.saffron[700]} /></View>;
+}
+
 function StoreCard({ store }: { store: Store }) {
   const router = useRouter();
+  const hasLocation = validStoreLocation(store.location);
   // Falls back, so a store type added later cannot blank this screen
   const TypeIcon = STORE_TYPE_ICON[store.storeType] ?? StoreIcon;
 
@@ -145,22 +152,17 @@ function StoreCard({ store }: { store: Store }) {
 
       <View className="flex-row items-start gap-3">
         <View className="relative">
-          <Image source={{ uri: sizedImage(store.image.url, 64) }} className="h-16 w-16 rounded-full border-2 border-sand-dark" />
+          <StoreImage key={store.image?.url || "missing"} url={store.image?.url} />
           <View className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-saffron-600">
             <TypeIcon size={11} color={colors.white} />
           </View>
         </View>
 
         <View className="flex-1">
-          <View className="flex-row items-start justify-between gap-2">
-            <Text className="flex-1 font-display-bold text-xl text-ink" numberOfLines={1}>
+            <Text className="font-display-bold text-lg text-ink" numberOfLines={2}>
               {store.storeName}
             </Text>
-            <View className="items-end">
-              <Text className="font-sans text-[10px] text-ink-500">Delivery Code</Text>
-              <Text className="font-sans-bold text-lg text-saffron-700">{store.deliveryCode}</Text>
-            </View>
-          </View>
+          <Text className="mb-1 mt-0.5 font-sans text-[11px] text-ink-500">{store.consumerId}</Text>
           <Text className="font-sans-medium text-sm text-ink-700" numberOfLines={1}>
             {store.ownerName}
           </Text>
@@ -170,24 +172,27 @@ function StoreCard({ store }: { store: Store }) {
           </View>
           <View className="mt-0.5 flex-row items-center gap-1.5">
             <MapPin size={11} color={colors.ink[500]} />
-            <Text className="font-sans text-xs text-ink-500" numberOfLines={1}>
-              {store.address.street}, {store.address.city}
+            <Text className="flex-1 font-sans text-xs text-ink-500" numberOfLines={2}>
+              {[store.address?.street, store.address?.city].filter(Boolean).join(", ") || "Address not recorded"}
             </Text>
           </View>
         </View>
       </View>
 
-      <View className="mt-3 flex-row items-center justify-between gap-2">
-        <View className="flex-row items-center gap-2">
+      <View className="mt-4 flex-row flex-wrap items-center justify-between gap-2">
+        <View className="flex-row flex-wrap items-center gap-2">
           <Badge label={STORE_TYPE_LABEL[store.storeType] ?? store.storeType} variant="info" />
           <Badge label={store.status} variant={store.status === "ACTIVE" ? "success" : "neutral"} />
         </View>
-        <Pressable
+        <View className="rounded-lg bg-saffron-50 px-3 py-1.5"><Text className="font-sans text-[10px] text-saffron-700">Delivery code <Text className="font-sans-bold text-sm">{store.deliveryCode || "Not available"}</Text></Text></View>
+      </View>
+      <View className="mt-3 border-t border-sand pt-3">
+        <Pressable accessibilityRole="button" accessibilityLabel={`Get directions to ${store.storeName}`} accessibilityState={{ disabled: !hasLocation }} disabled={!hasLocation}
           onPress={() => openInMaps(store.location.latitude, store.location.longitude, store.storeName)}
-          className="flex-row items-center gap-1.5 rounded-full bg-saffron-600 px-3.5 py-2 active:opacity-80"
+          className="min-h-11 flex-row items-center justify-center gap-2 rounded-xl bg-saffron-50 px-3 py-2 active:opacity-80"
         >
-          <Navigation size={14} color={colors.white} />
-          <Text className="font-sans-bold text-xs text-white">Navigate</Text>
+          <Navigation size={15} color={colors.saffron[700]} />
+          <Text className="shrink font-sans-bold text-sm text-saffron-700">{hasLocation ? "Get directions" : "Store location unavailable"}</Text>
         </Pressable>
       </View>
 
@@ -202,6 +207,7 @@ function StoreCard({ store }: { store: Store }) {
         />
         <Button
           label="Create Order"
+          disabled={store.status !== "ACTIVE"}
           size="sm"
           icon={<PackagePlus size={14} color={colors.white} />}
           onPress={() =>
@@ -213,6 +219,7 @@ function StoreCard({ store }: { store: Store }) {
           className="flex-1"
         />
       </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Request changes for ${store.storeName}`} onPress={() => router.push({ pathname: "/store-changes/[consumerId]", params: { consumerId: store.consumerId } })} className="mt-3 flex-row items-center gap-3 rounded-xl border border-cardamom-100 bg-cardamom-100 px-3 py-3 active:opacity-80"><PencilLine size={18} color={colors.cardamom[700]} /><View className="min-w-0 flex-1"><Text className="font-sans-bold text-sm text-cardamom-700">Request store correction</Text><Text className="mt-0.5 font-sans text-[11px] text-cardamom-700">Details, photo or location · Office approval</Text></View><ChevronRight size={17} color={colors.cardamom[700]} /></Pressable>
     </Card>
   );
 }

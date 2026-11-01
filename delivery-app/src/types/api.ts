@@ -57,6 +57,9 @@ export interface StatusHistoryEntry {
 // The store's delivery code is deliberately not part of this: the backend
 // does not send it. The store owner reads it out and the partner types it in.
 export interface PopulatedStore {
+  ownerName?: string;
+  phone?: string;
+  image?: { url?: string };
   _id: string;
   storeName: string;
   address: {

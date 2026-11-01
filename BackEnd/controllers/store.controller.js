@@ -9,6 +9,9 @@ import { findManagedStore, managedStoreFilter } from "../services/storeAccess.se
 import { updateTargetProgress } from "../services/target.service.js";
 import { publicMessage } from "../utils/publicError.js";
 import { coverageForState, normalizePincode, normalizeSalesState } from "../utils/salesLocation.js";
+import { effectiveMinimum } from "../utils/orderMinimums.js";
+import { readGstNumber, registrationGps } from "../utils/storeDetails.js";
+import { withStorePhoneLock } from "../services/storePhone.service.js";
 import {
   STORE_TYPES,
   applyLocationPrices,
@@ -18,7 +21,7 @@ import {
 
 // The same fields the public catalogue exposes
 const CATALOGUE_FIELDS =
-  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage minOrderQty";
+  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage minOrderQty retailerMinOrderQty wholesalerMinOrderQty distributorMinOrderQty horecaMinOrderQty";
 
 /**
  * THE CATALOGUE AS ONE STORE SEES IT (Agent, own store only)
@@ -67,6 +70,7 @@ export const getStoreCatalog = async (req, res) => {
       return {
         ...product,
         ...tierPrices,
+        minOrderQty: effectiveMinimum(product, store.storeType),
         effectivePrice: price,
         priceSource: source,
         locationPricing: fromLocation,
@@ -245,12 +249,17 @@ export const createStore = async (req, res) => {
 
     const deliveryCode = await generateDeliveryCode();
 
-    const store = await Store.create({
+    const gstNumber = readGstNumber(req.body.gstNumber);
+    const gps = registrationGps(req.body);
+    const store = await withStorePhoneLock(cleanPhone, async () => {
+      if (await Store.exists({ phone: cleanPhone })) throw new Error("A store with this phone number is already registered");
+      return Store.create({
       consumerId,
       deliveryCode,
       storeName: storeName.trim(),
       ownerName: ownerName.trim(),
       phone: cleanPhone,
+      gstNumber,
       address: {
         state: cleanState,
         city: city.trim(),
@@ -258,6 +267,7 @@ export const createStore = async (req, res) => {
         pincode: cleanPincode,
       },
       location: {
+        ...gps,
         latitude: lat,
         longitude: lng,
       },
@@ -269,6 +279,7 @@ export const createStore = async (req, res) => {
         publicId: req.file.filename,
       },
       status: "ACTIVE",
+    });
     });
     // A persisted store now owns this photo; later failures must not delete it.
     uploadedImageId = null;

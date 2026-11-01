@@ -78,6 +78,7 @@ function RootNavigator() {
 
       <Stack.Protected guard={!isBootstrapping && isAuthenticated}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="delivery-map" />
         <Stack.Screen name="notifications/index" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
         <Stack.Screen name="profile/index" />
         <Stack.Screen name="help" />

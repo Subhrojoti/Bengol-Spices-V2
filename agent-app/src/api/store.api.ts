@@ -14,6 +14,10 @@ export interface CreateStoreInput {
   latitude: number;
   longitude: number;
   imageUri: string;
+  gstNumber?: string;
+  locationAccuracy: number;
+  locationCapturedAt: number;
+  photoTakenAt: number;
 }
 
 export const storeApi = {
@@ -31,6 +35,11 @@ export const storeApi = {
     form.append("pincode", input.pincode);
     form.append("latitude", String(input.latitude));
     form.append("longitude", String(input.longitude));
+    form.append("gstNumber", input.gstNumber || "");
+    form.append("registrationVersion", "2");
+    form.append("locationAccuracy", String(input.locationAccuracy));
+    form.append("locationCapturedAt", String(input.locationCapturedAt));
+    form.append("photoTakenAt", String(input.photoTakenAt));
 
     const name = input.imageUri.split("/").pop() ?? "store.jpg";
     form.append("image", { uri: input.imageUri, name, type: "image/jpeg" } as unknown as Blob);

@@ -51,9 +51,9 @@ export const orderApi = {
 
   // ---------- Existing Razorpay checkout flow ----------
 
-  createInitialPayment: (amount: number) =>
+  createInitialPayment: (amount: number, orderPayload?: PlaceOrderInput) =>
     api
-      .post<{ success: true } & RazorpaySessionResponse>("/agent/orders/razorpay/create-initial-payment", { amount })
+      .post<{ success: true } & RazorpaySessionResponse>("/agent/orders/razorpay/create-initial-payment", { amount, orderPayload })
       .then((r) => r.data),
 
   createDuePayment: (orderId: string, amount: number) =>
@@ -77,14 +77,14 @@ export const orderApi = {
 
   // ---------- QR Code payment flow ----------
 
-  createInitialPaymentQr: (amount: number) =>
+  createInitialPaymentQr: (amount: number, orderPayload?: PlaceOrderInput) =>
     api
-      .post<{ success: true } & QrSessionResponse>("/agent/orders/razorpay/create-initial-qr", { amount })
+      .post<{ success: true } & QrSessionResponse>("/agent/orders/razorpay/create-initial-qr", { amount, orderPayload })
       .then((r) => r.data),
 
-  createDuePaymentQr: (orderId: string) =>
+  createDuePaymentQr: (orderId: string, amount?: number) =>
     api
-      .post<{ success: true } & QrSessionResponse>("/agent/orders/razorpay/create-due-qr", { orderId })
+      .post<{ success: true } & QrSessionResponse>("/agent/orders/razorpay/create-due-qr", { orderId, amount })
       .then((r) => r.data),
 
   checkQrPaymentStatus: (qrCodeId: string) =>
@@ -109,10 +109,11 @@ export const orderApi = {
   updateDeliveryStatus: (orderId: string, status: string) =>
     api.put<{ success: true; message: string }>(`/agent/orders/${encodeURIComponent(orderId)}/delivery-status`, { status }).then((r) => r.data),
 
-  collectCashPayment: (orderId: string, amount: number) =>
+  collectCashPayment: (orderId: string, amount: number, clientRequestId?: string) =>
     api
       .post<{ success: true; message: string }>(`/agent/orders/${encodeURIComponent(orderId)}/collect-payment`, {
         amount,
+        clientRequestId,
         method: "CASH",
         paymentMode: "CASH",
       })

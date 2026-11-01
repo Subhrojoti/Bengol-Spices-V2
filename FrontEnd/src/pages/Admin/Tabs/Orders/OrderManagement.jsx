@@ -1,4 +1,7 @@
+import StoreReportBackLink from "../../../../components/common/StoreReportBackLink";
+import OrderChanges from "../../../../components/common/OrderChanges";
 import reportAdminError from "../../../../utils/reportAdminError";
+import StoreDeliveryCode from "../../../../components/common/StoreDeliveryCode";
 import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -25,6 +28,7 @@ import Pagination from "../../../../components/common/Pagination";
 import usePagination from "../../../../hooks/usePagination";
 import {
   getAllAgentOrders,
+  getStoreOrders,
   getAllStores,
   confirmOrder,
   cancelOrder,
@@ -266,12 +270,14 @@ export const CancelDialog = ({ order, open, busy, onClose, onConfirm }) => {
 /* ------------------------------------------------------------------ */
 
 export default function OrderManagement() {
+  const [params, setParams] = useSearchParams();
+  const linkedConsumerId = params.get("consumerId") || "";
   const [orders, setOrders] = useState([]);
   const [storeRecords, setStoreRecords] = useState([]);
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
 
-  const [selectedStore, setSelectedStore] = useState(null);
+  const [selectedStore, setSelectedStore] = useState(() => params.get("consumerId"));
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [expandedHistory, setExpandedHistory] = useState(null);
 
@@ -289,7 +295,6 @@ export default function OrderManagement() {
   // An order to bring into view once it has been drawn
   const [scrollTo, setScrollTo] = useState(null);
   // ?order=ORD2026-0012, from the dashboard or the "new order" notice
-  const [params, setParams] = useSearchParams();
   const retriedFor = useRef(null);
 
   const beginRequest = useLatestRequest();
@@ -303,7 +308,7 @@ export default function OrderManagement() {
          store records are fetched alongside and joined by consumerId. A
          failure there must not take the orders down with it. */
       const [orderRes, storeRes] = await Promise.all([
-        getAllAgentOrders({ signal: request.signal }),
+        linkedConsumerId ? getStoreOrders(linkedConsumerId, { signal: request.signal }) : getAllAgentOrders({ signal: request.signal }),
         getAllStores({ signal: request.signal }).catch((error) => {
           if (!request.current()) return null;
           reportAdminError("Could not load store details:", error);
@@ -322,7 +327,7 @@ export default function OrderManagement() {
     } finally {
       if (request.current()) setRefreshing(false);
     }
-  }, [beginRequest]);
+  }, [beginRequest, linkedConsumerId]);
 
   useEffect(() => {
     load();
@@ -348,6 +353,7 @@ export default function OrderManagement() {
      the card can show its photo, owner, phone and type. */
   const stores = useMemo(() => {
     const grouped = {};
+    const linked = storeById[params.get("consumerId")];
 
     orders.forEach((order) => {
       const key = order.consumerId;
@@ -375,8 +381,9 @@ export default function OrderManagement() {
       grouped[key].due += openDue(order);
     });
 
+    if (linked && !grouped[linked.consumerId]) grouped[linked.consumerId] = { consumerId: linked.consumerId, agentId: linked.currentAgentId || linked.registeredBy, name: linked.storeName, owner: linked.ownerName, phone: linked.phone, state: linked.address?.state, city: linked.address?.city, image: linked.image?.url || "", storeType: linked.storeType, orders: [], due: 0 };
     return Object.values(grouped).sort((a, b) => b.orders.length - a.orders.length);
-  }, [orders, storeById]);
+  }, [orders, storeById, params]);
 
   const activeStore = useMemo(
     () => stores.find((s) => s.consumerId === selectedStore) || null,
@@ -486,9 +493,9 @@ export default function OrderManagement() {
     toast.success(`${count} order${count === 1 ? "" : "s"} exported`);
   }, [orders]);
 
-  const applyStatus = (orderId, next) =>
+  const applyStatus = (orderId, next, patch = {}) =>
     setOrders((prev) =>
-      prev.map((o) => (o.orderId === orderId ? { ...o, status: next } : o)),
+      prev.map((o) => (o.orderId === orderId ? { ...o, ...patch, status: next } : o)),
     );
 
   const runConfirm = async () => {
@@ -496,8 +503,9 @@ export default function OrderManagement() {
 
     try {
       setBusyId(confirmTarget.orderId);
-      await confirmOrder(confirmTarget.orderId);
-      applyStatus(confirmTarget.orderId, "CONFIRMED");
+      const response = await confirmOrder(confirmTarget.orderId, confirmTarget.revision);
+      applyStatus(confirmTarget.orderId, response.assignment?.assigned ? "ASSIGNED" : "CONFIRMED", response.statusHistory ? { statusHistory: response.statusHistory } : {});
+      if (response.assignment?.warning) toast.warning(response.assignment.warning);
       toast.success(`${confirmTarget.orderId} confirmed and ready to dispatch`);
       setConfirmTarget(null);
     } catch (error) {
@@ -572,6 +580,7 @@ export default function OrderManagement() {
   if (status === "error") {
     return (
       <div className="min-h-screen bg-slate-50 p-5 lg:p-8">
+        <StoreReportBackLink />
         <Card className="p-12 text-center">
           <AlertCircle size={26} className="mx-auto text-slate-400" />
           <h3 className="mt-3 font-semibold text-slate-800">
@@ -593,6 +602,7 @@ export default function OrderManagement() {
 
   return (
     <div className="min-h-screen space-y-4 bg-slate-50 px-5 pb-10 pt-5 lg:px-8 lg:pt-6">
+      <StoreReportBackLink />
       {/* ===== SUMMARY ===== */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Stat
@@ -808,6 +818,7 @@ export default function OrderManagement() {
                           <Detail label="Mode" value={order.paymentMode || "—"} />
                           <Detail label="Due date" value={dateOnly(order.dueDate)} />
                         </div>
+                        <StoreDeliveryCode consumerId={order.consumerId} />
 
                         {/* TIMELINE */}
                         {history.length > 0 && (
@@ -897,11 +908,12 @@ export default function OrderManagement() {
                           </div>
                         </div>
 
+                        {order.revision > 0 && <OrderChanges key={order.orderId + order.revision} orderId={order.orderId} />}
                         {/* ACTIONS */}
                         <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
                           <button
                             onClick={() => getInvoice(order)}
-                            disabled={invoiceId === order.orderId}
+                            disabled={invoiceId === order.orderId || (order.invoicePolicy === "ON_CONFIRMATION" && !order.statusHistory?.some(step => step.status === "CONFIRMED"))}
                             className="mr-auto inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
                             {invoiceId === order.orderId ? (
                               <Loader2 size={14} className="animate-spin" />

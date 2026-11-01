@@ -1,0 +1,110 @@
+{
+  "methodology": "Synthetic intercepted APIs: 200 agents, 120 delivery partners, 2,000 orders/1,000 stores; installed headless Chrome, 4x CPU, three cold contexts per route, 40ms fixture latency. Laboratory timings, not production FPS/INP. Mobile screenshots at 390px. Same fixture/build-server setup for both builds.",
+  "results": [
+    {
+      "route": "/admin/agent?tab=performance",
+      "readyMs": {
+        "before": 2277.5096000000012,
+        "after": 1682.5373,
+        "changePercent": -26.12381085023751
+      },
+      "domNodes": {
+        "before": 1446,
+        "after": 333,
+        "changePercent": -76.97095435684648
+      },
+      "svgNodes": {
+        "before": 1293,
+        "after": 155,
+        "changePercent": -88.0123743232792
+      },
+      "contentHeight": {
+        "before": 10460,
+        "after": 1781,
+        "changePercent": -82.97323135755258
+      },
+      "longTaskMs": {
+        "before": 1867,
+        "after": 712,
+        "changePercent": -61.863952865559725
+      },
+      "longestTaskMs": {
+        "before": 761,
+        "after": 229,
+        "changePercent": -69.90801576872536
+      }
+    },
+    {
+      "route": "/admin/delivery?tab=performance",
+      "readyMs": {
+        "before": 1873.3499999999985,
+        "after": 1525.8718000000008,
+        "changePercent": -18.54849334080647
+      },
+      "domNodes": {
+        "before": 4616,
+        "after": 463,
+        "changePercent": -89.96967071057192
+      },
+      "svgNodes": {
+        "before": 22,
+        "after": 24,
+        "changePercent": 9.090909090909092
+      },
+      "contentHeight": {
+        "before": 36050,
+        "after": 3428,
+        "changePercent": -90.49098474341193
+      },
+      "longTaskMs": {
+        "before": 576,
+        "after": 523,
+        "changePercent": -9.20138888888889
+      },
+      "longestTaskMs": {
+        "before": 210,
+        "after": 181,
+        "changePercent": -13.80952380952381
+      }
+    },
+    {
+      "route": "/admin/payment-summary",
+      "readyMs": {
+        "before": 1678.8298000000032,
+        "after": 1604.2986999999994,
+        "changePercent": -4.439467300378135
+      },
+      "domNodes": {
+        "before": 439,
+        "after": 439,
+        "changePercent": 0
+      },
+      "svgNodes": {
+        "before": 119,
+        "after": 119,
+        "changePercent": 0
+      },
+      "contentHeight": {
+        "before": 1534,
+        "after": 1535,
+        "changePercent": 0.0651890482398957
+      },
+      "longTaskMs": {
+        "before": 622,
+        "after": 638,
+        "changePercent": 2.572347266881029
+      },
+      "longestTaskMs": {
+        "before": 193,
+        "after": 175,
+        "changePercent": -9.32642487046632
+      },
+      "searchMs": {
+        "before": 953.8035999999993,
+        "after": 998.1421999999984,
+        "changePercent": 4.648609000846628
+      }
+    }
+  ],
+  "limitations": "Three local laboratory runs, synthetic data; not production timings, FPS or field INP. Main-page height and element count reflect paging; every record remains accessible."
+}

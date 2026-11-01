@@ -19,7 +19,9 @@ export function AppHeader({ title, showBack = false }: { title: string; showBack
             <ChevronLeft size={24} color={colors.ink.DEFAULT} />
           </IconButton>
         ) : null}
-        <Text className="font-display-bold text-2xl text-ink" numberOfLines={1}>
+        {/* Shrinks to fit rather than running under the icons on a narrow
+            phone or with large text ("Cash Verification", an order number) */}
+        <Text className="flex-1 font-display-bold text-2xl text-ink" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
           {title}
         </Text>
       </View>

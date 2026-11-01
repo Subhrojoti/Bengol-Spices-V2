@@ -46,9 +46,14 @@ export async function readLocation(timeoutMs = 15000): Promise<FixResult> {
     if (!(await Location.hasServicesEnabledAsync())) return { ok: false, reason: "off" };
 
     const position =
-      (await Promise.race([Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }), wait(timeoutMs)])) ??
+      (await Promise.race([
+        // A fresh reading that fails outright (no GPS signal indoors, say) is
+        // treated like one that is too slow, so the fallback below still runs
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }).catch(() => null),
+        wait(timeoutMs),
+      ])) ??
       // No fresh reading in time: one from the last minute will do
-      (await Location.getLastKnownPositionAsync({ maxAge: 60 * 1000 }));
+      (await Location.getLastKnownPositionAsync({ maxAge: 60 * 1000 }).catch(() => null));
 
     if (!position) return { ok: false, reason: "unavailable" };
 

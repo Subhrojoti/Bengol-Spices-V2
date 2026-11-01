@@ -6,6 +6,7 @@ import { IconButton, Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState, EmptyState } from "@/components/ui/States";
 import { useCancelReturn, useMyReturns } from "@/hooks/useReturns";
+import { returnApi } from "@/api/return.api";
 import { formatDate } from "@/utils/date";
 import { getErrorMessage } from "@/api/client";
 import { toast } from "@/utils/toast";
@@ -40,6 +41,16 @@ export default function ReturnsScreen() {
             await cancelReturn.mutateAsync(returnId);
             toast.success("Return cancelled");
           } catch (e) {
+            // Sent twice, or its answer lost: the return may be cancelled already
+            const cancelled = await returnApi
+              .getMyReturns()
+              .then((list) => list.some((r) => r.returnId === returnId && r.status === "CANCELLED"))
+              .catch(() => false);
+            if (cancelled) {
+              void refetch();
+              toast.success("Return cancelled");
+              return;
+            }
             toast.error("Couldn't cancel return", getErrorMessage(e));
           }
         },

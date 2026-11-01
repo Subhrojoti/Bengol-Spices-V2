@@ -1,8 +1,10 @@
+import OrderModification from "../models/OrderModification.js";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import Agent from "../models/Agent.js";
 import Store from "../models/store.js";
+import StoreChangeRequest from "../models/StoreChangeRequest.js";
 import Order from "../models/Order.js";
 import Payment from "../models/Payment.js";
 import Return from "../models/Return.js";
@@ -43,7 +45,9 @@ export const relatedCounts = async (stores, session = null) => {
   const deliveryEvents = await q(DeliveryEvent.countDocuments({ orderId: { $in: orderIds } }), session);
   const gatewayPayments = await q(GatewayPayment.countDocuments({ orderId: { $in: orderIds } }), session);
   const creationTargets = await q(AgentTargetProgress.countDocuments({ agentId: { $in: stores.map((s) => s.registeredBy) }, type: "STORE_CREATION" }), session);
-  return { orders: orders.length, payments, returns, invoices, deliveryEvents, gatewayPayments, creationTargets,
+  const storeChanges = await q(StoreChangeRequest.countDocuments({ consumerId: { $in: consumerIds } }), session);
+  const orderModifications = await q(OrderModification.countDocuments({ consumerId: { $in: consumerIds } }), session);
+  return { orderModifications, orders: orders.length, payments, returns, invoices, deliveryEvents, gatewayPayments, creationTargets, storeChanges,
     openOrders: orders.filter((o) => activeOrders.includes(o.status)).length,
     unpaidOrders: orders.filter((o) => o.status !== "CANCELLED" && o.dueAmount > 0).length,
     openReturns, photoReferences: stores.filter((s) => s.image?.url).length };
@@ -84,7 +88,7 @@ export const previewRemoval = async (consumerId, session = null) => {
   if (!store) refuse("Store not found", 404);
   const counts = await relatedCounts([store], session);
   const unsettled = counts.openOrders + counts.unpaidOrders + counts.openReturns;
-  const used = counts.orders + counts.payments + counts.returns + counts.invoices + counts.deliveryEvents + counts.gatewayPayments + counts.creationTargets;
+  const used = counts.orders + counts.payments + counts.returns + counts.invoices + counts.deliveryEvents + counts.gatewayPayments + counts.creationTargets + counts.storeChanges + counts.orderModifications;
   const options = [
     { key: "ARCHIVE", label: "A: Remove store only (archive)", allowed: !unsettled, removes: [], preserves: "Store history and every business record", reason: unsettled ? "Settle open orders, outstanding dues and return pickups first" : null },
     { key: "ARCHIVE_OPERATIONAL", label: "B: Archive and remove store photo", allowed: !unsettled, removes: ["Unshared store photo and its reference"], preserves: "Store, address, GPS, all orders, payments, invoices, returns, delivery and audit history", reason: unsettled ? "Settle open orders, outstanding dues and return pickups first" : null },

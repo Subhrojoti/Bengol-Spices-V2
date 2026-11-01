@@ -13,13 +13,13 @@ const financialYear = (date) => {
 
 /* Consecutive within each financial year, restarting at 1 every April:
    BS/26-27/1, BS/26-27/2 … as GST invoices require. */
-export const generateInvoiceNumber = async (date = new Date()) => {
+export const generateInvoiceNumber = async (date = new Date(), session = null) => {
   const fy = financialYear(date);
 
   const counter = await Counter.findByIdAndUpdate(
     `invoice_${fy}`,
     { $inc: { seq: 1 } },
-    { new: true, upsert: true },
+    { new: true, upsert: true, ...(session && { session }) },
   );
 
   return `BS/${fy}/${counter.seq}`;

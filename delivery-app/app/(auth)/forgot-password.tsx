@@ -133,7 +133,7 @@ export default function ForgotPasswordScreen() {
 
           <View className="mt-8 flex-row justify-center">
             <Text className="font-sans text-sm text-ink-500">Remembered it? </Text>
-            <Pressable onPress={() => router.replace("/(auth)/login")} hitSlop={6}>
+            <Pressable onPress={() => router.dismissTo("/(auth)/login")} hitSlop={6}>
               <Text className="font-sans-bold text-sm text-saffron-700">Back to Sign In</Text>
             </Pressable>
           </View>

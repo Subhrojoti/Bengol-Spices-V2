@@ -37,7 +37,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 const NOTHING = [];
 
-export default function usePagination(items, { pageSize = 10, resetKey = "" } = {}) {
+export default function usePagination(items, { pageSize = 10, resetKey = "", panelScroll = false } = {}) {
   const list = Array.isArray(items) ? items : NOTHING;
 
   const [state, setState] = useState({ page: 1, size: pageSize, key: resetKey });
@@ -62,11 +62,25 @@ export default function usePagination(items, { pageSize = 10, resetKey = "" } = 
     container.current = element;
   }, []);
 
-  const toTop = () => {
+  const toTop = useCallback(() => {
     const element = container.current;
     if (!element) return;
 
     element.scrollTop = 0; // a list that scrolls inside its own box
+
+    // Opt-in for reports under sticky section tabs. Scroll only the panel;
+    // scrollIntoView can also move the outer document and hide its header.
+    const panel = panelScroll && element.closest("main");
+    if (panel) {
+      const viewport = panel.getBoundingClientRect();
+      const tabs = panel.querySelector('[role="tablist"]')?.closest(".sticky");
+      const offset = (tabs?.offsetHeight || 0) + 12;
+      const y = element.getBoundingClientRect().top;
+      if (y < viewport.top + offset || y > viewport.bottom - 120) {
+        panel.scrollTo({ top: panel.scrollTop + y - viewport.top - offset, behavior: "smooth" });
+      }
+      return;
+    }
 
     // Only when its top is off screen (or under the panel's header bar):
     // a short list that is already in view stays where it is
@@ -74,18 +88,18 @@ export default function usePagination(items, { pageSize = 10, resetKey = "" } = 
     if (y < 72 || y > window.innerHeight - 120) {
       element.scrollIntoView({ block: "start", behavior: "smooth" });
     }
-  };
+  }, [panelScroll]);
 
   const setPage = useCallback((next) => {
     setState((current) => ({ ...current, page: next }));
     // after the new page has been drawn
     requestAnimationFrame(toTop);
-  }, []);
+  }, [toTop]);
 
   const setPageSize = useCallback((next) => {
     setState((current) => ({ ...current, size: next, page: 1 }));
     requestAnimationFrame(toTop);
-  }, []);
+  }, [toTop]);
 
   // No scrolling here: the caller is about to scroll to the item itself
   const showItem = useCallback(

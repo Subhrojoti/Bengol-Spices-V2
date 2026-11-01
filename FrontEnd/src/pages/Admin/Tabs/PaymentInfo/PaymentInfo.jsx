@@ -1,5 +1,6 @@
 import reportAdminError from "../../../../utils/reportAdminError";
 import useLatestRequest from "../../../../hooks/useLatestRequest";
+import DueDateExtension from "../../../../components/common/DueDateExtension";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -34,6 +35,9 @@ const FILTERS = [
 
 const n = (v) => Number(v || 0);
 const inr = (v) => `₹${n(v).toLocaleString("en-IN")}`;
+const isCancelled = order => (order.orderStatus || order.status) === "CANCELLED";
+const outstanding = order => isCancelled(order) ? 0 : Math.max(0, n(order.dueAmount));
+const hasVerification = order => [order.verifiedAmount, order.pendingVerificationAmount].every(value => value !== null && value !== undefined && Number.isFinite(Number(value)));
 
 const day = (value) =>
   value
@@ -58,7 +62,7 @@ const dayTime = (value) =>
    order fell due exactly seven days after it was placed, so "overdue" was
    wrong for any order with a different term. */
 const isOverdue = (order) => {
-  if (n(order.dueAmount) <= 0) return false;
+  if (outstanding(order) <= 0) return false;
   if (!order.dueDate) return false;
   return new Date(order.dueDate) < new Date();
 };
@@ -80,7 +84,7 @@ const PAYMENT_COLUMNS = [
   { header: "Agent phone", value: (o) => o.agent?.phone },
   { header: "Billed (Rs)", value: (o) => n(o.totalAmount) },
   { header: "Collected (Rs)", value: (o) => n(o.paidAmount) },
-  { header: "Due (Rs)", value: (o) => n(o.dueAmount) },
+  { header: "Due (Rs)", value: outstanding },
   { header: "Payment status", value: (o) => o.paymentStatus },
   { header: "Due date", value: (o) => sheetDate(o.dueDate) },
   { header: "Overdue", value: (o) => (isOverdue(o) ? "Yes" : "No") },
@@ -112,7 +116,7 @@ const Stat = ({ label, value, icon, tint, ink }) => (
         <p className="text-lg font-semibold leading-none tabular-nums text-slate-900">
           {value}
         </p>
-        <p className="mt-1 truncate text-xs text-slate-400">{label}</p>
+        <p className="mt-1 break-words text-xs leading-snug text-slate-400">{label}</p>
       </div>
     </div>
   </Card>
@@ -203,8 +207,8 @@ export default function PaymentInfo() {
   const counts = useMemo(
     () => ({
       ALL: orders.length,
-      COMPLETED: orders.filter((o) => o.paymentStatus === "COMPLETED").length,
-      DUE: orders.filter((o) => n(o.dueAmount) > 0 && !isOverdue(o)).length,
+      COMPLETED: orders.filter((o) => !isCancelled(o) && o.paymentStatus === "COMPLETED").length,
+      DUE: orders.filter((o) => outstanding(o) > 0 && !isOverdue(o)).length,
       OVERDUE: orders.filter(isOverdue).length,
     }),
     [orders],
@@ -214,20 +218,24 @@ export default function PaymentInfo() {
     () => ({
       billed: orders.reduce((s, o) => s + n(o.totalAmount), 0),
       collected: orders.reduce((s, o) => s + n(o.paidAmount), 0),
-      due: orders.reduce((s, o) => s + n(o.dueAmount), 0),
-      overdue: orders.filter(isOverdue).reduce((s, o) => s + n(o.dueAmount), 0),
+      verified: orders.reduce((s, o) => s + n(o.verifiedAmount), 0),
+      pending: orders.reduce((s, o) => s + n(o.pendingVerificationAmount), 0),
+      due: orders.reduce((s, o) => s + outstanding(o), 0),
+      overdue: orders.filter(isOverdue).reduce((s, o) => s + outstanding(o), 0),
     }),
     [orders],
   );
+
+  const verificationAvailable = orders.every(hasVerification);
 
   const matching = useMemo(() => {
     const term = search.trim().toLowerCase();
 
     return orders
       .filter((order) => {
-        if (filter === "COMPLETED") return order.paymentStatus === "COMPLETED";
+        if (filter === "COMPLETED") return !isCancelled(order) && order.paymentStatus === "COMPLETED";
         if (filter === "OVERDUE") return isOverdue(order);
-        if (filter === "DUE") return n(order.dueAmount) > 0 && !isOverdue(order);
+        if (filter === "DUE") return outstanding(order) > 0 && !isOverdue(order);
         return true;
       })
       .filter((order) => {
@@ -275,8 +283,8 @@ export default function PaymentInfo() {
       store.orders.push(order);
       store.billed += n(order.totalAmount);
       store.collected += n(order.paidAmount);
-      store.due += n(order.dueAmount);
-      if (isOverdue(order)) store.overdue += n(order.dueAmount);
+      store.due += outstanding(order);
+      if (isOverdue(order)) store.overdue += outstanding(order);
     });
 
     return Object.values(map).sort((a, b) => b.due - a.due);
@@ -330,7 +338,7 @@ export default function PaymentInfo() {
           ink="#2a78d6"
         />
         <Stat
-          label="Collected"
+          label="Recorded payments"
           value={inr(totals.collected)}
           icon={<Banknote size={17} />}
           tint="#e6f7f0"
@@ -353,6 +361,8 @@ export default function PaymentInfo() {
       </div>
 
       {/* ===== TOOLBAR ===== */}
+      <div className="grid gap-3 sm:grid-cols-2"><Stat label="Verified payments" value={verificationAvailable ? inr(totals.verified) : "Not available"} icon={<Banknote size={17} />} tint="#e6f7f0" ink="#12805a" /><Stat label="Pending verification" value={verificationAvailable ? inr(totals.pending) : "Not available"} icon={<Clock3 size={17} />} tint="#fdf3e0" ink="#a06c00" /></div>
+      {!verificationAvailable && <p className="text-xs text-slate-500">The verification breakdown is unavailable for some orders. Recorded payments are shown above; missing verification amounts are not treated as zero.</p>}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => {
@@ -381,7 +391,7 @@ export default function PaymentInfo() {
           })}
         </div>
 
-        <div className="relative ml-auto">
+        <div className="relative ml-auto w-full sm:w-auto">
           <Search
             size={15}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -396,6 +406,7 @@ export default function PaymentInfo() {
 
         {/* Exactly what is listed below: the chosen filter and the search */}
         <button
+          aria-label="Export"
           onClick={() => {
             const view = FILTERS.find((f) => f.key === filter)?.label.toLowerCase() || "all";
             const count = downloadCsv(
@@ -413,6 +424,7 @@ export default function PaymentInfo() {
         </button>
 
         <button
+          aria-label="Refresh"
           onClick={() => load(true)}
           disabled={refreshing}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[14px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
@@ -551,7 +563,8 @@ export default function PaymentInfo() {
                       <tbody className="divide-y divide-slate-100">
                         {orderPager.pageItems.map((order) => {
                           const overdue = isOverdue(order);
-                          const settled = n(order.dueAmount) <= 0;
+                          const cancelled = isCancelled(order);
+                          const settled = !cancelled && outstanding(order) <= 0;
                           const payments = order.payments || [];
                           const showPayments = openOrder === order.orderId;
 
@@ -602,22 +615,22 @@ export default function PaymentInfo() {
 
                                 <td className="px-5 py-3.5 text-right text-[13.5px] font-semibold">
                                   <Money
-                                    value={order.dueAmount}
-                                    tone={settled ? "muted" : overdue ? "rose" : "amber"}
+                                    value={outstanding(order)}
+                                    tone={cancelled || settled ? "muted" : overdue ? "rose" : "amber"}
                                   />
                                 </td>
 
                                 <td className="px-5 py-3.5 text-right">
                                   <span
                                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-semibold ring-1 ring-inset ${
-                                      settled
+                                      cancelled ? "bg-slate-100 text-slate-600 ring-slate-500/20" : settled
                                         ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
                                         : overdue
                                           ? "bg-rose-50 text-rose-700 ring-rose-600/20"
                                           : "bg-amber-50 text-amber-700 ring-amber-600/20"
                                     }`}>
                                     {overdue && <TriangleAlert size={11} />}
-                                    {settled
+                                    {cancelled ? "Cancelled" : settled
                                       ? "Settled"
                                       : overdue
                                         ? "Overdue"
@@ -631,9 +644,17 @@ export default function PaymentInfo() {
                               {showPayments && (
                                 <tr>
                                   <td colSpan={7} className="bg-blue-50/30 px-5 py-4">
+                                    <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                                      <span>Recorded: <strong>{inr(order.recordedAmount ?? order.paidAmount)}</strong></span>
+                                      <span>Verified: <strong className="text-emerald-700">{hasVerification(order) ? inr(order.verifiedAmount) : "Not available"}</strong></span>
+                                      <span>Pending verification: <strong className="text-amber-700">{hasVerification(order) ? inr(order.pendingVerificationAmount) : "Not available"}</strong></span>
+                                      {n(order.rejectedAmount) > 0 && <span>Not verified: {inr(order.rejectedAmount)}</span>}
+                                      <DueDateExtension order={order} onSaved={() => load(true)} />
+                                    </div>
                                     <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-slate-400">
                                       Collection history
                                     </p>
+                                    {Math.abs(n(order.reconciliationDifference)) > 0.005 && <p className="mb-3 text-xs text-rose-600">Payment history differs from recorded payments by {inr(Math.abs(order.reconciliationDifference))}. Review this with the office before making adjustments.</p>}
                                     <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
                                       {payments.map((p, i) => (
                                         <div
@@ -648,13 +669,14 @@ export default function PaymentInfo() {
                                               {p.method}
                                             </span>
                                           )}
+                                          <span className="text-xs text-slate-500">{p.collectionKind === "INITIAL" ? "Initial payment" : p.collectionKind === "INSTALMENT" ? "Instalment" : "Collection"} · {p.verification || "Verified / legacy"}</span>
                                           <span className="flex items-center gap-1 text-[12.5px] text-slate-500">
                                             <Clock3 size={11} className="text-slate-400" />
                                             {dayTime(p.collectedAt)}
                                           </span>
                                           {p.collectedBy && (
                                             <span className="ml-auto font-mono text-[12px] text-slate-400">
-                                              {p.collectedBy}
+                                              {p.collectorRole === "DELIVERY_PARTNER" ? "Delivery partner" : "Agent"}: {p.collectorName || p.collectedBy}
                                             </span>
                                           )}
                                         </div>

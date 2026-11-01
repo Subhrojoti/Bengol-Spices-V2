@@ -15,7 +15,7 @@
    name like "=HYPERLINK(...)" would execute on the accountant's machine.
    A leading apostrophe makes the program treat the cell as text; it is not
    shown in the sheet. Real numbers are left as numbers so they still sum. */
-const guardFormula = (text) => (/^[=+\-@\t\r]/.test(text) ? `'${text}` : text);
+const guardFormula = (text) => (/^[=+\-@\t\r\n＝＋－＠]/.test(text) ? `'${text}` : text);
 
 const cell = (value) => {
   if (value === null || value === undefined) return "";

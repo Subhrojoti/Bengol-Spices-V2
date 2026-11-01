@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationApi } from "@/api/notification.api";
+import { getErrorMessage } from "@/api/client";
+import { toast } from "@/utils/toast";
 
 export function useNotifications() {
   return useQuery({
@@ -14,5 +16,6 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: (id: string) => notificationApi.markAsRead(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onError: error => toast.error("Could not update notification", getErrorMessage(error)),
   });
 }

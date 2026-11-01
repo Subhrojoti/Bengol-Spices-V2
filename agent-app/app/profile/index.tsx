@@ -46,7 +46,14 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-          <LinearGradient colors={gradients.hero} className="rounded-b-[32px] px-5 pb-8 pt-3">
+          {/* An inline style, as every other gradient in this app has: a
+              gradient ignores className here, so the padding and the rounded
+              bottom never applied and the back button and photo sat against
+              the edge of the screen */}
+          <LinearGradient
+            colors={gradients.hero}
+            style={{ borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingHorizontal: 20, paddingBottom: 32, paddingTop: 12 }}
+          >
             <IconButton onPress={() => router.back()} className="bg-white/15">
               <ChevronLeft size={20} color={colors.white} />
             </IconButton>

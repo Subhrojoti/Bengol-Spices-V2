@@ -134,7 +134,7 @@ const TableSkeleton = () => (
   </div>
 );
 
-export default function AgentManagement() {
+export default function AgentManagement({ onViewStores }) {
   const [agents, setAgents] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [refreshing, setRefreshing] = useState(false);
@@ -405,6 +405,7 @@ export default function AgentManagement() {
 
                         <td className="px-5 py-3.5">
                           <div className="flex items-center justify-end gap-2">
+                            {onViewStores && <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-blue-600" onClick={() => onViewStores(agent.agentId)}>Store Details</button>}
                             {isAdminPanel && <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700" onClick={() => setAdministration(agent)}>Manage</button>}
                             {agent.status === "PENDING" && (
                               <>

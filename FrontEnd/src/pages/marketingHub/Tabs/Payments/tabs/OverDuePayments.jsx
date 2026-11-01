@@ -91,11 +91,11 @@ const OverDuePayments = () => {
         const overdueOrders = dueOrders.filter((order) => {
           if (order.dueAmount <= 0) return false;
 
-          const orderDate = new Date(order.createdAt);
-          const overdueDate = new Date(orderDate);
-          overdueDate.setDate(overdueDate.getDate() + 7);
-
-          return today > overdueDate;
+          // The backend owns credit periods and approved extensions. Orders
+          // awaiting a credit start (or without a valid date) are not overdue.
+          if (!order.dueDate) return false;
+          const overdueDate = new Date(order.dueDate);
+          return Number.isFinite(overdueDate.getTime()) && today > overdueDate;
         });
 
         // Group by consumerId

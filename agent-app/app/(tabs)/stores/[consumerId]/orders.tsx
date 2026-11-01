@@ -259,7 +259,9 @@ export default function StoreOrdersScreen() {
 function Figure({ label, value, tone = "text-ink", boxed = false }: { label: string; value: string; tone?: string; boxed?: boolean }) {
   return (
     <View className={`flex-1 ${boxed ? "rounded-xl bg-cream-100 px-3 py-2" : ""}`}>
-      <Text className="font-sans text-[10px] text-ink-500">{label}</Text>
+      <Text className="font-sans text-[10px] text-ink-500" numberOfLines={1} adjustsFontSizeToFit>
+        {label}
+      </Text>
       <Text className={`font-sans-bold text-sm ${tone}`} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
@@ -334,8 +336,8 @@ function OrderRow({ row, last, onDownload, downloading }: { row: Row; last: bool
       onPress={() => router.push(`/orders/${order.orderId}`)}
       className={`border-x border-b border-sand bg-white px-4 py-3.5 active:opacity-80 ${last ? "rounded-b-2xl" : ""}`}
     >
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1">
+      <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+        <View className="max-w-full shrink">
           <Text className="font-sans-bold text-sm text-ink">{order.orderId}</Text>
           <Text className="mt-0.5 font-sans text-xs text-ink-500" numberOfLines={1}>
             {formatDate(order.createdAt)}

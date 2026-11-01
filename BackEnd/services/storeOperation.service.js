@@ -42,7 +42,7 @@ export const storeOperation = (handler) => async (req, res, next) => {
       consumerId = (await Order.findOne({ orderId }).select("consumerId").lean())?.consumerId;
     } else if (req.params?.returnId) {
       consumerId = (await Return.findOne({ returnId: req.params.returnId }).select("consumerId").lean())?.consumerId;
-    } else consumerId = req.body?.orderPayload?.consumerId || req.body?.consumerId;
+    } else consumerId = req.params?.consumerId || req.body?.orderPayload?.consumerId || req.body?.consumerId;
     if (typeof consumerId !== "string") return handler(req, res, next);
     return await withStoreLocks([consumerId], () => handler(req, res, next));
   } catch (error) { next(error); }

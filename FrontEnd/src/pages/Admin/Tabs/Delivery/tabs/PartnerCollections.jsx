@@ -1,0 +1,15 @@
+import { useEffect, useState } from "react";
+import { Dialog } from "@mui/material";
+import { getPartnerCollections } from "../../../../../api/services";
+import useLatestRequest from "../../../../../hooks/useLatestRequest";
+const money = value => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+export default function PartnerCollections({ partner, query, onClose }) {
+  const [page, setPage] = useState(1), [data, setData] = useState(null), [error, setError] = useState(""), [revision, setRevision] = useState(0);
+  const begin = useLatestRequest();
+  useEffect(() => {
+    const request = begin();
+    getPartnerCollections(partner.partnerId, { ...JSON.parse(query), page }, { signal: request.signal }).then(result => { if (request.current()) { setData(result); setError(""); } }).catch(e => { if (request.current()) { setData(null); setError(e.response?.data?.message || "Could not load collections"); } });
+  }, [partner.partnerId, query, page, revision, begin]);
+  const button = "rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 disabled:opacity-50";
+  return <Dialog open onClose={onClose} fullWidth maxWidth="sm"><div className="space-y-4 bg-white p-5"><div className="flex justify-between gap-3"><h3 className="font-semibold text-slate-900">Collections · {partner.name}</h3><button className={button} onClick={onClose}>Close</button></div><p className="text-xs text-slate-500">Collections on orders matching the selected report dates.</p>{error && <div role="alert" className="space-y-2 text-sm text-rose-600"><p>{error}</p><button className={button} onClick={() => { setData(null); setError(""); setRevision(n => n + 1); }}>Retry history</button></div>}{!data && !error && <p role="status" className="text-sm text-slate-500">Loading history…</p>}{data && <><p className="text-sm text-slate-600">Recorded {money(data.recordedAmount)} · Verified {money(data.verifiedAmount)} · Pending {money(data.pendingVerificationAmount)}</p><div className="max-h-[55dvh] space-y-2 overflow-y-auto">{data.payments.length ? data.payments.map(payment => <div key={payment.id} className="rounded-lg border border-slate-200 p-3 text-sm"><p className="font-semibold text-slate-900">{payment.orderId} · {money(payment.amount)} · {payment.method}</p><p className="mt-1 text-xs text-slate-500">{new Date(payment.collectedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} · {payment.verification || "Verified / legacy"}</p><p className="mt-1 text-xs text-slate-500">{payment.collector.name || payment.collector.id}{payment.note ? ` · ${payment.note}` : ""}</p></div>) : <p className="text-sm text-slate-500">No collections in this view.</p>}</div><div className="flex justify-between gap-3"><button className={button} disabled={data.page <= 1} onClick={() => { setData(null); setPage(data.page - 1); }}>Previous</button><span className="text-sm text-slate-500">{data.page} / {data.pages}</span><button className={button} disabled={data.page >= data.pages} onClick={() => { setData(null); setPage(data.page + 1); }}>Next</button></div></>}</div></Dialog>;
+}

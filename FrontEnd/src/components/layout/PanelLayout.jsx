@@ -105,6 +105,7 @@ const PanelLayout = ({
       brandTitle={brandTitle}
       accent={accent}
       expanded={variant === "mobile" ? true : expanded}
+      showGroupHeadings={variant === "mobile" || pinned}
       profile={profile}
       profilePath={profilePath}
       onLogout={onLogout}

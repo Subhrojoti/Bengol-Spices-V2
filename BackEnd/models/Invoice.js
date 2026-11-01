@@ -13,6 +13,7 @@ const invoiceSchema = new mongoose.Schema(
     },
 
     buyer: {
+      gstin: String,
       name: String,
       phone: String,
       address: String,
@@ -43,6 +44,8 @@ const invoiceSchema = new mongoose.Schema(
     payments: [
       {
         amount: Number,
+        paymentRecordId: { type: mongoose.Schema.Types.ObjectId, ref: "Payment" },
+        paymentId: String,
         method: String,
         date: { type: Date, default: Date.now },
       },

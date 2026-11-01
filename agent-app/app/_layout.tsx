@@ -89,7 +89,11 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Screen name="cash-payments" />
         <Stack.Screen name="help" />
         <Stack.Screen name="returns/index" />
+        <Stack.Screen name="new-store" />
+        <Stack.Screen name="store-changes/[consumerId]" />
+        <Stack.Screen name="store-map" />
         <Stack.Screen name="orders/[orderId]/index" />
+        <Stack.Screen name="orders/[orderId]/edit" />
         <Stack.Screen name="orders/[orderId]/collect-payment" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       </Stack.Protected>
     </Stack>

@@ -20,7 +20,9 @@ const textVariantClasses: Record<BadgeVariant, string> = {
 export function Badge({ label, variant = "neutral" }: { label: string; variant?: BadgeVariant }) {
   return (
     <View className={`self-start rounded-full px-3 py-1 ${variantClasses[variant]}`}>
-      <Text className={`font-sans-bold text-xs ${textVariantClasses[variant]}`}>{label}</Text>
+      <Text className={`font-sans-bold text-xs ${textVariantClasses[variant]}`} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }

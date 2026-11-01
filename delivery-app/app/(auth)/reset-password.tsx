@@ -54,7 +54,10 @@ export default function ResetPasswordScreen() {
         confirmPassword: values.confirmPassword,
       });
       toast.success("Password updated", res.message || "You can now sign in with your new password.");
-      router.replace("/(auth)/login");
+      // Back to the sign-in screen already open underneath, not a second one on top
+      // (Back then returned to the forgot-password screen this one was reached through).
+      // Opened from the email link, with nothing underneath, it takes this screen's place.
+      router.dismissTo("/(auth)/login");
     } catch (error) {
       toast.error("Couldn't reset password", getErrorMessage(error));
     } finally {
@@ -139,7 +142,7 @@ export default function ResetPasswordScreen() {
 
           <View className="mt-8 flex-row justify-center">
             <Text className="font-sans text-sm text-ink-500">Link expired? </Text>
-            <Pressable onPress={() => router.replace("/(auth)/forgot-password")} hitSlop={6}>
+            <Pressable onPress={() => router.dismissTo("/(auth)/forgot-password")} hitSlop={6}>
               <Text className="font-sans-bold text-sm text-saffron-700">Request a new one</Text>
             </Pressable>
           </View>

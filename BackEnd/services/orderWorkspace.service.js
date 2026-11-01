@@ -3,7 +3,7 @@ import Store from "../models/store.js";
 import Agent from "../models/Agent.js";
 import Invoice from "../models/Invoice.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
-import { dayRange, isDateKey } from "../utils/salesTarget.js";
+import { orderDateFilter, orderDateOf } from "../utils/orderReportDates.js";
 
 export const ORDER_STATUSES = ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
 const transit = ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"];
@@ -24,10 +24,11 @@ const integer = (query, key, fallback, max) => {
 export const workspaceFilter = async (query) => {
   const search = string(query, "q"), agentId = string(query, "agentId"), consumerId = string(query, "consumerId");
   const from = string(query, "from", 10), to = string(query, "to", 10), status = string(query, "status", 24) || "ALL";
-  if ((from && !isDateKey(from)) || (to && !isDateKey(to)) || (from && to && from > to)) bad("Choose a valid date range");
+  const dateBasis = string(query, "dateBasis", 12) || "PLACED";
+  const dateMatch = orderDateFilter({ dateBasis, from, to });
   if (!["ALL", "IN_TRANSIT", ...ORDER_STATUSES].includes(status)) bad("Invalid order status");
   const filter = { ...(agentId && { agentId }), ...(consumerId && { consumerId }),
-    ...((from || to) && { createdAt: { ...(from && { $gte: dayRange(from).start }), ...(to && { $lt: dayRange(to).end }) } }) };
+    ...(Object.keys(dateMatch).length && { $and: [dateMatch] }) };
   if (search) {
     const re = literal(search);
     const [agents, stores] = await Promise.all([
@@ -39,7 +40,7 @@ export const workspaceFilter = async (query) => {
     if (stores.length) filter.$or.push({ consumerId: { $in: stores.map(s => s.consumerId) } });
   }
   const statusMatch = status === "ALL" ? {} : { status: status === "IN_TRANSIT" ? { $in: transit } : status };
-  return { filter, statusMatch, page: integer(query, "page", 1, 1000000), pageSize: integer(query, "pageSize", 25, 50) };
+  return { filter, statusMatch, dateBasis, page: integer(query, "page", 1, 1000000), pageSize: integer(query, "pageSize", 25, 50) };
 };
 
 const labelsFor = async (rows) => {
@@ -53,7 +54,7 @@ const labelsFor = async (rows) => {
 };
 
 export const listWorkspaceOrders = async (query) => {
-  const { filter, statusMatch, page: wanted, pageSize } = await workspaceFilter(query);
+  const { filter, statusMatch, dateBasis, page: wanted, pageSize } = await workspaceFilter(query);
   // Facets share the same filtered read. Status counts retain the other filters
   // but intentionally exclude the selected status, so switching is meaningful.
   const [result] = await Order.aggregate([{ $match: filter }, { $facet: {
@@ -61,12 +62,13 @@ export const listWorkspaceOrders = async (query) => {
     total: [{ $match: statusMatch }, { $count: "count" }],
   } }]);
   const total = result.total[0]?.count || 0, pages = Math.max(1, Math.ceil(total / pageSize)), page = Math.min(wanted, pages);
-  const rows = await Order.find({ ...filter, ...statusMatch }).select("orderId consumerId agentId status totalAmount paidAmount dueAmount createdAt deliveryAddress.storeName")
+  const rows = await Order.find({ ...filter, ...statusMatch }).select("orderId consumerId agentId status totalAmount paidAmount dueAmount createdAt deliveryAddress.storeName statusHistory delivery.deliveredAt")
     .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * pageSize).limit(pageSize).lean();
   const counts = { ALL: 0, ...Object.fromEntries(ORDER_STATUSES.map(s => [s, 0])) };
   for (const row of result.statuses) { counts[row._id] = row.count; counts.ALL += row.count; }
   counts.IN_TRANSIT = transit.reduce((sum, key) => sum + counts[key], 0);
-  return { success: true, orders: await labelsFor(rows), total, page, pageSize, pages, counts };
+  const displayed = rows.map(row => { const { statusHistory, delivery, ...compact } = row; return { ...compact, reportDate: orderDateOf({ ...compact, statusHistory, delivery }, dateBasis) }; });
+  return { success: true, orders: await labelsFor(displayed), dateBasis, total, page, pageSize, pages, counts };
 };
 
 export const workspaceOrder = async (orderId) => {
@@ -101,9 +103,9 @@ const cell = (value) => {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 const stamp = (value) => value && Number.isFinite(new Date(value).getTime()) ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "";
-export const csvColumns = ["Order ID", "Placed on (IST)", "Status", "Store ID", "Store", "Owner", "Phone", "Agent ID", "Items", "Total (Rs)", "Paid (Rs)", "Due (Rs)", "Payment mode", "Payment status", "Due date (IST)", "Invoice no.", "Cancelled because"];
+export const csvColumns = ["Order ID", "Placed on (IST)", "Status", "Store ID", "Store", "Owner", "Phone", "Agent ID", "Items", "Total (Rs)", "Paid (Rs)", "Due (Rs)", "Payment mode", "Payment status", "Due date (IST)", "Invoice no.", "Cancelled because", "Confirmed on (IST)", "Delivered on (IST)"];
 export const orderCsvLine = (o, invoiceNumber) => [o.orderId, stamp(o.createdAt), o.status, o.consumerId, o.deliveryAddress?.storeName, o.deliveryAddress?.ownerName, o.deliveryAddress?.phone, o.agentId,
-  (o.products || []).map(p => `${p.name} x ${p.quantity} ${p.uom || "units"}`).join("; "), Number(o.totalAmount || 0), Number(o.paidAmount || 0), o.status === "CANCELLED" ? 0 : Number(o.dueAmount || 0), o.paymentMode, o.paymentStatus, stamp(o.dueDate), invoiceNumber, o.cancellation?.reason].map(cell).join(",") + "\r\n";
+  (o.products || []).map(p => `${p.name} x ${p.quantity} ${p.uom || "units"}`).join("; "), Number(o.totalAmount || 0), Number(o.paidAmount || 0), o.status === "CANCELLED" ? 0 : Number(o.dueAmount || 0), o.paymentMode, o.paymentStatus, stamp(o.dueDate), invoiceNumber, o.cancellation?.reason, stamp(orderDateOf(o, "CONFIRMED")), stamp(orderDateOf(o, "DELIVERED"))].map(cell).join(",") + "\r\n";
 export const csvHeader = () => "\uFEFF" + csvColumns.map(cell).join(",") + "\r\n";
 export const exportWorkspaceOrders = async (query, write, stopped) => {
   const { filter, statusMatch } = await workspaceFilter(query);

@@ -55,7 +55,7 @@ export const employeeRoutes = [
     icon: Groups3Icon,
     // was `permissions:` (plural) — the guard reads `permission`, so this tab
     // was reachable by every employee regardless of their access.
-    permission: ["canManageAgents", "canPayoutIncentives"],
+    permission: ["canManageAgents", "canPayoutIncentives", "canViewStoreReports", "canReviewStoreChanges"],
     component: Agent,
   },
   {
