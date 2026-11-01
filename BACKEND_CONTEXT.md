@@ -5,6 +5,12 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Production release (1 November):** application `abf72b3` pushed and backend/
+website deployed; files, health and normal read-only Admin smoke verified.
+Mobile source pushed, no mobile binaries published. Existing local-only entries
+below describe their original review stage; see
+[release evidence and rollback constraints](deploy/releases/2026-11-01-ecosystem-admin.md).
+
 **Admin release recheck (1 November, local only):** reviewed all main Admin
 sections and critical workflows; added same-page retry after a collection-history
 read failure. No backend/API or production changes in this follow-up. See
