@@ -16,6 +16,11 @@ const get = (url, config = {}) => {
 
 const API_BASE_URL = "http://localhost:8000";
 
+export const getBills = async (params, options = {}) => (await get("/admin/bills", { ...options, params })).data;
+export const getBill = async (id, options) => (await get(`/admin/bills/${encodeURIComponent(id)}`, options)).data;
+export const getBillOptions = async (params, options = {}) => (await get("/admin/bills/options", { ...options, params })).data;
+export const downloadBills = async (params, options = {}) => get("/admin/bills/download", { ...options, params, responseType: "blob", timeout: 300000 });
+
 export const getStoreReport = async (params, options = {}) => (await get("/agent/store/reports", { ...options, params })).data;
 export const getStoreReportAgents = async (options) => (await get("/agent/store/reports/agents", options)).data;
 export const revealStoreDeliveryCode = async (consumerId, options) => (await axiosInstance.post(`/agent/store/${encodeURIComponent(consumerId)}/delivery-code`, undefined, options)).data;
@@ -693,12 +698,12 @@ export const getFaqs = async () => {
 
 // Download Invoice
 
-export const downloadInvoice = async (orderNo) => {
+export const downloadInvoice = async (orderNo, options = {}) => {
   try {
     const response = await get(
       `/api/invoice/download/${orderNo}`,
       {
-        responseType: "blob",
+          ...options, responseType: "blob",
       },
     );
 

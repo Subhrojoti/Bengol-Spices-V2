@@ -1,5 +1,10 @@
 # Admin frontend audit and continuation guide
 
+**Bills and collector tabs (1 November, local only):** added Bills navigation,
+default-off employee billing access, issued-bill filters/details/PDFs/ZIPs and
+collector-scoped Cash Verification tabs. Existing Orders code reveal reused and
+verified. See [implementation, security and final validation](../../../BackEnd/docs/BILLS_COLLECTOR_TABS_2026-11-01.md).
+
 **Release recheck (1 November, local only):** fixed a failed collection-history
 page trapping Admin without Retry. Preserves report dates/page and existing UI;
 see [scope, full-run timeout investigation and final validation](ADMIN_RELEASE_RECHECK_2026-11-01.md).

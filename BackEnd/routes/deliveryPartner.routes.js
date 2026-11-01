@@ -18,6 +18,7 @@ import { checkPermission } from "../middleware/permission.js";
 import { limitLoginAttempts } from "../middleware/loginLimiter.js";
 import { limitApplications } from "../middleware/rateLimit.js";
 import { getMobilePaymentHistory, collectDeliveryPayment } from "../controllers/mobileCollections.controller.js";
+import { createDeliveryQr, recoverDeliveryQr, deliveryQrStatus, closeDeliveryQr, verifyDeliveryQr } from "../controllers/deliveryQr.controller.js";
 import { storeOperation } from "../services/storeOperation.service.js";
 import { getPartnerCollections } from "../controllers/partnerCollections.controller.js";
 
@@ -42,6 +43,11 @@ router.get("/orders", protect, isDeliveryPartner, getMyAssignedOrders);
 router.get("/collections", protect, isDeliveryPartner, getPartnerCollections);
 router.get("/orders/:orderId/payments", protect, isDeliveryPartner, getMobilePaymentHistory);
 router.post("/orders/:orderId/payments", protect, isDeliveryPartner, storeOperation(collectDeliveryPayment));
+router.post("/orders/:orderId/payment-qr", protect, isDeliveryPartner, storeOperation(createDeliveryQr));
+router.get("/orders/:orderId/payment-qr", protect, isDeliveryPartner, recoverDeliveryQr);
+router.get("/orders/:orderId/payment-qr/:qrCodeId", protect, isDeliveryPartner, deliveryQrStatus);
+router.post("/orders/:orderId/payment-qr/:qrCodeId/verify", protect, isDeliveryPartner, storeOperation(verifyDeliveryQr));
+router.post("/orders/:orderId/payment-qr/:qrCodeId/close", protect, isDeliveryPartner, closeDeliveryQr);
 router.get(
   "/dashboard",
   protect,

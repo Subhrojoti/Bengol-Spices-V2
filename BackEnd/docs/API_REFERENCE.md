@@ -31,52 +31,56 @@ Router: [admin.routes.js](../routes/admin.routes.js).
 
 | Method | Full path | Pipeline and handler | Router line |
 |---|---|---|---|
-| GET | `/admin/delivery-partners/:partnerId/purge-preview` | `protect -> isAdmin -> getDeliveryPartnerPurgePreview` | 46 |
-| POST | `/admin/delivery-partners/:partnerId/purge` | `protect -> isAdmin -> executeDeliveryPartnerPurge` | 47 |
-| GET | `/admin/dispatch-mappings` | `protect -> isAdmin -> getDispatchMappings` | 48 |
-| GET | `/admin/delivery-performance` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getDeliveryPerformance` | 49 |
-| GET | `/admin/delivery-performance/:partnerId/orders` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getPartnerOrders` | 50 |
-| GET | `/admin/delivery-performance/:partnerId/collections` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getPartnerCollections` | 51 |
-| PUT | `/admin/dispatch-mappings` | `protect -> isAdmin -> saveDispatchMapping` | 52 |
-| DELETE | `/admin/dispatch-mappings/:agentId` | `protect -> isAdmin -> revokeDispatchMapping` | 53 |
-| GET | `/admin/order-workspace` | `protect -> isAdmin -> getWorkspaceOrders` | 54 |
-| GET | `/admin/order-workspace/options` | `protect -> isAdmin -> getWorkspaceOptions` | 55 |
-| GET | `/admin/order-workspace/export` | `protect -> isAdmin -> exportWorkspace` | 56 |
-| GET | `/admin/order-workspace/:orderId` | `protect -> isAdmin -> getWorkspaceOrder` | 57 |
-| GET | `/admin/store-management` | `protect -> isAdmin -> getManagedStores` | 58 |
-| POST | `/admin/store-transfers/preview` | `protect -> isAdmin -> getTransferPreview` | 59 |
-| POST | `/admin/store-transfers` | `protect -> isAdmin -> executeTransfer` | 60 |
-| GET | `/admin/store-management/:consumerId/removal-preview` | `protect -> isAdmin -> getRemovalPreview` | 61 |
-| POST | `/admin/store-management/:consumerId/remove` | `protect -> isAdmin -> executeRemoval` | 62 |
-| GET | `/admin/store-management/:consumerId/purge-preview` | `protect -> isAdmin -> getStorePurgePreview` | 63 |
-| POST | `/admin/store-management/:consumerId/purge` | `protect -> isAdmin -> executeStorePurge` | 64 |
-| POST | `/admin/agents/:agentId/access` | `protect -> isAdmin -> setAgentAccess` | 65 |
-| GET | `/admin/management-audit` | `protect -> isAdmin -> getManagementAudit` | 66 |
-| GET | `/admin/agents/:agentId/purge-preview` | `protect -> isAdmin -> getAgentPurgePreview` | 67 |
-| POST | `/admin/agents/:agentId/purge` | `protect -> isAdmin -> executeAgentPurge` | 68 |
-| GET | `/admin/data-cleanups/:requestId` | `protect -> isAdmin -> getCleanupStatus` | 69 |
-| POST | `/admin/data-cleanups/:requestId/retry-media` | `protect -> isAdmin -> retryCleanup` | 70 |
-| PUT | `/admin/:employeeId/permissions` | `protect -> isAdmin -> updateEmployeePermissions` | 77 |
-| POST | `/admin/agents/:agentId/approve` | `protect -> checkPermission("canManageAgents") -> approveAgent` | 84 |
-| POST | `/admin/agents/:agentId/reject` | `protect -> checkPermission("canManageAgents") -> rejectAgent` | 91 |
-| POST | `/admin/delivery-partners/:partnerId/approve` | `protect -> checkPermission("canManageDeliveryPartners") -> approveDeliveryPartner` | 98 |
-| POST | `/admin/delivery-partners/:partnerId/reject` | `protect -> checkPermission("canManageDeliveryPartners") -> rejectDeliveryPartner` | 104 |
-| GET | `/admin/agents` | `protect -> checkPermission("canManageAgents") -> getAllAgents` | 111 |
-| GET | `/admin/dashboard-summary` | `protect -> checkPermission("canViewDashboardSummary") -> getDashboardSummary` | 114 |
-| GET | `/admin/attention` | `protect -> checkPermission("canViewDashboardSummary") -> getAttentionSummary` | 122 |
-| GET | `/admin/analytics/product-sales` | `protect -> checkPermission(["canViewDashboardSummary", "canManageAgents"]) -> getProductSales` | 130 |
-| GET | `/admin/cash-payments` | `protect -> checkPermission("canVerifyPayments") -> getCashPayments` | 140 |
-| POST | `/admin/cash-payments/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCashBulk` | 141 |
-| GET | `/admin/cash-payments/:paymentId` | `protect -> checkPermission("canVerifyPayments") -> getCashPaymentDetail` | 146 |
-| POST | `/admin/cash-payments/:paymentId/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCash` | 151 |
-| POST | `/admin/cash-payments/:paymentId/reject` | `protect -> checkPermission("canVerifyPayments") -> rejectCash` | 156 |
-| GET | `/admin/delivery/alerts` | `protect -> checkPermission("canAssignDelivery") -> getDeliveryAlerts` | 167 |
-| GET | `/admin/delivery/orders/:orderId/trail` | `protect -> checkPermission(["canAssignDelivery", "canGetAllOrders"]) -> getDeliveryTrail` | 172 |
-| POST | `/admin/delivery/orders/:orderId/retry` | `protect -> checkPermission("canAssignDelivery") -> retryDelivery` | 177 |
-| POST | `/admin/delivery/orders/:orderId/allow-without-location` | `protect -> checkPermission("canAssignDelivery") -> allowWithoutLocation` | 182 |
-| POST | `/admin/delivery/events/:eventId/review` | `protect -> checkPermission("canAssignDelivery") -> markDeliveryEventReviewed` | 187 |
-| GET | `/admin/delivery/settings` | `protect -> checkPermission("canAssignDelivery") -> getDeliverySettings` | 192 |
-| PUT | `/admin/delivery/settings` | `protect -> isAdmin -> updateDeliverySettings` | 198 |
+| GET | `/admin/bills` | `protect -> checkPermission("canViewBills") -> getBills` | 47 |
+| GET | `/admin/bills/options` | `protect -> checkPermission("canViewBills") -> getBillOptions` | 48 |
+| GET | `/admin/bills/download` | `protect -> checkPermission("canViewBills") -> downloadBills` | 49 |
+| GET | `/admin/bills/:invoiceId` | `protect -> checkPermission("canViewBills") -> getBill` | 50 |
+| GET | `/admin/delivery-partners/:partnerId/purge-preview` | `protect -> isAdmin -> getDeliveryPartnerPurgePreview` | 51 |
+| POST | `/admin/delivery-partners/:partnerId/purge` | `protect -> isAdmin -> executeDeliveryPartnerPurge` | 52 |
+| GET | `/admin/dispatch-mappings` | `protect -> isAdmin -> getDispatchMappings` | 53 |
+| GET | `/admin/delivery-performance` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getDeliveryPerformance` | 54 |
+| GET | `/admin/delivery-performance/:partnerId/orders` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getPartnerOrders` | 55 |
+| GET | `/admin/delivery-performance/:partnerId/collections` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getPartnerCollections` | 56 |
+| PUT | `/admin/dispatch-mappings` | `protect -> isAdmin -> saveDispatchMapping` | 57 |
+| DELETE | `/admin/dispatch-mappings/:agentId` | `protect -> isAdmin -> revokeDispatchMapping` | 58 |
+| GET | `/admin/order-workspace` | `protect -> isAdmin -> getWorkspaceOrders` | 59 |
+| GET | `/admin/order-workspace/options` | `protect -> isAdmin -> getWorkspaceOptions` | 60 |
+| GET | `/admin/order-workspace/export` | `protect -> isAdmin -> exportWorkspace` | 61 |
+| GET | `/admin/order-workspace/:orderId` | `protect -> isAdmin -> getWorkspaceOrder` | 62 |
+| GET | `/admin/store-management` | `protect -> isAdmin -> getManagedStores` | 63 |
+| POST | `/admin/store-transfers/preview` | `protect -> isAdmin -> getTransferPreview` | 64 |
+| POST | `/admin/store-transfers` | `protect -> isAdmin -> executeTransfer` | 65 |
+| GET | `/admin/store-management/:consumerId/removal-preview` | `protect -> isAdmin -> getRemovalPreview` | 66 |
+| POST | `/admin/store-management/:consumerId/remove` | `protect -> isAdmin -> executeRemoval` | 67 |
+| GET | `/admin/store-management/:consumerId/purge-preview` | `protect -> isAdmin -> getStorePurgePreview` | 68 |
+| POST | `/admin/store-management/:consumerId/purge` | `protect -> isAdmin -> executeStorePurge` | 69 |
+| POST | `/admin/agents/:agentId/access` | `protect -> isAdmin -> setAgentAccess` | 70 |
+| GET | `/admin/management-audit` | `protect -> isAdmin -> getManagementAudit` | 71 |
+| GET | `/admin/agents/:agentId/purge-preview` | `protect -> isAdmin -> getAgentPurgePreview` | 72 |
+| POST | `/admin/agents/:agentId/purge` | `protect -> isAdmin -> executeAgentPurge` | 73 |
+| GET | `/admin/data-cleanups/:requestId` | `protect -> isAdmin -> getCleanupStatus` | 74 |
+| POST | `/admin/data-cleanups/:requestId/retry-media` | `protect -> isAdmin -> retryCleanup` | 75 |
+| PUT | `/admin/:employeeId/permissions` | `protect -> isAdmin -> updateEmployeePermissions` | 82 |
+| POST | `/admin/agents/:agentId/approve` | `protect -> checkPermission("canManageAgents") -> approveAgent` | 89 |
+| POST | `/admin/agents/:agentId/reject` | `protect -> checkPermission("canManageAgents") -> rejectAgent` | 96 |
+| POST | `/admin/delivery-partners/:partnerId/approve` | `protect -> checkPermission("canManageDeliveryPartners") -> approveDeliveryPartner` | 103 |
+| POST | `/admin/delivery-partners/:partnerId/reject` | `protect -> checkPermission("canManageDeliveryPartners") -> rejectDeliveryPartner` | 109 |
+| GET | `/admin/agents` | `protect -> checkPermission("canManageAgents") -> getAllAgents` | 116 |
+| GET | `/admin/dashboard-summary` | `protect -> checkPermission("canViewDashboardSummary") -> getDashboardSummary` | 119 |
+| GET | `/admin/attention` | `protect -> checkPermission("canViewDashboardSummary") -> getAttentionSummary` | 127 |
+| GET | `/admin/analytics/product-sales` | `protect -> checkPermission(["canViewDashboardSummary", "canManageAgents"]) -> getProductSales` | 135 |
+| GET | `/admin/cash-payments` | `protect -> checkPermission("canVerifyPayments") -> getCashPayments` | 145 |
+| POST | `/admin/cash-payments/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCashBulk` | 146 |
+| GET | `/admin/cash-payments/:paymentId` | `protect -> checkPermission("canVerifyPayments") -> getCashPaymentDetail` | 151 |
+| POST | `/admin/cash-payments/:paymentId/approve` | `protect -> checkPermission("canVerifyPayments") -> approveCash` | 156 |
+| POST | `/admin/cash-payments/:paymentId/reject` | `protect -> checkPermission("canVerifyPayments") -> rejectCash` | 161 |
+| GET | `/admin/delivery/alerts` | `protect -> checkPermission("canAssignDelivery") -> getDeliveryAlerts` | 172 |
+| GET | `/admin/delivery/orders/:orderId/trail` | `protect -> checkPermission(["canAssignDelivery", "canGetAllOrders"]) -> getDeliveryTrail` | 177 |
+| POST | `/admin/delivery/orders/:orderId/retry` | `protect -> checkPermission("canAssignDelivery") -> retryDelivery` | 182 |
+| POST | `/admin/delivery/orders/:orderId/allow-without-location` | `protect -> checkPermission("canAssignDelivery") -> allowWithoutLocation` | 187 |
+| POST | `/admin/delivery/events/:eventId/review` | `protect -> checkPermission("canAssignDelivery") -> markDeliveryEventReviewed` | 192 |
+| GET | `/admin/delivery/settings` | `protect -> checkPermission("canAssignDelivery") -> getDeliverySettings` | 197 |
+| PUT | `/admin/delivery/settings` | `protect -> isAdmin -> updateDeliverySettings` | 203 |
 
 ## /employee
 
@@ -175,19 +179,24 @@ Router: [deliveryPartner.routes.js](../routes/deliveryPartner.routes.js).
 
 | Method | Full path | Pipeline and handler | Router line |
 |---|---|---|---|
-| POST | `/delivery-partner/register` | `limitApplications -> upload.single("document") -> registerDeliveryPartner` | 26 |
-| POST | `/delivery-partner/login` | `limitLoginAttempts("phone") -> loginDeliveryPartner` | 33 |
-| POST | `/delivery-partner/logout` | `protect -> isDeliveryPartner -> logoutDeliveryPartner` | 34 |
-| GET | `/delivery-partner/all` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getAllDeliveryPartners` | 35 |
-| GET | `/delivery-partner/orders` | `protect -> isDeliveryPartner -> getMyAssignedOrders` | 41 |
-| GET | `/delivery-partner/collections` | `protect -> isDeliveryPartner -> getPartnerCollections` | 42 |
-| GET | `/delivery-partner/orders/:orderId/payments` | `protect -> isDeliveryPartner -> getMobilePaymentHistory` | 43 |
-| POST | `/delivery-partner/orders/:orderId/payments` | `protect -> isDeliveryPartner -> storeOperation(collectDeliveryPayment)` | 44 |
-| GET | `/delivery-partner/dashboard` | `protect -> isDeliveryPartner -> getDeliveryPartnerDashboard` | 45 |
-| GET | `/delivery-partner/history` | `protect -> isDeliveryPartner -> getMyDeliveryHistory` | 53 |
-| GET | `/delivery-partner/:partnerId/history` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getDeliveryPartnerHistory` | 56 |
-| GET | `/delivery-partner/profile` | `protect -> isDeliveryPartner -> getProfile` | 63 |
-| POST | `/delivery-partner/change-password` | `protect -> isDeliveryPartner -> changeDeliveryPartnerPassword` | 66 |
+| POST | `/delivery-partner/register` | `limitApplications -> upload.single("document") -> registerDeliveryPartner` | 27 |
+| POST | `/delivery-partner/login` | `limitLoginAttempts("phone") -> loginDeliveryPartner` | 34 |
+| POST | `/delivery-partner/logout` | `protect -> isDeliveryPartner -> logoutDeliveryPartner` | 35 |
+| GET | `/delivery-partner/all` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getAllDeliveryPartners` | 36 |
+| GET | `/delivery-partner/orders` | `protect -> isDeliveryPartner -> getMyAssignedOrders` | 42 |
+| GET | `/delivery-partner/collections` | `protect -> isDeliveryPartner -> getPartnerCollections` | 43 |
+| GET | `/delivery-partner/orders/:orderId/payments` | `protect -> isDeliveryPartner -> getMobilePaymentHistory` | 44 |
+| POST | `/delivery-partner/orders/:orderId/payments` | `protect -> isDeliveryPartner -> storeOperation(collectDeliveryPayment)` | 45 |
+| POST | `/delivery-partner/orders/:orderId/payment-qr` | `protect -> isDeliveryPartner -> storeOperation(createDeliveryQr)` | 46 |
+| GET | `/delivery-partner/orders/:orderId/payment-qr` | `protect -> isDeliveryPartner -> recoverDeliveryQr` | 47 |
+| GET | `/delivery-partner/orders/:orderId/payment-qr/:qrCodeId` | `protect -> isDeliveryPartner -> deliveryQrStatus` | 48 |
+| POST | `/delivery-partner/orders/:orderId/payment-qr/:qrCodeId/verify` | `protect -> isDeliveryPartner -> storeOperation(verifyDeliveryQr)` | 49 |
+| POST | `/delivery-partner/orders/:orderId/payment-qr/:qrCodeId/close` | `protect -> isDeliveryPartner -> closeDeliveryQr` | 50 |
+| GET | `/delivery-partner/dashboard` | `protect -> isDeliveryPartner -> getDeliveryPartnerDashboard` | 51 |
+| GET | `/delivery-partner/history` | `protect -> isDeliveryPartner -> getMyDeliveryHistory` | 59 |
+| GET | `/delivery-partner/:partnerId/history` | `protect -> checkPermission("canGetAllDeliveryPartners") -> getDeliveryPartnerHistory` | 62 |
+| GET | `/delivery-partner/profile` | `protect -> isDeliveryPartner -> getProfile` | 69 |
+| POST | `/delivery-partner/change-password` | `protect -> isDeliveryPartner -> changeDeliveryPartnerPassword` | 72 |
 
 ## /products
 
@@ -288,4 +297,4 @@ Router: [events.routes.js](../routes/events.routes.js).
 |---|---|---|---|
 | GET | `/api/events/stream` | `protect -> isAdminOrEmployee -> openEventStream` | 10 |
 
-Registered method/path entries: **173**, including health. Commented routes are excluded.
+Registered method/path entries: **182**, including health. Commented routes are excluded.

@@ -23,6 +23,8 @@ const gatewayPaymentSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
+        "QR_OPEN", // issued QR; gateway confirmation has not been applied
+        "QR_CLOSED", // closed without any confirmed funds; retained for recovery
         "PROCESSING", // being applied right now
         "APPLIED", // order placed / due reduced
         "FAILED", // unexpected failure; can be retried, or refunded by the office
@@ -42,6 +44,9 @@ const gatewayPaymentSchema = new mongoose.Schema(
 
     razorpayOrderId: String,
     qrCodeId: String,
+    qrImageUrl: String,
+    qrCloseBy: Number,
+    collectedBy: { id: String, role: String, name: String },
     razorpayPaymentIds: [String],
 
     failureReason: String,
@@ -52,4 +57,5 @@ const gatewayPaymentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+gatewayPaymentSchema.index({ orderId: 1, "collectedBy.id": 1, status: 1, createdAt: -1 });
 export default mongoose.model("GatewayPayment", gatewayPaymentSchema);

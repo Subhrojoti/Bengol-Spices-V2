@@ -1,7 +1,7 @@
 {
   "note": "Static import reachability/signals, not proof of runtime coverage. Review includes shared frontend dependencies; changes are restricted to Admin behavior.",
-  "parsedFrontendModules": 158,
-  "reachableModules": 99,
+  "parsedFrontendModules": 172,
+  "reachableModules": 113,
   "modules": [
     {
       "file": "src/App.jsx",
@@ -49,8 +49,8 @@
     },
     {
       "file": "src/api/services.js",
-      "sha256": "bef21e8b249d7b54fbe0571c8b0353ac79651b9d56312fb7e25b43b0e3543b30",
-      "lines": 1045,
+      "sha256": "47c2f49ae3a8bb7951fa10b41916ec06b8f0ff769d1378af33d8d729cd8ab846",
+      "lines": 1065,
       "imports": [
         "axios",
         "./axiosInstance",
@@ -90,6 +90,24 @@
       }
     },
     {
+      "file": "src/components/common/CategoryMinimums.jsx",
+      "sha256": "5e278bbb9d9cef92580f6fc4d2c928da787a10241c6e3b74c114cc4458165b8f",
+      "lines": 5,
+      "imports": [
+        "../../utils/categoryMinimums"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
       "file": "src/components/common/ConfirmDialog.jsx",
       "sha256": "5e4b6fd7ffbe7b604d9408c980ec2114762c06f060b4ce4c30c05f32c04a9c7d",
       "lines": 110,
@@ -107,6 +125,28 @@
         "createObjectURL": 0,
         "dangerouslySetInnerHTML": 0,
         "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/DueDateExtension.jsx",
+      "sha256": "cfd48824d351f2667f95b20242f90cdd2e8367257c30e36dce0d06b353cf01bb",
+      "lines": 24,
+      "imports": [
+        "react",
+        "@mui/material",
+        "sonner",
+        "../../hooks/usePanelBasePath",
+        "../../api/services"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
       }
     },
     {
@@ -168,6 +208,25 @@
       }
     },
     {
+      "file": "src/components/common/OrderChanges.jsx",
+      "sha256": "6e3c84125ab71a071084fb9a89d4a83a79f9e760582be2e851f40c3624115fe0",
+      "lines": 14,
+      "imports": [
+        "react",
+        "../../api/axiosInstance"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
       "file": "src/components/common/Pagination.jsx",
       "sha256": "71fdb0209111ced0c32bc579a57fb8b2398617b44b986660024d76efe6d5b79d",
       "lines": 171,
@@ -202,6 +261,28 @@
       }
     },
     {
+      "file": "src/components/common/StoreDeliveryCode.jsx",
+      "sha256": "af371e87bfc70bce3861a53759b6300d60abd2e138a2919239b28c57e9cf616c",
+      "lines": 21,
+      "imports": [
+        "react",
+        "sonner",
+        "../../hooks/usePanelBasePath",
+        "../../hooks/useLatestRequest",
+        "../../api/services"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
+      }
+    },
+    {
       "file": "src/components/common/StorePhoto.jsx",
       "sha256": "8dc8620707363383c56278413c2eeb7e3de9983142fa4985942e91c154a6bd25",
       "lines": 60,
@@ -216,6 +297,25 @@
         "useEffect": 0,
         "useMemo": 0,
         "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/components/common/StoreReportBackLink.jsx",
+      "sha256": "80387bd0396e28fcc888b4b4db2a68e4c894dee235ce304335ad160b02ffe872",
+      "lines": 12,
+      "imports": [
+        "react-router-dom",
+        "lucide-react"
+      ],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
         "setInterval": 0,
         "addEventListener": 0,
         "createObjectURL": 0,
@@ -381,8 +481,8 @@
     },
     {
       "file": "src/config/adminRoutes.js",
-      "sha256": "a04c70075337129614fb6b4e744e292a3c050a053c735b52c598a95d2d8a582b",
-      "lines": 133,
+      "sha256": "854974d7dd74bb60da489adaf1baf07941c4f195c3b5dfcaf2d2317e8dd46ba2",
+      "lines": 135,
       "imports": [
         "react",
         "@mui/icons-material/Dashboard",
@@ -468,8 +568,8 @@
     },
     {
       "file": "src/config/permissions.js",
-      "sha256": "d0010ead2118b5ab430873aef75fda9828fe2ed5cc3faacb39c7c22d00628a36",
-      "lines": 49,
+      "sha256": "258d745bd8c757db60d310f102642b0ded999c4a28d6d5e29247ef6bad428e2c",
+      "lines": 54,
       "imports": [],
       "signals": {
         "useEffect": 0,
@@ -521,8 +621,8 @@
     },
     {
       "file": "src/hooks/useLiveOrders.jsx",
-      "sha256": "bc6d7382142d5478ad20fb31b3e31b0ad45e165ce85874aef454e1665584aad2",
-      "lines": 286,
+      "sha256": "f031e378bf8c773364f74d75406fe154b4dcfa23453f0874ae93b2dc7593ac9c",
+      "lines": 287,
       "imports": [
         "react",
         "react-router-dom",
@@ -561,15 +661,15 @@
     },
     {
       "file": "src/hooks/usePagination.js",
-      "sha256": "8324e8287e1f9cf5326b83b0f79820d0ca52a414da5942b48ccc8cc250cf039f",
-      "lines": 125,
+      "sha256": "476e60f30dbddf6e863a5ca73c8c836c5e778493c494b52b8a937eaf6e54a92f",
+      "lines": 139,
       "imports": [
         "react"
       ],
       "signals": {
         "useEffect": 0,
         "useMemo": 2,
-        "useCallback": 5,
+        "useCallback": 6,
         "setInterval": 0,
         "addEventListener": 0,
         "createObjectURL": 0,
@@ -711,8 +811,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Agent/Agent.jsx",
-      "sha256": "f059e38b8adbb1102e5cd9ad7781e5f5cea096af66915a05079e60612ecf704e",
-      "lines": 64,
+      "sha256": "f591ecf3221f4064f7d2665cc043c78343bab1ebbc46ef302e187693de290c3e",
+      "lines": 76,
       "imports": [
         "react",
         "react-router-dom",
@@ -727,7 +827,7 @@
         "addEventListener": 0,
         "createObjectURL": 0,
         "dangerouslySetInnerHTML": 0,
-        "localStorage": 0
+        "localStorage": 1
       }
     },
     {
@@ -780,8 +880,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Agent/tabs/AgentManagement.jsx",
-      "sha256": "3976c422a8132b2033af6e602c46f229c9d4a386d062fddf9e7e280d82ecd877",
-      "lines": 631,
+      "sha256": "9da1e31b295bd97036bbb9f1c50f52710903e447681e4ed60ec26878ada85e06",
+      "lines": 632,
       "imports": [
         "../../../../../utils/reportAdminError",
         "../../../../../utils/safeExternalUrl",
@@ -808,8 +908,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Agent/tabs/AgentPerformance.jsx",
-      "sha256": "975c42c494fbd2edee2914670d74958af4d43fecf4287526931f2db94c07e7da",
-      "lines": 348,
+      "sha256": "c3b520090f28107e98555df98ce7812279f299c68d18acf5aff540e8278a8690",
+      "lines": 371,
       "imports": [
         "../../../../../utils/reportAdminError",
         "../../../../../hooks/useLatestRequest",
@@ -822,14 +922,64 @@
         "../../../../../theme/useChartChrome"
       ],
       "signals": {
-        "useEffect": 2,
+        "useEffect": 3,
         "useMemo": 3,
         "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 1,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Agent/tabs/StoreChanges.jsx",
+      "sha256": "33e0858433b3679c902fdde7f249e657ec3b0d0a89b3505e6f3d2440fcad3294",
+      "lines": 73,
+      "imports": [
+        "react",
+        "lucide-react",
+        "sonner",
+        "../../../../../hooks/useLatestRequest",
+        "../../../../../api/services",
+        "../../../../../components/common/StorePhoto",
+        "../../../../../components/common/StatusPill",
+        "../../../../../utils/image"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
         "setInterval": 0,
         "addEventListener": 0,
         "createObjectURL": 0,
         "dangerouslySetInnerHTML": 0,
         "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Agent/tabs/StoreDetails.jsx",
+      "sha256": "7a0b5eb0b3fac169772bbf903bb86dca7e0eaadca8782b76f81587ccfd3dfb8b",
+      "lines": 110,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "sonner",
+        "../../../../../api/services",
+        "../../../../../hooks/useLatestRequest",
+        "../../../../../components/common/StorePhoto",
+        "../../../../../utils/orderWorkspace",
+        "../../../../../utils/image"
+      ],
+      "signals": {
+        "useEffect": 4,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
       }
     },
     {
@@ -864,10 +1014,13 @@
     },
     {
       "file": "src/pages/Admin/Tabs/AllProducts/EditProductDetails.jsx",
-      "sha256": "3e77b1e013cabbbc599326ab092bfd3129bc85c2113c2de6305e601f85bc82d1",
-      "lines": 678,
+      "sha256": "e22fc9a8acc4e0b04ac057b48c4ca4146366c31e2fd9afce20b7ed6773ec0435",
+      "lines": 684,
       "imports": [
         "../../../../hooks/useObjectUrl",
+        "../../../../hooks/usePanelBasePath",
+        "../../../../components/common/CategoryMinimums",
+        "../../../../utils/categoryMinimums",
         "react",
         "@mui/material",
         "sonner",
@@ -920,8 +1073,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/AssignLocation/AssignLocation.jsx",
-      "sha256": "a21212195c464c005d8e0aa38e07237f1c0aba2f3a1e54c4fd6225a6a31cf110",
-      "lines": 1018,
+      "sha256": "11dcbc988784ff4f8e80dc922c41d9880f8521541c407d6154020835afa06f6a",
+      "lines": 1020,
       "imports": [
         "../../../../utils/reportAdminError",
         "react",
@@ -948,9 +1101,36 @@
       }
     },
     {
+      "file": "src/pages/Admin/Tabs/Bills/Bills.jsx",
+      "sha256": "d3b6c6a77fa9ebe0070f73c12188592fe72dcf1b44462fd7faafd0d4b1f594ac",
+      "lines": 77,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "@mui/material",
+        "lucide-react",
+        "sonner",
+        "../../../../api/services",
+        "../../../../hooks/useLatestRequest",
+        "../Orders/OrderFilterLookup",
+        "../../../../components/common/StatusPill",
+        "../../../../utils/orderWorkspace"
+      ],
+      "signals": {
+        "useEffect": 4,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
       "file": "src/pages/Admin/Tabs/CashVerification/CashVerification.jsx",
-      "sha256": "ddce12e6d3436026cef54a9152ed149d89582d7cedc3ab657cef888ed1d3d530",
-      "lines": 919,
+      "sha256": "e6f2fba1951ff6ade977f8197a089ef6ab7df849c0b7e2202bcf55b42681eeee",
+      "lines": 934,
       "imports": [
         "../../../../utils/reportAdminError",
         "react",
@@ -1003,8 +1183,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Delivery/Delivery.jsx",
-      "sha256": "5969a324dd960c1e8de1b47449f1d89272a383bc4c1cab777fec3c3a96f3e50c",
-      "lines": 78,
+      "sha256": "a1f18b65b4c5a9c499aa40df406837a74f101444111d0621b636155c6e151459",
+      "lines": 86,
       "imports": [
         "react",
         "react-router-dom",
@@ -1019,7 +1199,7 @@
         "addEventListener": 0,
         "createObjectURL": 0,
         "dangerouslySetInnerHTML": 0,
-        "localStorage": 0
+        "localStorage": 1
       }
     },
     {
@@ -1090,13 +1270,15 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryApproval.jsx",
-      "sha256": "c9d132f1483f03883846cb07fe9b49f111bfb00ca64f4905ff8cf5d2aec8dead",
-      "lines": 592,
+      "sha256": "b9176871938d76e39599d85e127724ef5fcb6d1790b1dea7c237c23f0fa40fb1",
+      "lines": 599,
       "imports": [
         "../../../../../utils/reportAdminError",
         "../../../../../utils/safeExternalUrl",
         "../../../../../hooks/useLatestRequest",
         "react",
+        "react-router-dom",
+        "./DeliveryPartnerDeletion",
         "sonner",
         "lucide-react",
         "../../../../../components/common/StatusPill",
@@ -1118,7 +1300,7 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryManagement.jsx",
-      "sha256": "bd69b61934e45d35ef6bb8a3242d57c5197af0f12f2341fbf63cfc19e54674bd",
+      "sha256": "aa673f0156b08fa9b3c8731949417afa4ac2f0a35828e1a2ba12240de6679dd4",
       "lines": 873,
       "imports": [
         "../../../../../utils/reportAdminError",
@@ -1137,6 +1319,122 @@
         "useEffect": 3,
         "useMemo": 8,
         "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryPartnerDeletion.jsx",
+      "sha256": "85cc8a41dd7b44005e159225bbf93601344b784800a076e0b58cac3ff1ea2025",
+      "lines": 80,
+      "imports": [
+        "react",
+        "@mui/material",
+        "../../../../../api/services",
+        "../../../../../hooks/useLatestRequest",
+        "../../../../../hooks/usePagination",
+        "../../../../../components/common/Pagination"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/DeliveryPerformance.jsx",
+      "sha256": "207463742daaa4909232e3d1b808d2351c02bbf9dfc4272485d0cfd964b69653",
+      "lines": 63,
+      "imports": [
+        "react",
+        "react-router-dom",
+        "../../../../../api/services",
+        "../../../../../hooks/useLatestRequest",
+        "../../../../../utils/orderWorkspace",
+        "./PartnerCollections",
+        "./PartnerOrders",
+        "../../../../../components/common/Pagination",
+        "../../../../../hooks/usePagination"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 2,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 1
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/DispatchMappings.jsx",
+      "sha256": "25c618aeec1d0428a30486dca67f02e7d1f93f82643f81718d07f149ba478b3c",
+      "lines": 37,
+      "imports": [
+        "../../../../../components/common/ConfirmDialog",
+        "react",
+        "sonner",
+        "../../../../../api/services",
+        "../../../../../hooks/useLatestRequest"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 2,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/PartnerCollections.jsx",
+      "sha256": "851f2e445d101470f4600c28b26e8bcd86d2476dd384165c98ead4ecbb8f79a2",
+      "lines": 16,
+      "imports": [
+        "react",
+        "@mui/material",
+        "../../../../../api/services",
+        "../../../../../hooks/useLatestRequest"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
+      "file": "src/pages/Admin/Tabs/Delivery/tabs/PartnerOrders.jsx",
+      "sha256": "352b6b412ef1b63ba9883ec7b1c77bca613afe8159dd35321f77f615b6252b4a",
+      "lines": 68,
+      "imports": [
+        "react",
+        "@mui/material",
+        "../../../../../api/services",
+        "../../../../../hooks/useLatestRequest",
+        "../../../../../components/common/StatusPill",
+        "../../../../../utils/uom",
+        "../DeliveryTrail"
+      ],
+      "signals": {
+        "useEffect": 2,
+        "useMemo": 0,
+        "useCallback": 0,
         "setInterval": 0,
         "addEventListener": 0,
         "createObjectURL": 0,
@@ -1174,9 +1472,11 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Orders/AdminOrdersWorkspace.jsx",
-      "sha256": "46d4a2daed61b87edc99e048fbae2777504fb3e292da41edd845acb19250e3fd",
-      "lines": 130,
+      "sha256": "24f36e3a873bc5deea1f580257357cab501d220c0182c7d3cb202078dd41fc76",
+      "lines": 140,
       "imports": [
+        "../../../../components/common/OrderChanges",
+        "../../../../components/common/StoreReportBackLink",
         "react",
         "react-router-dom",
         "@mui/material",
@@ -1188,6 +1488,8 @@
         "../../../../components/common/Pagination",
         "../../../../components/common/ConfirmDialog",
         "../../../../components/common/StorePhoto",
+        "../../../../components/common/DueDateExtension",
+        "../../../../components/common/StoreDeliveryCode",
         "../Delivery/DeliveryTrail",
         "../../../../hooks/useLatestRequest",
         "../../../../api/services",
@@ -1207,8 +1509,8 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Orders/OrderFilterLookup.jsx",
-      "sha256": "69f8c4d6eb81b2437a9efba94e3073e271c6ebff166f51881f87f2f3b1ebe96d",
-      "lines": 41,
+      "sha256": "870b0716bb0b882160c96a0c340f74cc06340ef98b570007a98d0b099eeafc78",
+      "lines": 42,
       "imports": [
         "react",
         "lucide-react",
@@ -1228,10 +1530,13 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Orders/OrderManagement.jsx",
-      "sha256": "0b5cd4dd815aec3eefde9bbb797202814a98860233e2452226b2f5f254db97fd",
-      "lines": 1005,
+      "sha256": "459b5bf489663e77fb3df5a6be46f8ac267cf54a0d6fd2300506bf5813419aae",
+      "lines": 1017,
       "imports": [
+        "../../../../components/common/StoreReportBackLink",
+        "../../../../components/common/OrderChanges",
         "../../../../utils/reportAdminError",
+        "../../../../components/common/StoreDeliveryCode",
         "../../../../hooks/useLatestRequest",
         "react",
         "react-router-dom",
@@ -1286,11 +1591,12 @@
     },
     {
       "file": "src/pages/Admin/Tabs/PaymentInfo/PaymentInfo.jsx",
-      "sha256": "7b08bde78f8e0ea5227c518bb20fe601311b6ed6b912937122b7bcff17757d5b",
-      "lines": 689,
+      "sha256": "9eb96b9e2a72084b09ee9c84a612779cb24ff61d5ae0877e395ee70be7a6fa46",
+      "lines": 711,
       "imports": [
         "../../../../utils/reportAdminError",
         "../../../../hooks/useLatestRequest",
+        "../../../../components/common/DueDateExtension",
         "react",
         "lucide-react",
         "../../../../api/services",
@@ -1340,10 +1646,13 @@
     },
     {
       "file": "src/pages/Admin/Tabs/ProductCreation/ProductCreation.jsx",
-      "sha256": "881838ccce7caf74d6153c6e945ba9af4d3a301f70abc61144a89e74b4071760",
-      "lines": 762,
+      "sha256": "38f7ae19b1c009ebd931e163faff5af1afa7a17c80c9d3dd29fdb0a962b4ba56",
+      "lines": 768,
       "imports": [
         "../../../../hooks/useObjectUrl",
+        "../../../../hooks/usePanelBasePath",
+        "../../../../components/common/CategoryMinimums",
+        "../../../../utils/categoryMinimums",
         "react",
         "sonner",
         "lucide-react",
@@ -1364,10 +1673,11 @@
     },
     {
       "file": "src/pages/Admin/Tabs/ProductSales/ProductSales.jsx",
-      "sha256": "3301b57bfe9b83957fd5d5f0e30887dbfdcad878c1578130fcb0567f421c3b9c",
-      "lines": 918,
+      "sha256": "2e048bd3254920fe42fa65641446dfee973e73fa10e3e7461d32c35fe1e4136b",
+      "lines": 1015,
       "imports": [
         "react",
+        "react-router-dom",
         "../../../../hooks/useLatestRequest",
         "recharts",
         "lucide-react",
@@ -1380,9 +1690,9 @@
         "../../../../utils/uom"
       ],
       "signals": {
-        "useEffect": 4,
+        "useEffect": 6,
         "useMemo": 5,
-        "useCallback": 2,
+        "useCallback": 3,
         "setInterval": 0,
         "addEventListener": 0,
         "createObjectURL": 0,
@@ -1418,7 +1728,7 @@
     },
     {
       "file": "src/pages/Admin/Tabs/Targets/Targets.jsx",
-      "sha256": "2fa311825799394133eea738f95526673bfddc27ea979cce7009edb5c35cd140",
+      "sha256": "9827edb3b82bbcf5445297647da200e327c58c51835b37f2397bdb59821fd0e2",
       "lines": 74,
       "imports": [
         "react",
@@ -2045,8 +2355,24 @@
       }
     },
     {
+      "file": "src/utils/categoryMinimums.js",
+      "sha256": "00c5e067da46c48aecefddf48bc07f26b598a00b4309c1a8d85634c3beee5315",
+      "lines": 10,
+      "imports": [],
+      "signals": {
+        "useEffect": 0,
+        "useMemo": 0,
+        "useCallback": 0,
+        "setInterval": 0,
+        "addEventListener": 0,
+        "createObjectURL": 0,
+        "dangerouslySetInnerHTML": 0,
+        "localStorage": 0
+      }
+    },
+    {
       "file": "src/utils/csv.js",
-      "sha256": "aa62073a8252521311b118332b6e49a7ad634205c17c0f692a8673ba516191de",
+      "sha256": "b26d6e3a1f4a4a74faaefb4e6db76ecd53e3bc89e98e936f8c0df6bee52c294c",
       "lines": 80,
       "imports": [],
       "signals": {

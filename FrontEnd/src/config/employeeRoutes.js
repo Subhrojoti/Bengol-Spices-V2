@@ -25,6 +25,7 @@ import { AllInbox, LocalShipping, OutboxOutlined } from "@mui/icons-material";
 import CustomNotification from "../pages/Admin/Tabs/CustomNotification/CustomNotification";
 import NotificationsActive from "@mui/icons-material/NotificationsActive";
 import AssignLocation from "../pages/Admin/Tabs/AssignLocation/AssignLocation";
+import Bills from "../pages/Admin/Tabs/Bills/Bills";
 
 /**
  * `permission` guards the route. A string means "must hold this permission";
@@ -82,6 +83,7 @@ export const employeeRoutes = [
     permission: "canGetAllOrders",
     component: OrderManagement,
   },
+  { label: "Bills", path: "bills", group: "Operations", icon: ListAltIcon, permission: "canViewBills", component: Bills },
   {
     label: "Returns",
     path: "return-management",

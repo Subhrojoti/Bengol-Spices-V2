@@ -28,7 +28,8 @@
     "razorpay": "^2.9.6",
     "resend": "^6.11.0",
     "streamifier": "^0.1.1",
-    "yup": "^1.7.1"
+    "yup": "^1.7.1",
+    "zip-stream": "7.0.5"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.13",

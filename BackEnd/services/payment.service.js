@@ -115,13 +115,14 @@ export const applyDuePayment = async ({
   nextPaymentMode,
   collector,
   clientRequestId,
+  gatewayVerified = false,
 }) => {
   const actor = collector || { id: agentId, role: "AGENT" };
   if (!["AGENT", "DELIVERY_PARTNER"].includes(actor.role) || !actor.id) return refuse(403, "Invalid payment collector");
   if (!["number", "string"].includes(typeof amount)) return refuse(400, "Enter a valid positive amount");
   amount = roundRupees(amount);
   if (!Number.isFinite(amount) || amount <= 0) return refuse(400, "Enter a valid positive amount");
-  if (actor.role === "DELIVERY_PARTNER" && !["CASH", "UPI"].includes(method)) return refuse(400, "Delivery partners may collect Cash or UPI only");
+  if (actor.role === "DELIVERY_PARTNER" && !["CASH", "UPI"].includes(method) && !(gatewayVerified === true && method === "RAZORPAY" && razorpayPaymentId && razorpayOrderId)) return refuse(400, "Delivery partners may collect Cash or UPI only");
   if (clientRequestId !== undefined && (typeof clientRequestId !== "string" || !/^[A-Za-z0-9_-]{16,100}$/.test(clientRequestId))) return refuse(400, "Invalid payment request identifier");
   if (clientRequestId) await Payment.init();
   const requestHash = crypto.createHash("sha256").update(JSON.stringify({ orderId, amount, method, note: note || "" })).digest("hex");
@@ -235,7 +236,7 @@ export const beginGatewayPayment = async (key, fields) => {
     {
       key,
       $or: [
-        { status: "FAILED" },
+        { status: { $in: ["FAILED", "QR_OPEN", "QR_CLOSED"] } },
         {
           status: "PROCESSING",
           updatedAt: { $lt: new Date(Date.now() - STALE_PROCESSING_MS) },

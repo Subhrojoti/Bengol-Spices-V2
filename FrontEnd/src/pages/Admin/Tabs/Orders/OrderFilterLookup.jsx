@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import useLatestRequest from "../../../../hooks/useLatestRequest";
 import { getOrderWorkspaceOptions } from "../../../../api/services";
 
-export default function OrderFilterLookup({ type, value, onChange }) {
+export default function OrderFilterLookup({ type, value, onChange, loadOptions = getOrderWorkspaceOptions }) {
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [options, setOptions] = useState([]), [label, setLabel] = useState({ value, text: value }), [error, setError] = useState(false), [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0), begin = useLatestRequest(), root = useRef(null), search = useRef(null), id = useId();
   const plural = type === "agent" ? "agents" : "stores", title = type === "agent" ? "Agent" : "Store";
@@ -12,12 +12,12 @@ export default function OrderFilterLookup({ type, value, onChange }) {
     const request = begin();
     const timer = setTimeout(async () => {
       setLoading(true); setError(false);
-      try { const response = await getOrderWorkspaceOptions({ type, q: query, selected: value }, { signal: request.signal }); if (request.current()) { setOptions(response.options.filter(option => !query.trim() || option.label.toLowerCase().includes(query.trim().toLowerCase()))); setActive(0); setLabel({ value, text: response.options.find(o => o.value === value)?.label || value }); } }
+      try { const response = await loadOptions({ type, q: query, selected: value }, { signal: request.signal }); if (request.current()) { setOptions(response.options.filter(option => !query.trim() || option.label.toLowerCase().includes(query.trim().toLowerCase()))); setActive(0); setLabel({ value, text: response.options.find(o => o.value === value)?.label || value }); } }
       catch { if (request.current()) setError(true); }
       finally { if (request.current()) setLoading(false); }
     }, 180);
     return () => { clearTimeout(timer); begin(); };
-  }, [open, query, value, type, begin]);
+  }, [open, query, value, type, begin, loadOptions]);
   useEffect(() => {
     if (!open) return undefined;
     search.current?.focus();

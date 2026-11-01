@@ -179,6 +179,7 @@ export default function CashVerification() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [status, setStatus] = useState("PENDING");
+  const [collectorRole, setCollectorRole] = useState("ALL");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [agentId, setAgentId] = useState("");
@@ -201,12 +202,13 @@ export default function CashVerification() {
       try {
         const res = await getCashPayments({
           status,
+          ...(collectorRole !== "ALL" ? { collectorRole } : {}),
           ...(from ? { from } : {}),
           ...(to ? { to } : {}),
         }, { signal: request.signal });
         if (!request.current()) return;
         setRows(res?.data || []);
-        setLoadedQuery(`${status}|${from}|${to}`);
+        setLoadedQuery(`${status}|${from}|${to}|${collectorRole}`);
         setSummary(res?.summary || null);
         setTruncated(Boolean(res?.truncated));
         setPhase("ready");
@@ -223,9 +225,9 @@ export default function CashVerification() {
         if (request.current()) setRefreshing(false);
       }
     },
-    [status, from, to, beginRequest],
+    [status, from, to, collectorRole, beginRequest],
   );
-  const staleRows = loadedQuery !== `${status}|${from}|${to}`;
+  const staleRows = loadedQuery !== `${status}|${from}|${to}|${collectorRole}`;
 
   useEffect(() => {
     load();
@@ -259,7 +261,7 @@ export default function CashVerification() {
   }, [rows, agentId, query]);
 
   const [pager, pagerTop] = usePagination(visible, {
-    resetKey: `${status}|${from}|${to}|${agentId}|${query}`,
+    resetKey: `${status}|${from}|${to}|${collectorRole}|${agentId}|${query}`,
   });
 
   /* Only what is on the list now, and still pending, can be in a batch */
@@ -368,6 +370,9 @@ export default function CashVerification() {
   return (
     <Page>
       {/* ===== HOW MUCH IS WHERE ===== */}
+      <div role="tablist" aria-label="Payment collectors" className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-200/60 p-1">
+        {[["ALL", "All collectors"], ["AGENT", "Agents"], ["DELIVERY_PARTNER", "Delivery partners"]].map(([role, label]) => <button key={role} role="tab" aria-selected={collectorRole === role} disabled={busy} onClick={() => { setCollectorRole(role); setSelected(new Set()); setAgentId(""); setRecord({ open: false, row: null }); }} className={`rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${collectorRole === role ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{label}</button>)}
+      </div>
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Tile
           label="Waiting to be verified"
@@ -488,7 +493,7 @@ export default function CashVerification() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Order, store or agent"
+                placeholder="Order, store, agent or collector"
                 aria-label="Search payments"
                 className="w-40 bg-transparent text-[13.5px] text-slate-800 outline-none placeholder:text-slate-400"
               />
@@ -507,7 +512,7 @@ export default function CashVerification() {
         <p className="flex items-start gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 text-[12.5px] leading-relaxed text-slate-500">
           <Info size={13} className="mt-0.5 shrink-0 text-slate-400" />
           <span>
-            Cash an agent records does not count toward their sales, targets or
+            Offline payments recorded by agents or delivery partners do not count toward sales, targets or
             incentives until it is approved here. Approve a payment once the
             money has reached the company; it then counts for the month it was
             collected in. Cash collected on an earlier month&apos;s order is

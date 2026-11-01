@@ -36,6 +36,7 @@ import { getWorkspaceOrders, getWorkspaceOrder, getWorkspaceOptions, exportWorks
 import { getDispatchMappings, saveDispatchMapping, revokeDispatchMapping } from "../controllers/dispatchMapping.controller.js";
 import { getDeliveryPerformance, getPartnerOrders } from "../controllers/deliveryPerformance.controller.js";
 import { getPartnerCollections } from "../controllers/partnerCollections.controller.js";
+import { getBills, getBill, getBillOptions, downloadBills } from "../controllers/bills.controller.js";
 
 const router = express.Router();
 import { getDeliveryPartnerPurgePreview, executeDeliveryPartnerPurge } from "../controllers/adminManagement.controller.js";
@@ -43,6 +44,10 @@ import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview,
 
 // 🔒 All routes require login
 router.use(protect);
+router.get("/bills", checkPermission("canViewBills"), getBills);
+router.get("/bills/options", checkPermission("canViewBills"), getBillOptions);
+router.get("/bills/download", checkPermission("canViewBills"), downloadBills);
+router.get("/bills/:invoiceId", checkPermission("canViewBills"), getBill);
 router.get("/delivery-partners/:partnerId/purge-preview", isAdmin, getDeliveryPartnerPurgePreview);
 router.post("/delivery-partners/:partnerId/purge", isAdmin, executeDeliveryPartnerPurge);
 router.get("/dispatch-mappings", isAdmin, getDispatchMappings);

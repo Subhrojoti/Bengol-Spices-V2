@@ -65,7 +65,8 @@ const purgePlan = async (agentId, session = null) => {
   if (stores.some((s) => other(s.registeredBy, agentId) || other(managerOf(s), agentId)) || outsideStores.length) conflicts.push("This agent has transferred or inherited stores. Shared store history must be separated before complete deletion.");
   if (orders.some((o) => other(o.agentId, agentId)) || outsideOrders.length || payments.some((p) => other(p.agentId, agentId) || other(p.collectedBy?.id, agentId)) || returns.some((r) => other(r.agentId, agentId)) || gateways.some((g) => other(g.agentId, agentId)) || foreignProgress) conflicts.push("Some related transactions or targets belong to another agent. Complete deletion is blocked to preserve their records.");
   if (agent.status === "APPROVED" && (agent.accessStatus || "ACTIVE") === "ACTIVE") conflicts.push("Block or deactivate this agent before permanently deleting test data.");
-  if (gateways.some((g) => g.status === "PROCESSING")) conflicts.push("A gateway payment is still processing. Resolve it in Payment Issues before cleanup.");
+  if (gateways.some((g) => ["PROCESSING", "QR_OPEN"].includes(g.status))) conflicts.push("A gateway payment is still processing or a delivery QR remains open. Close or resolve it before cleanup.");
+  if (gateways.some(g => other(g.collectedBy?.id, agentId))) conflicts.push("Gateway records belong to another collector. Preserve those records and ask the office to review them before cleanup.");
 
   const entries = [
     ["storeChanges", StoreChangeRequest, storeChanges],

@@ -5,6 +5,19 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Delivery UPI QR (1 November, release preparation):** missing feature added to
+Delivery mobile, backed by delivery-scoped create/recover/status/verify/close
+endpoints. Captured UPI evidence, exact amount and owner checked; uses existing
+payment/refund/idempotency rules and original-agent credit. See
+[workflow, security, test and mobile-release limits](BackEnd/docs/DELIVERY_QR_RELEASE_2026-11-01.md).
+
+**Bills and collector tabs (1 November, local only):** added role-scoped Cash
+Verification tabs and permission-controlled Bills listing/details/individual PDFs/
+filtered ZIPs. Reused existing Orders delivery-code reveal. Backend 94/94,
+frontend units 13/13, lint/build and final affected browser checks 9/9 pass;
+broad initial browser run and corrected findings are documented. See
+[implementation, API/security rules and validation](BackEnd/docs/BILLS_COLLECTOR_TABS_2026-11-01.md).
+
 **Production release (1 November):** application `abf72b3` pushed and backend/
 website deployed; files, health and normal read-only Admin smoke verified.
 Mobile source pushed, no mobile binaries published. Existing local-only entries

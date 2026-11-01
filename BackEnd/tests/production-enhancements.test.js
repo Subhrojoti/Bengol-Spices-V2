@@ -1,6 +1,7 @@
 import test, { before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import { inflateRawSync } from "node:zlib";
 import { Writable } from "node:stream";
 import mongoose from "mongoose";
 import express from "express";
@@ -70,6 +71,85 @@ const rawOrder = async (code, store, agent, extra = {}) => {
   const result = { orderId: code, consumerId: store.consumerId, store: store._id, agentId: agent.agentId, status: "DELIVERED", totalAmount: 100, paidAmount: 100, dueAmount: 0, paymentStatus: "COMPLETED", paymentMode: "CASH", dueDate: new Date(Date.now() + 86400000), orderLocation: { latitude: 22.5, longitude: 88.3 }, deliveryAddress: { storeName: store.storeName, ownerName: "Owner", phone: store.phone, state: "WEST BENGAL", city: "Kolkata", street: "Test", pincode: "700001" }, createdAt: new Date(), products: [{ name: "Spice", quantity: 1, unitPrice: 100, totalPrice: 100, uom: "packet" }], ...extra };
   await Order.collection.insertOne(result); return result;
 };
+
+test("Bills permission, stable filtering, saved names and current balances remain independent of order access", async () => {
+  const a = await person("BILL-A"), b = await person("BILL-B"), s = await shop("BILL-S", a), other = await shop("BILL-T", b);
+  const issued = new Date("2026-10-31T18:30:00Z");
+  for (let index = 0; index < 27; index++) {
+    const code = `BILL-${index}`;
+    await rawOrder(code, s, a, { paidAmount: 60, dueAmount: 40 });
+    await Invoice.create({ orderId: code, invoiceNumber: `BS/26-27/${index}`, invoiceDate: issued, buyer: { name: "Original [Store]" }, totalAmount: 100, paidAmount: 0, dueAmount: 100 });
+  }
+  await rawOrder("BILL-CANCEL", s, a, { status: "CANCELLED", dueAmount: 999 });
+  await Invoice.create({ orderId: "BILL-CANCEL", invoiceNumber: "BS/CANCEL", invoiceDate: issued, totalAmount: 100 });
+  await rawOrder("BILL-OTHER", other, b);
+  await Invoice.create({ orderId: "BILL-OTHER", invoiceNumber: "BS/OTHER", invoiceDate: issued });
+  await rawOrder("BILL-DRAFT", s, a, { status: "PLACED", invoicePolicy: "ON_CONFIRMATION", statusHistory: [] });
+  await Invoice.create({ orderId: "BILL-DRAFT", invoiceNumber: "BS/DRAFT", invoiceDate: issued });
+  const staff = await Employee.create({ employeeId: "BILL-E", name: "Bills staff", email: "bills@test.invalid", phone: "bill-staff", password: "hash", status: "ACTIVE" });
+  const auth = jwt.sign({ id: String(staff._id), role: "EMPLOYEE" }, process.env.JWT_SECRET);
+  assert.equal((await call("/admin/bills", auth)).status, 403);
+  assert.equal((await call("/admin/bills", token(a))).status, 403);
+  await Employee.updateOne({ _id: staff._id }, { $set: { "permissions.canViewBills": true } });
+  const query = "agentId=BILL-A&consumerId=BILL-S&from=2026-11-01&to=2026-11-01";
+  const first = await call(`/admin/bills?${query}`, auth);
+  assert.equal(first.status, 200); assert.equal(first.data.total, 28); assert.equal(first.data.bills.length, 25);
+  assert.equal(first.data.summary.billAmount, 2800); assert.equal(first.data.summary.dueAmount, 1080);
+  assert.deepEqual((await call(`/admin/bills?${query}`, auth)).data.bills, first.data.bills);
+  const second = await call(`/admin/bills?${query}&page=2`, auth);
+  assert.equal(second.data.bills.length, 3); assert(!second.data.bills.some(row => first.data.bills.some(previous => previous.id === row.id)));
+  const due = await call(`/admin/bills?${query}&balance=DUE&q=%5BStore%5D`, auth);
+  assert.equal(due.data.total, 27); assert(due.data.bills.every(row => row.storeName === "Original [Store]" && row.dueAmount === 40 && row.paidAmount === 60));
+  assert.equal((await call(`/admin/bills?${query}&from=2026-11-02&to=2026-11-01`, auth)).status, 400);
+  assert.equal((await call("/admin/bills?dateBasis=INVALID", auth)).status, 400);
+  assert.equal((await call("/admin/bills?agentId[$ne]=x", auth)).status, 200); // unknown keys cannot become Mongo operators
+  const detail = await call(`/admin/bills/${due.data.bills[0].id}`, auth); assert.equal(detail.data.bill.storeName, "Original [Store]");
+  assert.equal((await call("/admin/bills/options?type=agent", auth)).status, 200);
+  assert.equal((await call("/admin/order-workspace", auth)).status, 403);
+  await Employee.updateOne({ _id: staff._id }, { $set: { "permissions.canViewBills": false } });
+  assert.equal((await call(`/admin/bills/${due.data.bills[0].id}`, auth)).status, 403);
+  assert.equal((await call("/admin/bills/download", auth)).status, 403);
+});
+
+test("bulk Bills ZIP contains every matching PDF across pages and never changes invoices or counters", async () => {
+  const a = await person("ZIP-A"), s = await shop("ZIP-S", a);
+  for (let index = 0; index < 26; index++) {
+    const code = `ZIP-${index}`; await rawOrder(code, s, a);
+    await Invoice.create({ orderId: code, invoiceNumber: `BS/26-27/${index}`, invoiceDate: new Date("2026-11-01T06:00:00Z"), buyer: { name: "Original store", address: "Saved address" }, items: [{ name: "Spice", quantity: 1, unitPrice: 100, totalAmount: 100, gstRate: 0 }], totalAmount: 100, totalGST: 0, paidAmount: 100, dueAmount: 0 });
+  }
+  const before = await Invoice.find().sort({ orderId: 1 }).lean();
+  const response = await fetch(origin + "/admin/bills/download?consumerId=ZIP-S", { headers: { Authorization: `Bearer ${admin()}` } });
+  assert.equal(response.status, 200); assert.match(response.headers.get("content-disposition"), /bengol-invoices.zip/);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const zip = Buffer.from(await response.arrayBuffer()), names = [];
+  // Read ZIP central-directory entries and validate each referenced PDF, not
+  // just the archive magic or a browser's download event.
+  let position = zip.readUInt32LE(zip.length - 6);
+  const entries = zip.readUInt16LE(zip.length - 12);
+  for (let index = 0; index < entries; index++) {
+    assert.equal(zip.readUInt32LE(position), 0x02014b50);
+    const nameLength = zip.readUInt16LE(position + 28), extraLength = zip.readUInt16LE(position + 30), commentLength = zip.readUInt16LE(position + 32);
+    const size = zip.readUInt32LE(position + 20), offset = zip.readUInt32LE(position + 42), method = zip.readUInt16LE(position + 10);
+    names.push(zip.subarray(position + 46, position + 46 + nameLength).toString());
+    const start = offset + 30 + zip.readUInt16LE(offset + 26) + zip.readUInt16LE(offset + 28);
+    const bytes = zip.subarray(start, start + size), pdf = method === 8 ? inflateRawSync(bytes) : bytes;
+    assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
+    position += 46 + nameLength + extraLength + commentLength;
+  }
+  assert.equal(entries, 26); assert.equal(new Set(names).size, 26); assert(names.every(name => !name.includes("/") && !name.includes("\\")));
+  assert.deepEqual(await Invoice.find().sort({ orderId: 1 }).lean(), before); assert.equal(await Counter.countDocuments(), 0);
+  assert.equal((await call("/admin/bills/download?consumerId=NO-MATCH", admin())).status, 404);
+});
+
+test("cash verification collector scopes filter rows and summary together without changing sales ownership", async () => {
+  const a = await person("COLLECT-A"), s = await shop("COLLECT-S", a); await rawOrder("COLLECT-O", s, a);
+  for (const [amount, collectedBy] of [[10, { id: "COLLECT-A", role: "AGENT" }], [20, { id: "delivery-test", role: "DELIVERY_PARTNER" }], [5, undefined]]) await Payment.create({ orderId: "COLLECT-O", consumerId: s.consumerId, agentId: a.agentId, amount, method: "CASH", ...(collectedBy && { collectedBy }), verification: { status: "PENDING" } });
+  const all = await call("/admin/cash-payments", admin()); assert.equal(all.status, 200); assert.equal(all.data.summary.pending.amount, 35);
+  const agents = await call("/admin/cash-payments?collectorRole=AGENT", admin()); assert.equal(agents.data.data.length, 1); assert.equal(agents.data.summary.pending.amount, 10);
+  const delivery = await call("/admin/cash-payments?collectorRole=DELIVERY_PARTNER", admin()); assert.equal(delivery.data.data.length, 1); assert.equal(delivery.data.summary.pending.amount, 20); assert.equal(delivery.data.data[0].agentId, "COLLECT-A");
+  assert.equal((await call("/admin/cash-payments?collectorRole=INVALID", admin())).status, 400);
+  assert.equal(await Payment.countDocuments({ "verification.status": "PENDING" }), 3);
+});
 
 test("Admin order workspace filters globally, pages stably, counts other statuses and retains full legacy responses", async () => {
   const a = await person("A"), s = await shop("S", a), statuses = ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
@@ -468,6 +548,85 @@ test("legacy invoices cannot enter the draft edit workflow and edit/confirm race
 
 const partner = async (name) => DeliveryPartner.create({ name, phone: name, password: "hash", status: "ACTIVE", address: { state: "WEST BENGAL", city: "Kolkata", street: "Test", pincode: "700001" }, documents: { idType: "AADHAAR", idNumber: "synthetic", documentUrl: "https://example.invalid/doc" } });
 const partnerToken = p => jwt.sign({ id: String(p._id), role: "DELIVERY_PARTNER", sessionVersion: p.sessionVersion }, process.env.JWT_SECRET);
+
+const stubDeliveryQr = t => {
+  process.env.RAZORPAY_KEY_ID ||= "rzp_test_synthetic"; process.env.RAZORPAY_KEY_SECRET ||= "synthetic";
+  let qr, created = 0, items = [], refunds = 0;
+  t.mock.method(razorpayInstance.qrCode, "create", async fields => { created++; qr = { ...fields, id: `qr_DeliveryTest${created}`, image_url: "https://example.invalid/qr.png", status: "active", payments_amount_received: 0 }; return qr; });
+  t.mock.method(razorpayInstance.qrCode, "fetch", async value => { if (value !== qr?.id) throw Object.assign(new Error("Not found"), { statusCode: 404 }); return qr; });
+  t.mock.method(razorpayInstance.qrCode, "fetchAllPayments", async () => ({ items }));
+  t.mock.method(razorpayInstance.qrCode, "close", async () => { qr.status = "closed"; qr.close_reason = "on_demand"; return qr; });
+  t.mock.method(razorpayInstance.payments, "refund", async () => { refunds++; return { id: "rfnd_DeliveryTest" }; });
+  return { get qr() { return qr; }, get created() { return created; }, get refunds() { return refunds; },
+    setItems: value => { items = value; }, paid: () => { qr.status = "closed"; qr.close_reason = "paid"; qr.payments_amount_received = qr.payment_amount; items = [{ id: "pay_DeliveryTest1", status: "captured", method: "upi", currency: "INR", amount: qr.payment_amount }]; } };
+};
+
+test("delivery UPI QR is scoped, durable, reused and credits its original agent exactly once", async t => {
+  const gateway = stubDeliveryQr(t), a = await person("QR-A"), s = await shop("QR-S", a), p = await partner("QR-DP"), other = await partner("QR-OTHER");
+  await rawOrder("QR-O", s, a, { status: "ASSIGNED", paidAmount: 0, dueAmount: 100, delivery: { partnerId: p._id } });
+  const url = "/delivery-partner/orders/QR-O/payment-qr", auth = partnerToken(p);
+  assert.equal((await call(url, token(a), "POST", { amount: 25.5 })).status, 403);
+  assert.equal((await call(url, partnerToken(other), "POST", { amount: 25.5 })).status, 404);
+  for (const amount of [null, "", 0, 0.5, 101, "1.234", {}, "1e2"]) assert.equal((await call(url, auth, "POST", { amount })).status, 400);
+  assert.equal(gateway.created, 0);
+  const created = await call(url, auth, "POST", { amount: 25.5 }); assert.equal(created.status, 200); assert.equal(created.data.amount, 25.5);
+  assert.equal(gateway.qr.type, "upi_qr"); assert.equal(gateway.qr.usage, "single_use"); assert.equal(gateway.qr.payment_amount, 2550);
+  assert.equal((await call(url, auth)).data.qr.qrCodeId, created.data.qrCodeId);
+  assert.equal((await call(url, partnerToken(other))).data.qr, null);
+  assert.equal((await call(url, auth, "POST", { amount: 10 })).data.reused, true); assert.equal(gateway.created, 1);
+  const endpoint = `${url}/${created.data.qrCodeId}`;
+  assert.equal((await call(endpoint, partnerToken(other))).status, 404);
+  assert.equal((await call(endpoint + "/verify", auth, "POST", {})).status, 400);
+  gateway.paid(); gateway.setItems([{ id: "pay_FailedTest1", status: "failed", amount: 2550 }, { id: "pay_DeliveryTest1", status: "captured", method: "upi", currency: "INR", amount: 2550 }]);
+  assert.equal((await call(endpoint + "/verify", auth, "POST", { amount: 100, method: "CASH" })).status, 200);
+  const payment = await Payment.findOne({ orderId: "QR-O" }).lean();
+  assert.equal(payment.amount, 25.5); assert.equal(payment.agentId, a.agentId); assert.equal(payment.collectedBy.id, String(p._id)); assert.equal(payment.collectedBy.role, "DELIVERY_PARTNER"); assert.equal(payment.method, "RAZORPAY"); assert.equal(payment.verification, undefined);
+  assert.equal((await call(endpoint + "/verify", auth, "POST", {})).status, 200); assert.equal(await Payment.countDocuments(), 1);
+  assert.equal((await Order.findOne({ orderId: "QR-O" })).dueAmount, 74.5);
+  assert.equal((await call(url, auth)).data.qr, null); assert.equal((await GatewayPayment.findOne()).status, "APPLIED");
+});
+
+test("delivery QR rejects wrong gateway evidence and offline clients cannot self-verify", async t => {
+  const gateway = stubDeliveryQr(t), a = await person("QR-A"), s = await shop("QR-S", a), p = await partner("QR-DP");
+  await rawOrder("QR-O", s, a, { status: "DELIVERED", paidAmount: 0, dueAmount: 100, delivery: { partnerId: p._id } });
+  const url = "/delivery-partner/orders/QR-O/payment-qr", auth = partnerToken(p);
+  const qr = (await call(url, auth, "POST", { amount: 20 })).data.qrCodeId; gateway.paid();
+  for (const patch of [{ amount: 1999 }, { currency: "USD" }, { method: "card" }, { status: "authorized" }]) {
+    gateway.setItems([{ id: "pay_DeliveryTest1", status: "captured", currency: "INR", method: "upi", amount: 2000, ...patch }]);
+    assert.equal((await call(`${url}/${qr}/verify`, auth, "POST", {})).status, 409);
+  }
+  assert.equal((await call("/delivery-partner/orders/QR-O/payments", auth, "POST", { amount: 20, method: "RAZORPAY", gatewayVerified: true, razorpayPaymentId: "pay_DeliveryTest1", clientRequestId: id() })).status, 400);
+  assert.equal(await Payment.countDocuments(), 0); assert.equal((await Order.findOne({ orderId: "QR-O" })).dueAmount, 100);
+  gateway.qr.notes.collectorId = "someone-else";
+  assert.equal((await call(`${url}/${qr}/verify`, auth, "POST", {})).status, 404);
+});
+
+test("paid delivery QR after reassignment is tracked and refunded only once", async t => {
+  const gateway = stubDeliveryQr(t), a = await person("QR-A"), s = await shop("QR-S", a), p = await partner("QR-DP"), other = await partner("QR-OTHER");
+  await rawOrder("QR-O", s, a, { status: "ASSIGNED", paidAmount: 0, dueAmount: 100, delivery: { partnerId: p._id } });
+  const url = "/delivery-partner/orders/QR-O/payment-qr", auth = partnerToken(p), qr = (await call(url, auth, "POST", { amount: 20 })).data.qrCodeId;
+  gateway.paid(); await Order.updateOne({ orderId: "QR-O" }, { "delivery.partnerId": other._id });
+  const result = await call(`${url}/${qr}/verify`, auth, "POST", {});
+  assert.equal(result.status, 400); assert.equal(result.data.refunded, true); assert.equal(gateway.refunds, 1);
+  assert.equal((await call(`${url}/${qr}/verify`, auth, "POST", {})).data.refunded, true); assert.equal(gateway.refunds, 1);
+  assert.equal(await Payment.countDocuments(), 0); assert.equal((await Order.findOne({ orderId: "QR-O" })).dueAmount, 100);
+  assert.equal((await GatewayPayment.findOne()).status, "REFUNDED");
+});
+
+test("unpaid delivery QR closes safely, expiry releases recovery and test cleanup preserves gateway traces", async t => {
+  const gateway = stubDeliveryQr(t), a = await person("QR-A"), s = await shop("QR-S", a), p = await partner("QR-DP");
+  await rawOrder("QR-O", s, a, { status: "ASSIGNED", paidAmount: 0, dueAmount: 100, delivery: { partnerId: p._id } });
+  const url = "/delivery-partner/orders/QR-O/payment-qr", auth = partnerToken(p), qr = (await call(url, auth, "POST", { amount: 20 })).data.qrCodeId;
+  assert.equal((await call(`${url}/${qr}/close`, auth, "POST", {})).data.paid, false);
+  assert.equal((await GatewayPayment.findOne()).status, "QR_CLOSED"); assert.equal((await call(url, auth)).data.qr, null);
+  const next = await call(url, auth, "POST", { amount: 25 }); assert.notEqual(next.data.qrCodeId, qr); assert.equal(gateway.created, 2);
+  gateway.qr.status = "closed"; gateway.qr.close_reason = "expired";
+  assert.equal((await call(`${url}/${next.data.qrCodeId}`, auth)).data.closed, true); assert.equal((await call(url, auth)).data.qr, null);
+  await Order.updateOne({ orderId: "QR-O" }, { status: "CANCELLED", dueAmount: 0 });
+  const preview = await call(`/admin/delivery-partners/${p._id}/purge-preview`, admin()); assert.equal(preview.status, 200); assert.equal(preview.data.allowed, false); assert(preview.data.blockers.some(text => /Online payment/.test(text)));
+  await Agent.updateOne({ _id: a._id }, { accessStatus: "BLOCKED" });
+  assert.equal((await call(`/admin/agents/${a.agentId}/purge-preview`, admin())).data.allowed, false);
+});
 
 const partnerPurgeCommand = preview => ({ requestId: id(), confirmationToken: preview.data.confirmationToken, confirmIdentifier: preview.data.partner.id, confirmPhrase: "DELETE TEST DELIVERY DATA", testDataConfirmed: true });
 test("test delivery cleanup deletes only reviewed cancelled history, keeps stores/agents/unrelated business, and replays safely", async () => {

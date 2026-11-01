@@ -18,7 +18,7 @@ import {
    carries the store's name, phone, address, GST number and everything it
    bought and paid, so it now takes a permission that already shows those:
    "View All Orders" (where the Invoice button is) or "View Payment Info". */
-const STAFF_MAY_SEE_INVOICES = ["canGetAllOrders", "canSeePaymentInfo"];
+const STAFF_MAY_SEE_INVOICES = ["canGetAllOrders", "canSeePaymentInfo", "canViewBills"];
 
 const canSeeOrder = async (user, orderId) => {
   if (user.role === "ADMIN") return true;

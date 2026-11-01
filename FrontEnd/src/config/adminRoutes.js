@@ -26,6 +26,7 @@ const PaymentInfo = lazy(() => import("../pages/Admin/Tabs/PaymentInfo/PaymentIn
 const Targets = lazy(() => import("../pages/Admin/Tabs/Targets/Targets"));
 const ProductSales = lazy(() => import("../pages/Admin/Tabs/ProductSales/ProductSales"));
 const CashVerification = lazy(() => import("../pages/Admin/Tabs/CashVerification/CashVerification"));
+const Bills = lazy(() => import("../pages/Admin/Tabs/Bills/Bills"));
 const CustomNotification = lazy(() => import("../pages/Admin/Tabs/CustomNotification/CustomNotification"));
 const AssignLocation = lazy(() => import("../pages/Admin/Tabs/AssignLocation/AssignLocation"));
 
@@ -65,6 +66,7 @@ export const adminRoutes = [
     icon: AllInbox,
     component: OrderManagement,
   },
+  { label: "Bills", path: "bills", group: "Operations", icon: ListAltIcon, component: Bills },
   {
     label: "Returns",
     path: "return-management",

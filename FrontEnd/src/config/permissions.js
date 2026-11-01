@@ -11,6 +11,7 @@ export const PERMISSION_GROUPS = [
     group: "Orders",
     items: [
       { key: "canGetAllOrders", label: "View All Orders" },
+      { key: "canViewBills", label: "View Bills & Download Invoices" },
       { key: "canConfirmOrders", label: "Confirm Orders" },
       { key: "canCancelOrders", label: "Cancel Orders" },
       { key: "canAssignDelivery", label: "Assign Delivery" },

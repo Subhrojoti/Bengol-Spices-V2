@@ -140,7 +140,15 @@ const withOrdersAndAgents = async (payments) => {
  * How much cash is in each state: waiting (and how much of it has waited
  * too long), approved this month, and rejected and not yet put right.
  */
-export const verificationSummary = async (now = new Date()) => {
+const collectorFilter = (role = "ALL") => {
+  if (!["ALL", "AGENT", "DELIVERY_PARTNER"].includes(role)) return null;
+  if (role === "ALL") return {};
+  // An unrecorded collector stays in All; never infer one from sales ownership.
+  return { "collectedBy.id": { $type: "string", $ne: "" },
+    ...(role === "AGENT" ? { "collectedBy.role": { $in: ["AGENT", null] } } : { "collectedBy.role": role }) };
+};
+
+export const verificationSummary = async (now = new Date(), collectorRole = "ALL") => {
   const { start, end } = monthRange(monthKeyOf(now));
   const lateBefore = new Date(now.getTime() - LATE_AFTER_MS);
 
@@ -157,7 +165,7 @@ export const verificationSummary = async (now = new Date()) => {
   ];
 
   const [row] = await Payment.aggregate([
-    { $match: { "verification.status": { $in: VERIFICATION_STATUSES } } },
+    { $match: { "verification.status": { $in: VERIFICATION_STATUSES }, ...collectorFilter(collectorRole) } },
     {
       $facet: {
         pending: sum({ "verification.status": PENDING }),
@@ -197,7 +205,9 @@ export const verificationSummary = async (now = new Date()) => {
  * listed oldest first, since the oldest is the one to chase; the rest by
  * the newest decision. Returns { rows, truncated } or { error }.
  */
-export const listCashPayments = async ({ status = PENDING, agentId, from, to } = {}) => {
+export const listCashPayments = async ({ status = PENDING, agentId, from, to, collectorRole = "ALL" } = {}) => {
+  const scope = collectorFilter(collectorRole);
+  if (!scope) return { error: "Collector must be ALL, AGENT or DELIVERY_PARTNER" };
   const wanted = String(status || PENDING).toUpperCase();
 
   if (wanted !== "ALL" && !VERIFICATION_STATUSES.includes(wanted)) {
@@ -212,6 +222,7 @@ export const listCashPayments = async ({ status = PENDING, agentId, from, to } =
   }
 
   const filter = {
+    ...scope,
     "verification.status":
       wanted === "ALL" ? { $in: VERIFICATION_STATUSES } : wanted,
   };
@@ -227,10 +238,10 @@ export const listCashPayments = async ({ status = PENDING, agentId, from, to } =
 
   const sort =
     wanted === PENDING
-      ? { createdAt: 1 }
+      ? { createdAt: 1, _id: 1 }
       : wanted === "ALL"
-        ? { createdAt: -1 }
-        : { "verification.decidedAt": -1 };
+        ? { createdAt: -1, _id: -1 }
+        : { "verification.decidedAt": -1, _id: -1 };
 
   const payments = await Payment.find(filter)
     .sort(sort)

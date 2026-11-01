@@ -32,6 +32,7 @@ export const getCashPayments = async (req, res) => {
       agentId: req.query.agentId,
       from: req.query.from,
       to: req.query.to,
+      collectorRole: req.query.collectorRole,
     });
 
     if (list.error) return refuse(res, list.error);
@@ -40,7 +41,7 @@ export const getCashPayments = async (req, res) => {
       success: true,
       count: list.rows.length,
       truncated: list.truncated,
-      summary: await verificationSummary(),
+      summary: await verificationSummary(new Date(), req.query.collectorRole || "ALL"),
       data: list.rows,
     });
   } catch (error) {
