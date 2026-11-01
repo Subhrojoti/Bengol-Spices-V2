@@ -5,6 +5,15 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Production QR/Bills release (final verification 2 November):** application
+`b074409` pushed and backend/website deployed. File hashes, health and live
+read-only Admin/Bills/collector checks pass. Physical-phone QR display,
+hide/resume, simulated confirmation and duplicate-verification checks pass
+against disposable data. No real payment or signed mobile release performed;
+installed Delivery apps require a new build. See
+[release evidence and recovery](deploy/releases/2026-11-02-delivery-qr-bills.md).
+The preparation/local-only entries below record earlier stages.
+
 **Delivery UPI QR (1 November, release preparation):** missing feature added to
 Delivery mobile, backed by delivery-scoped create/recover/status/verify/close
 endpoints. Captured UPI evidence, exact amount and owner checked; uses existing

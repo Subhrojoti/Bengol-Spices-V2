@@ -65,9 +65,9 @@ ignored `output/delivery-qr-2026-11-01`; this is not a signed APK/AAB.
 Final complete backend run: 98/98 pass, including the final cleanup/store-lock
 guards. Source inventory: 152 backend modules, 644 imports and 182 endpoints.
 
-The latest ADB inventory showed no connected phone. No new native-device QR
-visual/scan test or live gateway settlement test is claimed. Release the new
-Delivery APK/AAB only after an internal-device test. VPS deployment updates the
-API and pending Admin Bills/collector-tab work; it does not update installed
-mobile apps or publish to Play Store. Final deployment evidence is recorded in
-`deploy/releases/` after live verification.
+Final follow-up, 2 November: backend/website deployed and live checks passed.
+The owner connected a phone; Expo Go QR display, hide/resume, simulated captured
+payment, balance/collector/agent credit and duplicate-verification checks passed
+against disposable data. Real banking-app scanning and live settlement remain
+untested. VPS deployment does not update installed mobile apps or publish to
+Play Store. See [final release evidence](../../deploy/releases/2026-11-02-delivery-qr-bills.md).
