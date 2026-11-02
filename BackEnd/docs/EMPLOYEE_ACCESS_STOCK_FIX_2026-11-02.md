@@ -1,6 +1,7 @@
 # Employee feature access and stock validation
 
-2 November 2026. Local implementation; not yet pushed or deployed.
+2 November 2026. Released as application `2c40b98`; see
+[verified deployment evidence](../../deploy/releases/2026-11-02-permissions-delivery-codes.md).
 
 ## Findings and employee behavior
 
@@ -108,4 +109,5 @@ another order before gateway payment completes, so final validation stays in pla
   Admin layout retained; screenshots/logs stay in ignored `.admin-audit.local`.
 - Offline source inventory refreshed: 152 backend modules, 646 imports,
   182 endpoints. Existing account data, invoices, balances and credit dates were
-  not migrated or edited. Deployment is still required for live behavior.
+  not migrated or edited. Backend and website deployment is verified in the
+  linked release record.

@@ -1,6 +1,7 @@
 # Active-order delivery-code lookup
 
-2 November 2026. Implemented locally; not pushed or deployed.
+2 November 2026. Released as application `2c40b98`; see
+[verified deployment evidence](../../deploy/releases/2026-11-02-permissions-delivery-codes.md).
 
 The existing lookup was Orders > open order > Reveal delivery code, with another
 audited reveal in Store Details. The owner requested an easier separate section
@@ -66,4 +67,4 @@ are generated/changed and no delivery, invoice or payment workflow is changed.
   ignored `FrontEnd/.admin-audit.local/active-*` files.
 
 This builds on the pending [employee/stock correction](EMPLOYEE_ACCESS_STOCK_FIX_2026-11-02.md).
-Deployment must include backend and frontend together. No AAB rebuild is needed.
+Backend and frontend were deployed together. No AAB rebuild is needed.

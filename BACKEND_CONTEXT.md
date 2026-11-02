@@ -5,11 +5,14 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Final permission/code release recheck (2 November):** no additional bug found.
-Full backend 106/106, full Admin/Employee browser suite 168/168, frontend units
-13/13 and lint/build pass. Owner authorized push and VPS deployment; release
-preparation is underway. Earlier local-only entries below describe their review
-stage; final production evidence will be recorded in `deploy/releases/`.
+**Production employee/code release (2 November):** application `2c40b98` pushed
+and backend/website deployed. Final recheck found no additional bug: backend
+106/106, full browser suite 168/168, units 13/13 and lint/build pass. All 184 API
+and 220 website files match the release; live read-only Admin/permission-editor/
+active-code checks, health and backups verified. Grants/configuration unchanged;
+new refund permission stays default OFF. No mobile rebuild required. See
+[production evidence and recovery](deploy/releases/2026-11-02-permissions-delivery-codes.md).
+Earlier local-only entries below describe their original review stage.
 
 **Active delivery-code lookup (2 November, local only):** added Orders > Delivery
 codes for Admin/permitted employees. Searches and pages active orders only;

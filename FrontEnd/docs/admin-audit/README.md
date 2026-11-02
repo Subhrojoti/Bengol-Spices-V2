@@ -1,5 +1,11 @@
 # Admin frontend audit and continuation guide
 
+**Released 2 November:** employee/code/stock application `2c40b98` pushed and
+backend/website deployed. Full backend 106/106, full browser 168/168, units 13/13
+and lint/build pass; live read-only checks and file hashes verified. See
+[production evidence](../../../deploy/releases/2026-11-02-permissions-delivery-codes.md).
+The local-only entries below describe their original implementation stages.
+
 **Active delivery-code lookup (2 November, local only):** Orders now has an
 additional Delivery codes view for authorized office users, using existing
 styling, bounded active-order search and deliberate audited reveals. Existing
