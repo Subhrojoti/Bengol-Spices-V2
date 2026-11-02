@@ -5,6 +5,34 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Final permission/code release recheck (2 November):** no additional bug found.
+Full backend 106/106, full Admin/Employee browser suite 168/168, frontend units
+13/13 and lint/build pass. Owner authorized push and VPS deployment; release
+preparation is underway. Earlier local-only entries below describe their review
+stage; final production evidence will be recorded in `deploy/releases/`.
+
+**Active delivery-code lookup (2 November, local only):** added Orders > Delivery
+codes for Admin/permitted employees. Searches and pages active orders only;
+codes are deliberately revealed through the existing audited mechanism, with a
+fresh active-order check and both order/code permissions enforced by the API.
+Existing detail/report reveals remain. Backend 106/106, frontend units 13/13,
+affected browser checks 26/26, lint/build and phone/desktop visual checks pass.
+Read [behavior, permissions and validation](BackEnd/docs/ACTIVE_DELIVERY_CODES_2026-11-02.md).
+Not pushed/deployed; no mobile changes or AAB rebuild required.
+
+**Employee access and stock correction (2 November, local only):** replaced
+hard-coded Admin restrictions with employee permissions across shared business
+workflows, retaining Admin-only employee administration. Added a separate
+default-off refund/settlement permission with actor audit. Ordering catalogues
+exclude unavailable inventory and Cash/QR/checkout validate stock before writes
+or gateway initiation; transactional reservation stays intact. No mobile source
+change or AAB rebuild required. Read
+[permission mapping, compatibility and validation](BackEnd/docs/EMPLOYEE_ACCESS_STOCK_FIX_2026-11-02.md).
+Backend 103/103, frontend units 13/13, lint/build and final affected browser
+checks 24/24 pass. The broad 162-case run and corrected expectation are recorded
+in the linked notes; desktop/phone dark-theme screenshots were inspected.
+No push/deployment performed for these changes.
+
 **Production QR/Bills release (final verification 2 November):** application
 `b074409` pushed and backend/website deployed. File hashes, health and live
 read-only Admin/Bills/collector checks pass. Physical-phone QR display,

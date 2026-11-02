@@ -32,7 +32,7 @@ import {
 import { protect } from "../middleware/auth.js";
 import { isAdmin } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
-import { getWorkspaceOrders, getWorkspaceOrder, getWorkspaceOptions, exportWorkspace } from "../controllers/orderWorkspace.controller.js";
+import { getWorkspaceOrders, getWorkspaceOrder, getWorkspaceOptions, exportWorkspace, getActiveDeliveryCodes, revealActiveOrderDeliveryCode } from "../controllers/orderWorkspace.controller.js";
 import { getDispatchMappings, saveDispatchMapping, revokeDispatchMapping } from "../controllers/dispatchMapping.controller.js";
 import { getDeliveryPerformance, getPartnerOrders } from "../controllers/deliveryPerformance.controller.js";
 import { getPartnerCollections } from "../controllers/partnerCollections.controller.js";
@@ -44,35 +44,37 @@ import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview,
 
 // 🔒 All routes require login
 router.use(protect);
+router.get("/delivery-codes", checkPermission("canGetAllOrders"), checkPermission("canViewDeliveryCodes"), getActiveDeliveryCodes);
+router.post("/delivery-codes/:orderId/reveal", checkPermission("canGetAllOrders"), checkPermission("canViewDeliveryCodes"), revealActiveOrderDeliveryCode);
 router.get("/bills", checkPermission("canViewBills"), getBills);
 router.get("/bills/options", checkPermission("canViewBills"), getBillOptions);
 router.get("/bills/download", checkPermission("canViewBills"), downloadBills);
 router.get("/bills/:invoiceId", checkPermission("canViewBills"), getBill);
-router.get("/delivery-partners/:partnerId/purge-preview", isAdmin, getDeliveryPartnerPurgePreview);
-router.post("/delivery-partners/:partnerId/purge", isAdmin, executeDeliveryPartnerPurge);
-router.get("/dispatch-mappings", isAdmin, getDispatchMappings);
+router.get("/delivery-partners/:partnerId/purge-preview", checkPermission("canManageDeliveryPartners"), getDeliveryPartnerPurgePreview);
+router.post("/delivery-partners/:partnerId/purge", checkPermission("canManageDeliveryPartners"), executeDeliveryPartnerPurge);
+router.get("/dispatch-mappings", checkPermission("canAssignDelivery"), getDispatchMappings);
 router.get("/delivery-performance", checkPermission("canGetAllDeliveryPartners"), getDeliveryPerformance);
 router.get("/delivery-performance/:partnerId/orders", checkPermission("canGetAllDeliveryPartners"), getPartnerOrders);
 router.get("/delivery-performance/:partnerId/collections", checkPermission("canGetAllDeliveryPartners"), getPartnerCollections);
-router.put("/dispatch-mappings", isAdmin, saveDispatchMapping);
-router.delete("/dispatch-mappings/:agentId", isAdmin, revokeDispatchMapping);
-router.get("/order-workspace", isAdmin, getWorkspaceOrders);
-router.get("/order-workspace/options", isAdmin, getWorkspaceOptions);
-router.get("/order-workspace/export", isAdmin, exportWorkspace);
-router.get("/order-workspace/:orderId", isAdmin, getWorkspaceOrder);
-router.get("/store-management", isAdmin, getManagedStores);
-router.post("/store-transfers/preview", isAdmin, getTransferPreview);
-router.post("/store-transfers", isAdmin, executeTransfer);
-router.get("/store-management/:consumerId/removal-preview", isAdmin, getRemovalPreview);
-router.post("/store-management/:consumerId/remove", isAdmin, executeRemoval);
-router.get("/store-management/:consumerId/purge-preview", isAdmin, getStorePurgePreview);
-router.post("/store-management/:consumerId/purge", isAdmin, executeStorePurge);
-router.post("/agents/:agentId/access", isAdmin, setAgentAccess);
-router.get("/management-audit", isAdmin, getManagementAudit);
-router.get("/agents/:agentId/purge-preview", isAdmin, getAgentPurgePreview);
-router.post("/agents/:agentId/purge", isAdmin, executeAgentPurge);
-router.get("/data-cleanups/:requestId", isAdmin, getCleanupStatus);
-router.post("/data-cleanups/:requestId/retry-media", isAdmin, retryCleanup);
+router.put("/dispatch-mappings", checkPermission("canAssignDelivery"), saveDispatchMapping);
+router.delete("/dispatch-mappings/:agentId", checkPermission("canAssignDelivery"), revokeDispatchMapping);
+router.get("/order-workspace", checkPermission("canGetAllOrders"), getWorkspaceOrders);
+router.get("/order-workspace/options", checkPermission("canGetAllOrders"), getWorkspaceOptions);
+router.get("/order-workspace/export", checkPermission("canGetAllOrders"), exportWorkspace);
+router.get("/order-workspace/:orderId", checkPermission("canGetAllOrders"), getWorkspaceOrder);
+router.get("/store-management", checkPermission("canManageAgents"), getManagedStores);
+router.post("/store-transfers/preview", checkPermission("canManageAgents"), getTransferPreview);
+router.post("/store-transfers", checkPermission("canManageAgents"), executeTransfer);
+router.get("/store-management/:consumerId/removal-preview", checkPermission("canManageAgents"), getRemovalPreview);
+router.post("/store-management/:consumerId/remove", checkPermission("canManageAgents"), executeRemoval);
+router.get("/store-management/:consumerId/purge-preview", checkPermission("canManageAgents"), getStorePurgePreview);
+router.post("/store-management/:consumerId/purge", checkPermission("canManageAgents"), executeStorePurge);
+router.post("/agents/:agentId/access", checkPermission("canManageAgents"), setAgentAccess);
+router.get("/management-audit", checkPermission(["canManageAgents", "canManageDeliveryPartners"]), getManagementAudit);
+router.get("/agents/:agentId/purge-preview", checkPermission("canManageAgents"), getAgentPurgePreview);
+router.post("/agents/:agentId/purge", checkPermission("canManageAgents"), executeAgentPurge);
+router.get("/data-cleanups/:requestId", checkPermission(["canManageAgents", "canManageDeliveryPartners"]), getCleanupStatus);
+router.post("/data-cleanups/:requestId/retry-media", checkPermission(["canManageAgents", "canManageDeliveryPartners"]), retryCleanup);
 
 // =============================
 // ADMIN ONLY
@@ -113,7 +115,7 @@ router.post(
 );
 
 // Get all agents
-router.get("/agents", checkPermission("canManageAgents"), getAllAgents);
+router.get("/agents", checkPermission(["canManageAgents", "canAssignLocations"]), getAllAgents);
 
 // Dashboard summary
 router.get(
@@ -199,7 +201,6 @@ router.get(
   checkPermission("canAssignDelivery"),
   getDeliverySettings,
 );
-// Whether a far-away delivery is refused, and how far is far: admin only
-router.put("/delivery/settings", isAdmin, updateDeliverySettings);
+router.put("/delivery/settings", checkPermission("canAssignDelivery"), updateDeliverySettings);
 
 export default router;

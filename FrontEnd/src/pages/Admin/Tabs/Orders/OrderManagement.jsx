@@ -1,3 +1,4 @@
+import usePanelPermission from "../../../../hooks/usePanelPermission";
 import StoreReportBackLink from "../../../../components/common/StoreReportBackLink";
 import OrderChanges from "../../../../components/common/OrderChanges";
 import reportAdminError from "../../../../utils/reportAdminError";
@@ -270,6 +271,7 @@ export const CancelDialog = ({ order, open, busy, onClose, onConfirm }) => {
 /* ------------------------------------------------------------------ */
 
 export default function OrderManagement() {
+  const mayConfirm = usePanelPermission("canConfirmOrders"), mayCancel = usePanelPermission("canCancelOrders");
   const [params, setParams] = useSearchParams();
   const linkedConsumerId = params.get("consumerId") || "";
   const [orders, setOrders] = useState([]);
@@ -499,7 +501,7 @@ export default function OrderManagement() {
     );
 
   const runConfirm = async () => {
-    if (!confirmTarget) return;
+    if (!confirmTarget || !mayConfirm) return;
 
     try {
       setBusyId(confirmTarget.orderId);
@@ -518,7 +520,7 @@ export default function OrderManagement() {
   };
 
   const runCancel = async (reason) => {
-    if (!cancelTarget) return;
+    if (!cancelTarget || !mayCancel) return;
 
     try {
       setBusyId(cancelTarget.orderId);
@@ -933,7 +935,7 @@ export default function OrderManagement() {
                             </button>
                           )}
 
-                          {canCancel(order) && (
+                          {mayCancel && canCancel(order) && (
                             <button
                               onClick={() => setCancelTarget(order)}
                               disabled={busy}
@@ -943,7 +945,7 @@ export default function OrderManagement() {
                             </button>
                           )}
 
-                          {canConfirm(order) && (
+                          {mayConfirm && canConfirm(order) && (
                             <button
                               onClick={() => setConfirmTarget(order)}
                               disabled={busy}

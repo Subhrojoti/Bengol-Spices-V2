@@ -6,6 +6,7 @@ import DeliveryPartner from "../models/DeliveryPartner.js";
 import { orderDateFilter, orderDateOf } from "../utils/orderReportDates.js";
 
 export const ORDER_STATUSES = ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
+export const ACTIVE_ORDER_STATUSES = ORDER_STATUSES.filter(status => !["DELIVERED", "CANCELLED"].includes(status));
 const transit = ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"];
 const bad = (message) => { throw Object.assign(new Error(message), { status: 400 }); };
 const string = (query, key, max = 100) => {
@@ -53,8 +54,10 @@ const labelsFor = async (rows) => {
     storeImage: storeMap.get(o.consumerId)?.image?.url || "" }));
 };
 
-export const listWorkspaceOrders = async (query) => {
+export const listWorkspaceOrders = async (query, { activeOnly = false } = {}) => {
   const { filter, statusMatch, dateBasis, page: wanted, pageSize } = await workspaceFilter(query);
+  // Server-controlled scope: a supplied status cannot override active-only reads.
+  if (activeOnly) filter.$and = [...(filter.$and || []), { status: { $in: ACTIVE_ORDER_STATUSES } }];
   // Facets share the same filtered read. Status counts retain the other filters
   // but intentionally exclude the selected status, so switching is meaningful.
   const [result] = await Order.aggregate([{ $match: filter }, { $facet: {

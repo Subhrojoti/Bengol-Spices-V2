@@ -33,7 +33,7 @@ test("bare Employee landing and reload render the account with its permitted nav
   await page.getByRole("button", { name: "Keep menu open", exact: true }).click();
   await page.getByRole("button", { name: "Orders", exact: true }).click();
   await expect(page).toHaveURL(/\/employee\/order-management$/);
-  await expect(page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "All orders", exact: true })).toBeVisible();
   expect(network.unknown).toEqual([]);
 });
 
@@ -50,7 +50,7 @@ test("Employee permission restrictions remain enforced after the header renders"
 test("Employee downloads an invoice as a PDF through its existing bearer-authenticated API request", async ({ context, page }) => {
   const order = orders[0], path = `/api/invoice/download/${order.orderId}`;
   const network = await setup(context, { overrides: { [path]: (route) => route.fulfill({ contentType: "application/pdf", body: "%PDF-1.4\nsynthetic invoice" }) } });
-  await page.goto("/employee/order-management");
+  await page.goto("/employee/order-management?view=store");
   await page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true }).click();
   const card = page.locator(`#order-${order._id}`); await card.getByRole("button", { name: new RegExp(order.orderId) }).click();
   const download = page.waitForEvent("download"); await card.getByRole("button", { name: "Invoice", exact: true }).click();
@@ -62,11 +62,11 @@ test("Employee downloads an invoice as a PDF through its existing bearer-authent
 test("Employee invoice network failures show a retry message without claiming the invoice is absent", async ({ context, page }) => {
   const order = orders[0], path = `/api/invoice/download/${order.orderId}`;
   await setup(context, { overrides: { [path]: (route) => route.abort("failed") } });
-  await page.goto("/employee/order-management");
+  await page.goto("/employee/order-management?view=store");
   await page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true }).click();
   const card = page.locator(`#order-${order._id}`); await card.getByRole("button", { name: new RegExp(order.orderId) }).click();
   await card.getByRole("button", { name: "Invoice", exact: true }).click();
   await expect(page.getByText("Could not download the invoice. Check your connection and try again.", { exact: true })).toBeVisible();
   await expect(card.getByRole("button", { name: "Invoice", exact: true })).toBeEnabled();
-  await expect(page).toHaveURL(/\/employee\/order-management$/);
+  await expect(page).toHaveURL(/\/employee\/order-management\?view=store$/);
 });

@@ -1,5 +1,4 @@
 import useObjectUrl from "../../../../hooks/useObjectUrl";
-import usePanelBasePath from "../../../../hooks/usePanelBasePath";
 import CategoryMinimums from "../../../../components/common/CategoryMinimums";
 import { CATEGORY_MINIMUMS, categoryMinimumErrors } from "../../../../utils/categoryMinimums";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -186,7 +185,6 @@ const ImageDrop = ({ label, file, preview, onSelect, onClear }) => {
 /* ------------------------------------------------------------------ */
 
 export default function ProductCreation() {
-  const basePath = usePanelBasePath();
   const [form, setForm] = useState(EMPTY);
   const [certificates, setCertificates] = useState([]);
   const [certDraft, setCertDraft] = useState("");
@@ -243,8 +241,8 @@ export default function ProductCreation() {
       found.minOrderQty = "Minimum order quantity must be at least 1";
     }
 
-    return { ...found, ...(basePath === "/admin" ? categoryMinimumErrors(form) : {}) };
-  }, [form, basePath]);
+    return { ...found, ...categoryMinimumErrors(form) };
+  }, [form]);
 
   const missingImages = [
     !frontImage && "front image",
@@ -500,7 +498,7 @@ export default function ProductCreation() {
               </Field>
             </div>
 
-            {basePath === "/admin" && <CategoryMinimums form={form} onChange={set} errors={touched ? errors : {}} />}
+            <CategoryMinimums form={form} onChange={set} errors={touched ? errors : {}} />
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Min Order Qty" hint="defaults to 1" error={show("minOrderQty")}>
                 <input aria-label="Min Order Qty"

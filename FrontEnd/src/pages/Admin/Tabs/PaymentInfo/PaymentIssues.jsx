@@ -1,3 +1,4 @@
+import usePanelPermission from "../../../../hooks/usePanelPermission";
 import useLatestRequest from "../../../../hooks/useLatestRequest";
 import reportAdminError from "../../../../utils/reportAdminError";
 import { useCallback, useEffect, useState } from "react";
@@ -36,6 +37,7 @@ const STATUS_COPY = {
  * as a line in the server log. Hidden when there are none.
  */
 export default function PaymentIssues() {
+  const mayResolve = usePanelPermission("canResolvePaymentIssues");
   const [issues, setIssues] = useState([]);
   const [action, setAction] = useState(null); // { issue, kind: "refund" | "resolve" }
   const [note, setNote] = useState("");
@@ -69,7 +71,7 @@ export default function PaymentIssues() {
   };
 
   const confirm = async () => {
-    if (!action) return;
+    if (!action || !mayResolve) return;
 
     if (action.kind === "resolve" && !note.trim()) {
       toast.error("Add a note saying how this payment was settled");
@@ -141,7 +143,7 @@ export default function PaymentIssues() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              {mayResolve && <div className="flex items-center gap-2">
                 <button
                   onClick={() => setAction({ issue, kind: "refund" })}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-[13.5px] font-semibold text-white transition hover:bg-rose-700">
@@ -154,7 +156,7 @@ export default function PaymentIssues() {
                   <CheckCircle2 size={14} />
                   Mark settled
                 </button>
-              </div>
+              </div>}
             </div>
           ))}
         </div>

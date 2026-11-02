@@ -51,15 +51,18 @@ export const getStoreReportAgents = handle(async (req, res) => {
   res.json({ success: true, agents });
 });
 
-export const revealStoreDeliveryCode = handle(async (req, res) => {
-  const consumerId = text(req.params, "consumerId");
+export const auditedDeliveryCode = async (consumerId, user, orderId) => {
   const store = await Store.findOne({ consumerId }).select("deliveryCode").lean();
-  if (!store) return res.status(404).json({ success: false, message: "Store not found" });
+  if (!store) throw Object.assign(new Error("Store not found"), { status: 404 });
   // Fail closed if the access audit cannot be persisted. Never record the code.
   const requestId = crypto.randomUUID();
   await AdminAudit.create({ requestId, requestHash: crypto.createHash("sha256").update(requestId).digest("hex"),
     action: "REVEAL_STORE_DELIVERY_CODE", consumerIds: [consumerId], outcome: "COMPLETED",
-    actor: { id: String(req.user.employeeId || req.user.id || "ADMIN"), role: req.user.role, name: req.user.name || "" },
+    actor: { id: String(user.employeeId || user.id || "ADMIN"), role: user.role, name: user.name || "" },
+    ...(orderId && { details: { orderId } }),
   });
-  res.json({ success: true, consumerId, deliveryCode: store.deliveryCode || null });
+  return { success: true, consumerId, deliveryCode: store.deliveryCode || null };
+};
+export const revealStoreDeliveryCode = handle(async (req, res) => {
+  res.json(await auditedDeliveryCode(text(req.params, "consumerId"), req.user));
 });

@@ -1,4 +1,5 @@
 import reportAdminError from "../../../../../utils/reportAdminError";
+import usePanelPermission from "../../../../../hooks/usePanelPermission";
 import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -98,6 +99,7 @@ const Empty = ({ icon, title, hint }) => (
 );
 
 export default function DeliveryManagement({ focusOrderId, onFocused }) {
+  const mayDeliver = usePanelPermission("canAssignDelivery"), mayReturn = usePanelPermission("canAssignReturn");
   const [orders, setOrders] = useState([]);
   const [returns, setReturns] = useState([]);
   const [partners, setPartners] = useState([]);
@@ -105,7 +107,7 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
   const [status, setStatus] = useState("loading");
   const [refreshing, setRefreshing] = useState(false);
 
-  const [queue, setQueue] = useState("ORDERS"); // ORDERS | RETURNS
+  const [queue, setQueue] = useState(mayDeliver ? "ORDERS" : "RETURNS"); // ORDERS | RETURNS
   const [selectedId, setSelectedId] = useState(null);
 
   const [queueSearch, setQueueSearch] = useState("");
@@ -126,9 +128,9 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
          directory is joined in for the queue card. A refusal there must not
          take the dispatch board down with it. */
       const [orderRes, partnerRes, returnRes, storeRes] = await Promise.all([
-        getActiveOrders({ signal: request.signal }),
+        mayDeliver ? getActiveOrders({ signal: request.signal }) : Promise.resolve({ orders: [] }),
         getAllDeliveryPartners({ signal: request.signal }),
-        getActiveReturns({ signal: request.signal }),
+        mayReturn ? getActiveReturns({ signal: request.signal }) : Promise.resolve({ returns: [] }),
         getAllStores({ signal: request.signal }).catch(() => null),
       ]);
       if (!request.current()) return;
@@ -145,7 +147,7 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
     } finally {
       if (request.current()) setRefreshing(false);
     }
-  }, [beginRequest]);
+  }, [beginRequest, mayDeliver, mayReturn]);
 
   useEffect(() => {
     load();
@@ -281,7 +283,7 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
   );
 
   const runAssign = async (partner) => {
-    if (!selected) return;
+    if (!selected || (isOrders ? !mayDeliver : !mayReturn)) return;
 
     try {
       setAssigningId(partner._id);
@@ -472,7 +474,7 @@ export default function DeliveryManagement({ focusOrderId, onFocused }) {
               {[
                 { key: "ORDERS", label: "Orders", count: orders.length },
                 { key: "RETURNS", label: "Returns", count: returns.length },
-              ].map((t) => (
+              ].filter(t => t.key === "ORDERS" ? mayDeliver : mayReturn).map((t) => (
                 <button
                   key={t.key}
                   onClick={() => switchQueue(t.key)}

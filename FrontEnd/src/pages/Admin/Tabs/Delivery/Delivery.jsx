@@ -10,10 +10,10 @@ const DeliveryPerformance = lazy(() => import("./tabs/DeliveryPerformance"));
 import AdminSectionBoundary from "../../../../components/common/AdminSectionBoundary";
 
 const TABS = [
-  { key: "dispatch", label: "Dispatch", icon: Truck, Component: DeliveryManagement },
-  { key: "alerts", label: "Alerts", icon: BellRing, Component: DeliveryAlerts },
-  { key: "approval", label: "Partner Approval", icon: UserCheck, Component: DeliveryApproval },
-  { key: "mapping", label: "Agent mapping", icon: Truck, Component: DispatchMappings, adminOnly: true },
+  { key: "dispatch", label: "Dispatch", icon: Truck, Component: DeliveryManagement, permission: ["canAssignDelivery", "canAssignReturn"] },
+  { key: "alerts", label: "Alerts", icon: BellRing, Component: DeliveryAlerts, permission: "canAssignDelivery" },
+  { key: "approval", label: "Partner Approval", icon: UserCheck, Component: DeliveryApproval, permission: "canManageDeliveryPartners" },
+  { key: "mapping", label: "Agent mapping", icon: Truck, Component: DispatchMappings, permission: "canAssignDelivery" },
   { key: "performance", label: "Performance", icon: Truck, Component: DeliveryPerformance, permission: "canGetAllDeliveryPartners" },
 ];
 
@@ -22,7 +22,7 @@ export default function Delivery() {
   const employee = pathname.startsWith("/employee");
   let permissions = {};
   try { permissions = JSON.parse(localStorage.getItem("permissions") || "{}"); } catch { /* backend enforces access */ }
-  const tabs = TABS.filter(tab => (!tab.adminOnly || !employee) && (!tab.permission || !employee || permissions?.[tab.permission] === true));
+  const tabs = TABS.filter(tab => !employee || (Array.isArray(tab.permission) ? tab.permission : [tab.permission]).some(key => permissions?.[key] === true));
   /* A link can open a particular section: /admin/delivery?tab=approval.
      Anything unrecognised falls back to the first section, as before. */
   const [params, setParams] = useSearchParams();

@@ -53,6 +53,7 @@ const gatewayPaymentSchema = new mongoose.Schema(
     refundIds: [String],
     refundError: String,
     resolutionNote: String,
+    officeActions: [{ _id: false, action: { type: String, enum: ["REFUND", "RESOLVE"] }, actor: { id: String, role: String, name: String }, at: Date, note: String }],
   },
   { timestamps: true },
 );

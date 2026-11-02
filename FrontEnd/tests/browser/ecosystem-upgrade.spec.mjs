@@ -45,7 +45,7 @@ for (const role of ["ADMIN", "EMPLOYEE"]) test(`${role} Store Details dropdown o
     expect(network.requests.some(request => request.path === "/admin/order-workspace" && request.query.includes(`consumerId=${store.consumerId}`))).toBe(true);
   } else {
     await expect(page.getByRole("main").getByRole("heading", { name: "Orders", exact: true })).toBeVisible();
-    expect(network.requests.some(request => request.path === `/agent/orders/store/${store.consumerId}`)).toBe(true);
+    expect(network.requests.some(request => request.path === "/admin/order-workspace" && request.query.includes(`consumerId=${store.consumerId}`))).toBe(true);
   }
   await page.getByRole("link", { name: "Back to Store Details", exact: true }).click();
   await expect(page.getByLabel("Registering agent ID")).toHaveValue(agents[0].agentId); await expect(page.getByLabel("Store, owner, phone or ID")).toHaveValue("Test");
@@ -109,7 +109,7 @@ for (const role of ["ADMIN", "EMPLOYEE"]) test(`${role} store view enables a new
     [`/agent/orders/${order.orderId}/confirm`]: json({ success: true, statusHistory: [...order.statusHistory, { status: "CONFIRMED", changedAt: order.createdAt }] }),
     [`/api/invoice/download/${order.orderId}`]: route => route.fulfill({ contentType: "application/pdf", body: "%PDF-1.4\nsynthetic" }),
   } });
-  await page.goto(role === "ADMIN" ? "/admin/order-management?view=store" : "/employee/order-management");
+  await page.goto(role === "ADMIN" ? "/admin/order-management?view=store" : "/employee/order-management?view=store");
   await page.getByRole("button", { name: "Select Test Store 1 CS2026-0001", exact: true }).click();
   const card = page.locator(`#order-${order._id}`); await card.getByRole("button", { name: new RegExp(order.orderId) }).click();
   await expect(card.getByRole("button", { name: "Invoice", exact: true })).toBeDisabled();

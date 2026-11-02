@@ -40,6 +40,8 @@ import storeRoutes from "../routes/store.routes.js";
 import returnRoutes from "../routes/return.routes.js";
 import invoiceRoutes from "../routes/invoice.routes.js";
 import agentRoutes from "../routes/agent.routes.js";
+import employeeRoutes from "../routes/employee.routes.js";
+import productRoutes from "../routes/product.routes.js";
 import { applyAgent } from "../controllers/agent.controller.js";
 import { agentLogin } from "../controllers/auth.controller.js";
 import { applyDuePayment } from "../services/payment.service.js";
@@ -71,6 +73,173 @@ const rawOrder = async (code, store, agent, extra = {}) => {
   const result = { orderId: code, consumerId: store.consumerId, store: store._id, agentId: agent.agentId, status: "DELIVERED", totalAmount: 100, paidAmount: 100, dueAmount: 0, paymentStatus: "COMPLETED", paymentMode: "CASH", dueDate: new Date(Date.now() + 86400000), orderLocation: { latitude: 22.5, longitude: 88.3 }, deliveryAddress: { storeName: store.storeName, ownerName: "Owner", phone: store.phone, state: "WEST BENGAL", city: "Kolkata", street: "Test", pincode: "700001" }, createdAt: new Date(), products: [{ name: "Spice", quantity: 1, unitPrice: 100, totalPrice: 100, uom: "packet" }], ...extra };
   await Order.collection.insertOne(result); return result;
 };
+
+test("delegated employees can use Admin workflows, while employee administration and revoked rights stay protected", async () => {
+  const a = await person("DELEGATE-A"), s = await shop("DELEGATE-S", a), p = await partner("DELEGATE-P");
+  const permissions = Object.fromEntries(Object.keys(Employee.schema.paths).filter(key => key.startsWith("permissions.")).map(key => [key.slice(12), true]));
+  const employee = await Employee.create({ employeeId: "DELEGATE-E", name: "Delegated employee", email: "delegate@test.invalid", password: "hash", permissions });
+  const auth = jwt.sign({ id: String(employee._id), employeeId: employee.employeeId, role: "EMPLOYEE" }, process.env.JWT_SECRET);
+  for (const url of ["/admin/order-workspace", "/admin/order-workspace/options?type=agent", "/admin/order-workspace/export", "/admin/store-management", "/admin/management-audit", "/admin/dispatch-mappings", `/admin/agents/${a.agentId}/purge-preview`, `/admin/store-management/${s.consumerId}/purge-preview`, `/admin/delivery-partners/${p._id}/purge-preview`]) {
+    assert.equal((await call(url, auth)).status, 200, url);
+  }
+  for (const [url, method, body] of [["/employee/create", "POST", {}], ["/employee/all", "GET"], ["/employee/delete/OTHER", "DELETE"], ["/admin/OTHER/permissions", "PUT", { permissions: { canManageAgents: true } }]]) assert.equal((await call(url, auth, method, body)).status, 403, url);
+  assert.equal((await call(`/admin/agents/${a.agentId}/access`, auth, "POST", { action: "BLOCK", reason: "Delegated review", requestId: id() })).status, 200);
+  assert.equal((await AdminAudit.findOne({ action: "AGENT_ACCESS" }).lean()).actor.role, "EMPLOYEE");
+  const saved = await call("/admin/dispatch-mappings", auth, "PUT", { agentId: a.agentId, partnerId: String(p._id), enabled: true });
+  // Blocked agents cannot be mapped; restore before the mapping operation.
+  assert.equal((await call(`/admin/agents/${a.agentId}/access`, auth, "POST", { action: "REACTIVATE", reason: "Reviewed", requestId: id() })).status, 200);
+  const mapped = saved.status === 200 ? saved : await call("/admin/dispatch-mappings", auth, "PUT", { agentId: a.agentId, partnerId: String(p._id), enabled: true });
+  assert.equal(mapped.status, 200);
+  assert.equal((await call(`/admin/dispatch-mappings/${a.agentId}`, auth, "DELETE", { partnerId: String(p._id), updatedAt: mapped.data.mapping.updatedAt })).status, 200);
+  assert.equal((await call("/admin/delivery/settings", auth, "PUT", { radiusMetres: 100, blockFarDeliveries: false })).status, 200);
+  const product = await Product.create({ name: "Delegated spice", title: "Spice", category: "Spice", sku: "DELEGATE", uom: "packet", price: 10, stock: 100, minOrderQty: 10, images: { front: { url: "f", publicId: "f" }, back: { url: "b", publicId: "b" } } });
+  assert.equal((await call(`/products/update/${product._id}`, auth, "PUT", { retailerMinOrderQty: 20 })).status, 200);
+  assert.equal((await Product.findById(product._id)).retailerMinOrderQty, 20);
+  await Employee.updateOne({ _id: employee._id }, { $set: { permissions: {} } });
+  for (const url of ["/admin/order-workspace", "/admin/store-management", "/admin/dispatch-mappings", `/admin/agents/${a.agentId}/purge-preview`, `/admin/delivery-partners/${p._id}/purge-preview`]) assert.equal((await call(url, auth)).status, 403, url);
+  assert.equal((await call(`/products/update/${product._id}`, auth, "PUT", { retailerMinOrderQty: 30 })).status, 403);
+  assert.equal((await call("/admin/delivery/settings", auth, "PUT", { radiusMetres: 200, blockFarDeliveries: false })).status, 403);
+});
+
+test("cleanup receipts and audit history stay scoped to the delegated management permission", async () => {
+  const staff = await Employee.create({ employeeId: "SCOPE-E", name: "Scoped", email: "scope@test.invalid", password: "hash", permissions: { canManageDeliveryPartners: true } });
+  const auth = jwt.sign({ id: String(staff._id), role: "EMPLOYEE" }, process.env.JWT_SECRET);
+  const agentBatch = id(), partnerBatch = id();
+  await AdminAudit.create([{ requestId: agentBatch, requestHash: "a", action: "PURGE_TEST_AGENT", outcome: "COMPLETED", actor: { role: "ADMIN" }, result: {} }, { requestId: partnerBatch, requestHash: "b", action: "PURGE_TEST_DELIVERY_PARTNER", outcome: "COMPLETED", actor: { role: "ADMIN" }, result: {} }]);
+  assert.equal((await call(`/admin/data-cleanups/${agentBatch}`, auth)).status, 403);
+  assert.equal((await call(`/admin/data-cleanups/${agentBatch}/retry-media`, auth, "POST", {})).status, 403);
+  assert.equal((await call(`/admin/data-cleanups/${partnerBatch}`, auth)).status, 200);
+  assert.deepEqual((await call("/admin/management-audit", auth)).data.data.map(row => row.action), ["PURGE_TEST_DELIVERY_PARTNER"]);
+});
+
+test("financial issue actions require a separate permission and record the actual employee before a gateway refund", async () => {
+  const employee = await Employee.create({ employeeId: "FIN-E", name: "Finance", email: "finance@test.invalid", password: "hash", permissions: { canSeePaymentInfo: true } });
+  const auth = jwt.sign({ id: String(employee._id), employeeId: employee.employeeId, role: "EMPLOYEE" }, process.env.JWT_SECRET);
+  const issue = await GatewayPayment.create({ key: "payment:pay_Delegated", purpose: "ORDER_INITIAL", status: "REFUND_FAILED", amount: 10, razorpayPaymentIds: ["pay_Delegated"], failureReason: "Synthetic failed checkout" });
+  const path = `/agent/orders/payment-issues/${issue._id}`;
+  assert.equal((await call(`${path}/refund`, auth, "POST", {})).status, 403);
+  assert.equal((await call(`${path}/resolve`, auth, "POST", { note: "Review" })).status, 403);
+  process.env.RAZORPAY_KEY_ID ||= "rzp_test_synthetic"; process.env.RAZORPAY_KEY_SECRET ||= "synthetic";
+  const refund = razorpayInstance.payments.refund;
+  let calls = 0;
+  try {
+    razorpayInstance.payments.refund = async () => {
+      calls++;
+      const recorded = await GatewayPayment.findById(issue._id).lean();
+      assert.equal(recorded.officeActions.at(-1).actor.role, "EMPLOYEE");
+      assert.equal(recorded.officeActions.at(-1).actor.id, employee.employeeId);
+      return { id: "rfnd_Delegated" };
+    };
+    await Employee.updateOne({ _id: employee._id }, { $set: { "permissions.canResolvePaymentIssues": true } });
+    assert.equal((await call(`${path}/refund`, auth, "POST", {})).status, 200);
+    assert.equal((await call(`${path}/refund`, auth, "POST", {})).status, 404);
+    assert.equal(calls, 1);
+    const manual = await GatewayPayment.create({ key: "payment:pay_Manual", purpose: "ORDER_INITIAL", status: "REFUND_FAILED", amount: 5 });
+    assert.equal((await call(`/agent/orders/payment-issues/${manual._id}/resolve`, auth, "POST", { note: "Settled through the office" })).status, 200);
+    assert.equal((await GatewayPayment.findById(manual._id)).officeActions[0].note, "Settled through the office");
+    await Employee.updateOne({ _id: employee._id }, { $set: { "permissions.canResolvePaymentIssues": false } });
+    assert.equal((await call(`/agent/orders/payment-issues/${manual._id}/resolve`, auth, "POST", { note: "Again" })).status, 403);
+  } finally { razorpayInstance.payments.refund = refund; }
+});
+
+test("location-only employees receive the agent picker without identity documents or management access", async () => {
+  const a = await person("LOCATION-A");
+  const employee = await Employee.create({ employeeId: "LOCATION-E", name: "Location staff", email: "locations@test.invalid", password: "hash", permissions: { canAssignLocations: true } });
+  const auth = jwt.sign({ id: String(employee._id), role: "EMPLOYEE" }, process.env.JWT_SECRET);
+  const response = await call("/admin/agents", auth);
+  assert.equal(response.status, 200); assert.equal(response.data.agents[0].agentId, a.agentId);
+  for (const key of ["documents", "password", "passwordSet", "phone", "email"]) assert(!Object.hasOwn(response.data.agents[0], key), key);
+  assert.equal((await call("/admin/store-management", auth)).status, 403);
+  assert.equal((await call(`/admin/agents/${a.agentId}/access`, auth, "POST", {})).status, 403);
+});
+
+test("out-of-stock catalogue and all new-order payment paths reject unavailable stock without recording an order or collection", async () => {
+  const a = await person("STOCK-A"), s = await shop("STOCK-S", a), otherStore = await shop("STOCK-T", a);
+  const make = (sku, stock) => Product.create({ name: sku, title: sku, category: "Spice", sku, uom: "packet", price: 10, stock, minOrderQty: 10, images: { front: { url: "f", publicId: "f" }, back: { url: "b", publicId: "b" } } });
+  const empty = await make("EMPTY", 0), low = await make("LOW", 9), ready = await make("READY", 20);
+  const catalog = await call(`/agent/store/${s.consumerId}/products`, token(a));
+  assert.deepEqual(catalog.data.products.map(row => row.name), ["READY"]);
+  assert.equal(catalog.data.products[0].stock, 20);
+  assert(!(await call("/products/public/allProduct", token(a))).data.products.some(row => row.name === "EMPTY"));
+  // Public browsing remains unchanged; only the Agent ordering catalogue filters stock.
+  assert((await (await fetch(`${origin}/products/public/allProduct`)).json()).products.some(row => row.name === "EMPTY"));
+  const orderPayload = { consumerId: s.consumerId, paidAmount: 1, paymentMode: "CASH", products: [{ productId: String(empty._id), name: empty.name, uom: "packet", quantity: 10, unitPrice: 10 }] };
+  process.env.RAZORPAY_KEY_ID ||= "rzp_test_synthetic"; process.env.RAZORPAY_KEY_SECRET ||= "synthetic";
+  const originalOrder = razorpayInstance.orders.create, originalQr = razorpayInstance.qrCode.create;
+  let gatewayCalls = 0;
+  try {
+    razorpayInstance.orders.create = razorpayInstance.qrCode.create = async () => { gatewayCalls++; throw new Error("Unavailable stock must be refused before gateway access"); };
+    for (const product of [empty, low]) {
+      orderPayload.products[0] = { productId: String(product._id), name: product.name, uom: "packet", quantity: 10, unitPrice: 10 };
+      assert.equal((await call("/agent/orders", token(a), "POST", orderPayload)).status, 400);
+      for (const endpoint of ["create-initial-payment", "create-initial-qr"]) assert.equal((await call(`/agent/orders/razorpay/${endpoint}`, token(a), "POST", { amount: 1, orderPayload })).status, 400);
+    }
+    assert.equal(gatewayCalls, 0); assert.equal(await Order.countDocuments(), 0); assert.equal(await Payment.countDocuments(), 0); assert.equal(await Invoice.countDocuments(), 0);
+    // A stale cart may race another agent: the atomic reservation is the final guard.
+    orderPayload.products[0] = { productId: String(ready._id), name: ready.name, uom: "packet", quantity: 20, unitPrice: 10 };
+    const responses = await Promise.all([call("/agent/orders", token(a), "POST", { ...orderPayload, requestId: id() }), call("/agent/orders", token(a), "POST", { ...orderPayload, consumerId: otherStore.consumerId, requestId: id() })]);
+    assert.equal(responses.filter(row => row.status === 201).length, 1, JSON.stringify(responses));
+    assert.equal(responses.filter(row => [400, 409].includes(row.status)).length, 1, JSON.stringify(responses));
+    assert.equal((await call("/agent/orders", token(a), "POST", { ...orderPayload, consumerId: otherStore.consumerId, requestId: id() })).status, 400);
+    assert.equal((await Product.findById(ready._id)).stock, 0); assert.equal(await Order.countDocuments(), 1); assert.equal(await Payment.countDocuments(), 1);
+    assert.equal((await call(`/agent/store/${s.consumerId}/products`, token(a))).data.count, 0);
+  } finally { razorpayInstance.orders.create = originalOrder; razorpayInstance.qrCode.create = originalQr; }
+});
+
+test("active delivery-code lookup pages only open orders and cannot be widened by caller-supplied filters", async () => {
+  const a = await person("CODE-A"), s = await shop("CODE-S", a);
+  const statuses = ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"];
+  for (let i = 0; i < 28; i++) await rawOrder(`CODE-${i}`, s, a, { status: statuses[i % statuses.length] });
+  await rawOrder("CODE-DONE", s, a, { status: "DELIVERED" }); await rawOrder("CODE-CANCELLED", s, a, { status: "CANCELLED" });
+  const first = await call("/admin/delivery-codes", admin());
+  assert.equal(first.status, 200); assert.equal(first.data.total, 28); assert.equal(first.data.orders.length, 25);
+  assert(first.data.orders.every(row => statuses.includes(row.status) && !Object.hasOwn(row, "deliveryCode")));
+  const second = await call("/admin/delivery-codes?page=2", admin());
+  assert.equal(second.data.orders.length, 3); assert(!second.data.orders.some(row => first.data.orders.some(old => old.orderId === row.orderId)));
+  assert.equal((await call("/admin/delivery-codes?status=DELIVERED&activeOnly=false", admin())).data.total, 0);
+  assert.equal((await call("/admin/delivery-codes?status=CANCELLED", admin())).data.total, 0);
+  assert.equal((await call("/admin/delivery-codes?status=ASSIGNED&agentId=CODE-A&consumerId=CODE-S", admin())).data.total, 6);
+  assert.equal((await call("/admin/delivery-codes?q=CODE-DONE", admin())).data.total, 0);
+  assert.equal((await call("/admin/delivery-codes?q=CODE-S", admin())).data.total, 28);
+  assert.equal((await call("/admin/delivery-codes?page=-1", admin())).status, 400);
+  assert.equal(await AdminAudit.countDocuments({ action: "REVEAL_STORE_DELIVERY_CODE" }), 0);
+});
+
+test("active delivery-code reads require both order/code rights and audit each deliberate reveal without saving the code", async () => {
+  const a = await person("CODE-A"), s = await shop("CODE-S", a); await rawOrder("CODE-ORDER", s, a, { status: "ASSIGNED" });
+  const staff = await Employee.create({ employeeId: "CODE-E", name: "Office", email: "code@test.invalid", password: "hash", permissions: { canGetAllOrders: true } });
+  const auth = jwt.sign({ id: String(staff._id), employeeId: staff.employeeId, role: "EMPLOYEE" }, process.env.JWT_SECRET);
+  const endpoint = "/admin/delivery-codes/CODE-ORDER/reveal";
+  for (const credential of [auth, token(a)]) { assert.equal((await call("/admin/delivery-codes", credential)).status, 403); assert.equal((await call(endpoint, credential, "POST")).status, 403); }
+  assert.equal((await call(endpoint, "", "POST")).status, 401);
+  await Employee.updateOne({ _id: staff._id }, { $set: { "permissions.canViewDeliveryCodes": true } });
+  assert.equal((await call("/admin/delivery-codes", auth)).status, 200);
+  const result = await call(endpoint, auth, "POST", { consumerId: "UNRELATED" });
+  assert.equal(result.status, 200); assert.equal(result.data.consumerId, s.consumerId); assert.equal(result.data.deliveryCode, s.deliveryCode);
+  const audit = await AdminAudit.findOne({ action: "REVEAL_STORE_DELIVERY_CODE" }).lean();
+  assert.equal(audit.actor.id, "CODE-E"); assert.deepEqual(audit.consumerIds, [s.consumerId]); assert.equal(audit.details.orderId, "CODE-ORDER"); assert(!Object.hasOwn(audit.details, "deliveryCode"));
+  await Employee.updateOne({ _id: staff._id }, { $set: { "permissions.canGetAllOrders": false } });
+  assert.equal((await call(endpoint, auth, "POST")).status, 403); assert.equal((await call("/admin/delivery-codes", auth)).status, 403);
+});
+
+test("active-code reveal rechecks terminal status and refuses to disclose when its access audit cannot be saved", async () => {
+  const a = await person("CODE-A"), s = await shop("CODE-S", a); await rawOrder("CODE-ORDER", s, a, { status: "ASSIGNED" });
+  assert.equal((await call("/admin/delivery-codes", admin())).data.total, 1);
+  for (const status of ["DELIVERED", "CANCELLED"]) {
+    await Order.updateOne({ orderId: "CODE-ORDER" }, { $set: { status } });
+    const response = await call("/admin/delivery-codes/CODE-ORDER/reveal", admin(), "POST");
+    assert.equal(response.status, 409); assert.equal(response.data.deliveryCode, undefined);
+  }
+  assert.equal(await AdminAudit.countDocuments(), 0);
+  assert.equal((await call("/admin/delivery-codes/MISSING/reveal", admin(), "POST")).status, 404);
+  await Order.updateOne({ orderId: "CODE-ORDER" }, { $set: { status: "CONFIRMED" } });
+  const original = AdminAudit.create;
+  try {
+    AdminAudit.create = async () => { throw new Error("Synthetic delivery-code audit failure"); };
+    const response = await call("/admin/delivery-codes/CODE-ORDER/reveal", admin(), "POST");
+    assert.equal(response.status, 500); assert.equal(response.data.deliveryCode, undefined);
+  } finally { AdminAudit.create = original; }
+});
 
 test("Bills permission, stable filtering, saved names and current balances remain independent of order access", async () => {
   const a = await person("BILL-A"), b = await person("BILL-B"), s = await shop("BILL-S", a), other = await shop("BILL-T", b);
@@ -222,8 +391,8 @@ test("workspace search and lookups resolve current names, literal punctuation an
   await Store.deleteOne({ consumerId: "S" }); const legacy = await call("/admin/order-workspace?q=FIND", admin()); assert.equal(legacy.data.orders[0].storeName, s.storeName);
 });
 
-test("workspace rejects non-Admin reads and invalid filters, including export requests", async () => {
-  const a = await person("A"); const staff = await Employee.create({ employeeId: "WORK-E", name: "Employee", email: "work@test.invalid", phone: "work-staff", password: "hash", status: "ACTIVE", permissions: { canGetAllOrders: true } });
+test("workspace rejects unauthorized reads and invalid filters, including export requests", async () => {
+  const a = await person("A"); const staff = await Employee.create({ employeeId: "WORK-E", name: "Employee", email: "work@test.invalid", phone: "work-staff", password: "hash", status: "ACTIVE", permissions: { canSeePaymentInfo: true } });
   const employee = jwt.sign({ role: "EMPLOYEE", id: String(staff._id), employeeId: staff.employeeId }, process.env.JWT_SECRET);
   for (const path of ["/admin/order-workspace", "/admin/order-workspace/options?type=agent", "/admin/order-workspace/export", "/admin/order-workspace/MISSING"]) {
     assert.equal((await call(path, token(a))).status, 403); assert.equal((await call(path, employee)).status, 403); assert.equal((await call(path, "")).status, 401);
@@ -264,7 +433,7 @@ before(async () => {
   const app = express(); app.use(express.json());
   app.use("/admin", adminRoutes); app.use("/agent/orders", orderRoutes); app.use("/agent/store", storeRoutes);
   app.use("/returns", returnRoutes); app.use("/api/invoice", invoiceRoutes); app.use("/agent", agentRoutes);
-  app.use("/delivery-partner", deliveryRoutes);
+  app.use("/delivery-partner", deliveryRoutes); app.use("/employee", employeeRoutes); app.use("/products", productRoutes);
   app.use((err, req, res, next) => res.status(err.status || 500).json({ success: false, message: err.message }));
   server = app.listen(0, "127.0.0.1"); await new Promise((resolve) => server.once("listening", resolve));
   origin = `http://127.0.0.1:${server.address().port}`;
@@ -272,7 +441,7 @@ before(async () => {
 beforeEach(async () => { for (const model of Object.values(mongoose.models)) await model.deleteMany({}); });
 after(async () => { if (server) await new Promise((resolve) => server.close(resolve)); await mongoose.disconnect(); await replica?.stop(); });
 
-test("block/deactivate revoke tokens; reactivate needs a fresh login; management is admin-only", async () => {
+test("block/deactivate revoke tokens; reactivate needs a fresh login; management requires permission", async () => {
   const a = await person("A"); const old = token(a);
   assert.equal((await call("/agent/profile", old)).status, 200);
   assert.equal((await call("/admin/agents/A/access", old, "POST", { action: "BLOCK", reason: "Test", requestId: id() })).status, 403);
@@ -651,7 +820,7 @@ test("test delivery cleanup deletes only reviewed cancelled history, keeps store
   assert.equal((await call("/delivery-partner/profile", partnerToken(p))).status, 401);
 });
 
-test("delivery cleanup is Admin-only and rejects stale previews, active work, shared partners, gateways and reward accounting", async () => {
+test("delivery cleanup requires management permission and rejects stale previews, active work, shared partners, gateways and reward accounting", async () => {
   const a = await person("CLEANUP-A"), s = await shop("CLEANUP-S", a), p = await partner("CLEANUP-P"), second = await partner("CLEANUP-OTHER");
   const url = `/admin/delivery-partners/${p._id}`;
   const employee = await Employee.create({ employeeId: "CLEANUP-E", name: "Employee", email: "cleanup@test.invalid", password: "hash", phone: "1234", status: "ACTIVE", permissions: { canGetAllDeliveryPartners: true } });
@@ -771,14 +940,14 @@ test("store report agent selector is report-permission scoped and exposes only n
   assert(result.data.agents.some(agent => agent.agentId === b.agentId));
 });
 
-test("mapping revocation is Admin-only, stale guarded, audited and leaves existing orders unchanged", async () => {
+test("mapping revocation requires delivery assignment permission, stale guarded, audited and leaves existing orders unchanged", async () => {
   const a = await person("REVOKE-A"), s = await shop("REVOKE-S", a), p = await partner("REVOKE-DP");
   await rawOrder("REVOKE-ASSIGNED", s, a, { status: "ASSIGNED", delivery: { partnerId: p._id, assignedAt: new Date() } });
   const existing = await Order.findOne({ orderId: "REVOKE-ASSIGNED" }).lean();
   const saved = await call("/admin/dispatch-mappings", admin(), "PUT", { agentId: a.agentId, partnerId: String(p._id), enabled: true });
   const body = { partnerId: String(p._id), updatedAt: saved.data.mapping.updatedAt }, path = `/admin/dispatch-mappings/${a.agentId}`;
   assert.equal((await call(path, token(a), "DELETE", body)).status, 403);
-  const employee = await Employee.create({ employeeId: "REVOKE-E", name: "Staff", email: "revoke@test.invalid", password: "hash", permissions: { canAssignDelivery: true } });
+  const employee = await Employee.create({ employeeId: "REVOKE-E", name: "Staff", email: "revoke@test.invalid", password: "hash", permissions: { canGetAllDeliveryPartners: true } });
   const auth = jwt.sign({ role: "EMPLOYEE", id: String(employee._id), employeeId: employee.employeeId }, process.env.JWT_SECRET);
   assert.equal((await call(path, auth, "DELETE", body)).status, 403);
   assert.equal((await call(path, admin(), "DELETE", { ...body, updatedAt: "2000-01-01T00:00:00Z" })).status, 409);
@@ -1236,8 +1405,8 @@ test("legacy accounts retain login; blocking denies login; employees cannot use 
   const employee = await Employee.create({ employeeId: "E", name: "Employee", email: "employee@test.invalid", password: "synthetic", permissions: { canManageAgents: true } });
   const staff = jwt.sign({ id: String(employee._id), employeeId: "E", role: "EMPLOYEE" }, process.env.JWT_SECRET);
   assert.equal((await call("/admin/agents", staff)).status, 200);
-  assert.equal((await call("/admin/store-management", staff)).status, 403);
-  assert.equal((await call("/admin/agents/A/access", staff, "POST", { action: "REACTIVATE", reason: "No", requestId: id() })).status, 403);
+  assert.equal((await call("/admin/store-management", staff)).status, 200);
+  assert.equal((await call("/admin/agents/A/access", staff, "POST", { action: "REACTIVATE", reason: "Owner delegated agent management", requestId: id() })).status, 200);
 });
 
 test("reject, reapply and approve keep application history and the existing password setup process", async () => {
@@ -1360,9 +1529,9 @@ test("test-store cleanup removes only cancelled store history and unshared files
   } finally { storage.restore(); }
 });
 
-test("test-store cleanup is Admin-only and requires its store-specific, expiring, typed test confirmation", async () => {
+test("test-store cleanup requires management permission and its store-specific, expiring, typed test confirmation", async () => {
   const a = await person("A"), s = await shop("S", a); await rawOrder("C", s, a, { status: "CANCELLED" });
-  const employee = await Employee.create({ employeeId: "E", name: "Employee", email: "e@test.invalid", phone: "staff", password: "hash", status: "ACTIVE", permissions: { canManageAgents: true } });
+  const employee = await Employee.create({ employeeId: "E", name: "Employee", email: "e@test.invalid", phone: "staff", password: "hash", status: "ACTIVE", permissions: { canGetAllOrders: true } });
   const staff = jwt.sign({ role: "EMPLOYEE", id: String(employee._id), employeeId: "E" }, process.env.JWT_SECRET);
   const preview = await call("/admin/store-management/S/purge-preview", admin());
   for (const user of [token(a), staff]) {

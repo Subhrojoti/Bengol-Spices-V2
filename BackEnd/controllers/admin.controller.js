@@ -102,8 +102,9 @@ export const approveAgent = async (req, res) => {
 // GET ALL AGENTS (ADMIN)
 export const getAllAgents = async (req, res) => {
   try {
+    const management = req.user.role === "ADMIN" || req.user.permissions?.canManageAgents === true;
     const agents = await Agent.find()
-      .select("-passwordResetToken -passwordResetExpires")
+      .select(management ? "-passwordResetToken -passwordResetExpires" : "agentId name status")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -115,7 +116,7 @@ export const getAllAgents = async (req, res) => {
       // The hash itself is never sent.
       agents: agents.map(({ password, ...agent }) => ({
         ...agent,
-        passwordSet: Boolean(password),
+        ...(management && { passwordSet: Boolean(password) }),
       })),
     });
   } catch (error) {

@@ -1,5 +1,4 @@
 import useObjectUrl from "../../../../hooks/useObjectUrl";
-import usePanelBasePath from "../../../../hooks/usePanelBasePath";
 import CategoryMinimums from "../../../../components/common/CategoryMinimums";
 import { CATEGORY_MINIMUMS, categoryMinimumErrors } from "../../../../utils/categoryMinimums";
 import { useEffect, useMemo, useState } from "react";
@@ -157,7 +156,6 @@ const ImageSlot = ({ label, existing, file, onSelect, onClear }) => {
 /* ------------------------------------------------------------------ */
 
 const EditProductDetails = ({ product, onClose, onSuccess }) => {
-  const basePath = usePanelBasePath();
   const initial = useMemo(
     () => ({
       name: product?.name || "",
@@ -233,8 +231,8 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
       found.minOrderQty = "Minimum order quantity must be at least 1";
     }
 
-    return { ...found, ...(basePath === "/admin" ? categoryMinimumErrors(form) : {}) };
-  }, [form, basePath]);
+    return { ...found, ...categoryMinimumErrors(form) };
+  }, [form]);
 
   const show = (key) => (touched ? errors[key] : undefined);
 
@@ -531,7 +529,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
               </Field>
             </div>
 
-            {basePath === "/admin" && <CategoryMinimums form={form} onChange={set} errors={touched ? errors : {}} />}
+            <CategoryMinimums form={form} onChange={set} errors={touched ? errors : {}} />
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Min Order Qty" error={show("minOrderQty")}>
                 <input aria-label="Min Order Qty"

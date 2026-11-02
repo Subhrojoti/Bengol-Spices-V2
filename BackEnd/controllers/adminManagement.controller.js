@@ -33,8 +33,10 @@ export const executeStorePurge = handle((req) => purgeStore(req.params.consumerI
 export const getDeliveryPartnerPurgePreview = handle(req => previewDeliveryPartnerPurge(req.params.partnerId));
 export const executeDeliveryPartnerPurge = handle(req => purgeDeliveryPartner(req.params.partnerId, req.body || {}, actorOf(req.user)));
 const cleanupBatch = async (req, retry) => {
-  const record = await AdminAudit.findOne({ requestId: req.params.requestId, action: { $in: ["PURGE_TEST_AGENT", "PURGE_TEST_STORE", "PURGE_TEST_DELIVERY_PARTNER", "REMOVE_STORE"] }, outcome: "COMPLETED" }).select("result.unrecognizedFiles").lean();
+  const record = await AdminAudit.findOne({ requestId: req.params.requestId, action: { $in: ["PURGE_TEST_AGENT", "PURGE_TEST_STORE", "PURGE_TEST_DELIVERY_PARTNER", "REMOVE_STORE"] }, outcome: "COMPLETED" }).select("action result.unrecognizedFiles").lean();
   if (!record) throw Object.assign(new Error("Completed deletion batch not found"), { status: 404 });
+  const permission = record.action === "PURGE_TEST_DELIVERY_PARTNER" ? "canManageDeliveryPartners" : "canManageAgents";
+  if (req.user.role !== "ADMIN" && req.user.permissions?.[permission] !== true) throw Object.assign(new Error("You do not have permission for this cleanup"), { status: 403 });
   return { success: true, unrecognizedFiles: record.result?.unrecognizedFiles || 0, cleanup: await (retry ? processMediaCleanup : getMediaCleanup)(req.params.requestId) };
 };
 export const getCleanupStatus = handle((req) => cleanupBatch(req, false));
@@ -52,4 +54,11 @@ export const getManagedStores = handle(async (req) => {
   const names = Object.fromEntries(agents.map((a) => [a.agentId, a.name]));
   return { success: true, page, total, pages: Math.ceil(total / 100), stores: stores.map((s) => ({ ...s, currentAgentId: managerOf(s), assignedAgentName: names[managerOf(s)] || managerOf(s), creatorName: names[s.registeredBy] || s.registeredBy })) };
 });
-export const getManagementAudit = handle(async (req) => ({ success: true, data: await AdminAudit.find(req.query.agentId ? { $or: [{ sourceAgentId: String(req.query.agentId) }, { destinationAgentId: String(req.query.agentId) }] } : {}).sort({ createdAt: -1 }).limit(100).lean() }));
+export const getManagementAudit = handle(async (req) => {
+  const filter = req.query.agentId ? { $or: [{ sourceAgentId: String(req.query.agentId) }, { destinationAgentId: String(req.query.agentId) }] } : {};
+  if (req.user.role !== "ADMIN") filter.action = { $in: [
+    ...(req.user.permissions?.canManageAgents === true ? ["AGENT_ACCESS", "TRANSFER_STORES", "REMOVE_STORE", "PURGE_TEST_AGENT", "PURGE_TEST_STORE"] : []),
+    ...(req.user.permissions?.canManageDeliveryPartners === true ? ["PURGE_TEST_DELIVERY_PARTNER"] : []),
+  ] };
+  return { success: true, data: await AdminAudit.find(filter).sort({ createdAt: -1 }).limit(100).lean() };
+});

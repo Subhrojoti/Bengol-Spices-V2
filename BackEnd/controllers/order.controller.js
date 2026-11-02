@@ -499,6 +499,9 @@ export const placeOrder = async (req, res) => {
     // Validate combined quantities before stock reservation or payment recording.
     for (const { product, quantity } of minimumLines.values()) {
       const minimum = effectiveMinimum(product, storeType);
+      if (!Number.isFinite(product.stock) || product.stock < quantity) return res.status(400).json({
+        success: false, message: product.stock <= 0 ? `${product.name} is out of stock. Remove it from the cart or wait for restocking.` : `Not enough stock for ${product.name}. Asked for ${quantity}, only ${quantityWithUnit(product.stock, product.uom)} available.`,
+      });
       if (!Number.isFinite(quantity) || quantity < minimum) return res.status(400).json({
         success: false, message: `${product.name}: minimum order is ${minimum} ${product.uom || "units"} for this store category.`,
       });
@@ -2944,7 +2947,7 @@ export const getPaymentIssues = async (req, res) => {
 };
 
 // Takes one issue for an admin action, so a retry cannot run at the same time
-const claimIssue = async (id) => {
+const claimIssue = async (id, officeAction) => {
   if (!mongoose.isValidObjectId(id)) return { code: 404 };
 
   const issue = await GatewayPayment.findOne({
@@ -2972,7 +2975,7 @@ const claimIssue = async (id) => {
 
   const claimed = await GatewayPayment.findOneAndUpdate(
     { _id: issue._id, status: issue.status, updatedAt: issue.updatedAt },
-    { $set: { status: "PROCESSING" } },
+    { $set: { status: "PROCESSING" }, $push: { officeActions: officeAction } },
     { new: true },
   );
 
@@ -2992,7 +2995,7 @@ const issueNotAvailable = (res, { code, appliedTo }) =>
 // Refund it to the customer (Admin)
 export const refundPaymentIssue = async (req, res) => {
   try {
-    const claimed = await claimIssue(req.params.id);
+    const claimed = await claimIssue(req.params.id, { action: "REFUND", actor: { id: String(req.user.employeeId || req.user.id || "admin"), role: req.user.role, name: req.user.name || "Admin" }, at: new Date() });
     if (!claimed.issue) return issueNotAvailable(res, claimed);
 
     const { refunded, refundError } = await refundGatewayPayment(
@@ -3033,7 +3036,7 @@ export const resolvePaymentIssue = async (req, res) => {
       });
     }
 
-    const claimed = await claimIssue(req.params.id);
+    const claimed = await claimIssue(req.params.id, { action: "RESOLVE", actor: { id: String(req.user.employeeId || req.user.id || "admin"), role: req.user.role, name: req.user.name || "Admin" }, at: new Date(), note: note.slice(0, 500) });
     if (!claimed.issue) return issueNotAvailable(res, claimed);
 
     await markGatewayPayment(claimed.issue, {

@@ -11,7 +11,7 @@ import AdminSectionBoundary from "../../../../components/common/AdminSectionBoun
 
 const TABS = [
   { key: "management", label: "Management", icon: Users, Component: AgentManagement, permission: "canManageAgents" },
-  { key: "performance", label: "Performance", icon: TrendingUp, Component: AgentPerformance, permission: "canManageAgents" },
+  { key: "performance", label: "Performance", icon: TrendingUp, Component: AgentPerformance, permission: "canSeePaymentInfo" },
   { key: "incentives", label: "Incentives", icon: Wallet, Component: AgentIncentives, permission: "canPayoutIncentives" },
   { key: "stores", label: "Store Details", icon: Store, Component: StoreDetails, permission: "canViewStoreReports" },
   { key: "store-changes", label: "Store requests", icon: Store, Component: StoreChanges, permission: "canReviewStoreChanges" },

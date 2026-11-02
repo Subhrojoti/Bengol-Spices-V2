@@ -1,3 +1,4 @@
+import usePanelPermission from "../../../../../hooks/usePanelPermission";
 import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import reportAdminError from "../../../../../utils/reportAdminError";
 import { useCallback, useEffect, useState } from "react";
@@ -192,7 +193,7 @@ const LocationCheck = ({ settings, canEdit, onSaved }) => {
             The partner&apos;s position is read once, as they press the button.
           </p>
           {!canEdit && (
-            <p className="mt-1 text-[13px] text-slate-400">Only the admin can change this.</p>
+            <p className="mt-1 text-[13px] text-slate-400">Delivery assignment permission is required to change this.</p>
           )}
         </div>
 
@@ -259,6 +260,7 @@ const LocationCheck = ({ settings, canEdit, onSaved }) => {
 
 export default function DeliveryAlerts({ onReassign }) {
   const { pathname } = useLocation();
+  const canEditSettings = usePanelPermission("canAssignDelivery");
   // "/admin/delivery" → "admin"; the same page serves the employee panel
   const panel = pathname.split("/")[1] === "employee" ? "employee" : "admin";
 
@@ -373,7 +375,7 @@ export default function DeliveryAlerts({ onReassign }) {
 
       <LocationCheck
         settings={settings}
-        canEdit={panel === "admin"}
+        canEdit={canEditSettings}
         onSaved={(saved) => setData((current) => ({ ...current, settings: saved }))}
       />
 

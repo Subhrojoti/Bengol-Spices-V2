@@ -24,6 +24,8 @@ export const downloadBills = async (params, options = {}) => get("/admin/bills/d
 export const getStoreReport = async (params, options = {}) => (await get("/agent/store/reports", { ...options, params })).data;
 export const getStoreReportAgents = async (options) => (await get("/agent/store/reports/agents", options)).data;
 export const revealStoreDeliveryCode = async (consumerId, options) => (await axiosInstance.post(`/agent/store/${encodeURIComponent(consumerId)}/delivery-code`, undefined, options)).data;
+export const getActiveDeliveryCodes = async (params, options = {}) => (await get("/admin/delivery-codes", { ...options, params })).data;
+export const revealActiveOrderDeliveryCode = async (orderId, options) => (await axiosInstance.post(`/admin/delivery-codes/${encodeURIComponent(orderId)}/reveal`, undefined, options)).data;
 export const extendOrderDueDate = async (orderId, body) => (await axiosInstance.put(`/agent/orders/${encodeURIComponent(orderId)}/due-date`, body)).data;
 export const getDispatchMappings = async (options) => (await get("/admin/dispatch-mappings", options)).data;
 export const saveDispatchMapping = async (body) => (await axiosInstance.put("/admin/dispatch-mappings", body)).data;

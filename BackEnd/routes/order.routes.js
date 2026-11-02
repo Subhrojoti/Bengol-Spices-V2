@@ -31,7 +31,7 @@ import {
   resolvePaymentIssue,
 } from "../controllers/order.controller.js";
 import { protect } from "../middleware/auth.js";
-import { isAdmin, isAgent, isDeliveryPartner } from "../middleware/role.js";
+import { isAgent, isDeliveryPartner } from "../middleware/role.js";
 import { reportCouldNotDeliver } from "../controllers/delivery.controller.js";
 import { checkPermission } from "../middleware/permission.js";
 import { getMobilePaymentHistory } from "../controllers/mobileCollections.controller.js";
@@ -61,7 +61,7 @@ router.get("/all", protect, checkPermission("canGetAllOrders"), getAllOrders);
 router.get(
   "/active",
   protect,
-  checkPermission("canGetAllOrders"),
+  checkPermission(["canGetAllOrders", "canAssignDelivery"]),
   getActiveOrders,
 );
 
@@ -176,9 +176,9 @@ router.get(
   checkPermission("canSeePaymentInfo"),
   getPaymentIssues,
 );
-// Refunding money or closing an issue by hand is left to the admin
-router.post("/payment-issues/:id/refund", protect, isAdmin, refundPaymentIssue);
-router.post("/payment-issues/:id/resolve", protect, isAdmin, resolvePaymentIssue);
+// Reading payment information alone must never authorize a refund.
+router.post("/payment-issues/:id/refund", protect, checkPermission("canSeePaymentInfo"), checkPermission("canResolvePaymentIssues"), refundPaymentIssue);
+router.post("/payment-issues/:id/resolve", protect, checkPermission("canSeePaymentInfo"), checkPermission("canResolvePaymentIssues"), resolvePaymentIssue);
 
 // CREATE SHIPMENT (EMPLOYEE / ADMIN) [Future code mode --- ShipRocket]
 // router.post(

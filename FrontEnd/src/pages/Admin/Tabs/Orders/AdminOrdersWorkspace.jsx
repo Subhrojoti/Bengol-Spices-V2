@@ -1,3 +1,5 @@
+import usePanelPermission from "../../../../hooks/usePanelPermission";
+import ActiveDeliveryCodes from "./ActiveDeliveryCodes";
 import OrderChanges from "../../../../components/common/OrderChanges";
 import StoreReportBackLink from "../../../../components/common/StoreReportBackLink";
 import { createElement, useCallback, useEffect, useRef, useState } from "react";
@@ -28,18 +30,22 @@ const field = "block h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-w
 const card = "rounded-2xl border border-slate-200 bg-white shadow-sm";
 const statusKeys = Object.keys(ORDER_STATUS_LABELS).filter(key => key !== "IN_TRANSIT");
 
-function Views({ mode, change }) {
-  return <div role="group" aria-label="Order view" className="inline-flex rounded-xl border border-slate-200 bg-white p-1">{[["all", "All orders"], ["store", "By store"]].map(([value, text]) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => change(value)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${mode === value ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>{text}</button>)}</div>;
+function Views({ mode, change, codes }) {
+  return <div role="group" aria-label="Order view" className="inline-flex max-w-full flex-wrap rounded-xl border border-slate-200 bg-white p-1">{[["all", "All orders"], ["store", "By store"], ...(codes ? [["codes", "Delivery codes"]] : [])].map(([value, text]) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => change(value)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${mode === value ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>{text}</button>)}</div>;
 }
 
 export default function AdminOrdersWorkspace() {
-  const [params, setParams] = useSearchParams(), mode = params.get("view") === "store" ? "store" : "all";
-  const change = value => setParams(current => { const next = new URLSearchParams(current); if (value === "store") next.set("view", "store"); else next.delete("view"); return next; });
-  if (mode === "store") return <><div className="px-5 pt-5 lg:px-8"><Views mode={mode} change={change} /></div><OrderManagement /></>;
-  return <AllOrders views={<Views mode={mode} change={change} />} />;
+  const codes = usePanelPermission("canViewDeliveryCodes");
+  const [params, setParams] = useSearchParams(), mode = params.get("view") === "store" ? "store" : params.get("view") === "codes" && codes ? "codes" : "all";
+  const change = value => setParams(current => { const next = new URLSearchParams(current); if (value !== "all") next.set("view", value); else next.delete("view"); return next; });
+  const views = <Views mode={mode} change={change} codes={codes} />;
+  if (mode === "store") return <><div className="px-5 pt-5 lg:px-8">{views}</div><OrderManagement /></>;
+  if (mode === "codes") return <ActiveDeliveryCodes views={views} />;
+  return <AllOrders views={views} />;
 }
 
 function AllOrders({ views }) {
+  const mayConfirm = usePanelPermission("canConfirmOrders"), mayCancel = usePanelPermission("canCancelOrders");
   const [params, setParams] = useSearchParams();
   const search = params.get("q") || "", selected = params.get("order") || "";
   const chosenStatus = Object.hasOwn(ORDER_STATUS_LABELS, params.get("status")) ? params.get("status") : "ALL";
@@ -80,7 +86,7 @@ function AllOrders({ views }) {
     finally { setInvoiceBusy(false); }
   };
   const mutate = async (kind, reason) => {
-    if (actionRunning.current) return;
+    if (actionRunning.current || (kind === "confirm" ? !mayConfirm : !mayCancel)) return;
     const order = kind === "confirm" ? confirmTarget : cancelTarget; if (!order) return;
     actionRunning.current = true; setBusy(true);
     try { if (kind === "confirm") { const response = await confirmOrder(order.orderId, order.revision); if (response.assignment?.warning) toast.warning(response.assignment.warning); } else await cancelOrder(order.orderId, reason); toast.success(`${order.orderId} ${kind === "confirm" ? "confirmed" : "cancelled"}`); setConfirmTarget(null); setCancelTarget(null); refresh(); }
@@ -106,7 +112,7 @@ function AllOrders({ views }) {
       <StoreDeliveryCode key={detail.consumerId} consumerId={detail.consumerId} />
       {(detail.dueDateExtensions || []).length > 0 && <div className="my-3 space-y-2 text-xs text-slate-500">{detail.dueDateExtensions.map((item, i) => <p key={i}>{time(item.at)} · {item.by?.name || item.by?.role}: {date(item.previousDueDate)} → {date(item.dueDate)} · {item.reason}</p>)}</div>}
       <div className="border-t border-slate-100 py-4"><h4 className="mb-3 text-sm font-semibold text-slate-800">Status history</h4><ol className="ml-1 border-l border-blue-200 pl-4">{(detail.statusHistory || []).map((step, i) => <li key={step._id || i} className="relative pb-4 text-sm"><span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-blue-600" /><p className="font-medium text-slate-800">{ORDER_STATUS_LABELS[step.status] || step.status}</p><p className="text-xs text-slate-500">{time(step.changedAt)} · {step.changedBy?.role || "System"}</p></li>)}</ol>{detail.partnerName && <p className="text-sm text-slate-500">{detail.partnerName}</p>}{detail.cancellation?.reason && <p className="text-sm text-slate-600">Cancellation: {detail.cancellation.reason}</p>}</div>
-      <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"><button className={`${actionButton} border-blue-600 bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-300`} disabled={invoiceBusy || busy || (detail.invoicePolicy === "ON_CONFIRMATION" && !detail.statusHistory?.some(step => step.status === "CONFIRMED"))} title={detail.invoicePolicy === "ON_CONFIRMATION" && detail.status === "PLACED" ? "Invoice generates after confirmation" : undefined} onClick={invoice}>{invoiceBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}Download invoice</button>{detail.delivery?.partnerId && <button className={button} onClick={() => setTrail(detail.orderId)}><MapPin size={14} />View delivery trail</button>}{canConfirm(detail) && <button className={`${actionButton} border-emerald-700 bg-emerald-700 hover:bg-emerald-800 focus-visible:ring-emerald-300`} disabled={busy} onClick={() => setConfirmTarget(detail)}>Confirm order</button>}{canCancel(detail) && <button className={`${actionButton} border-rose-600 bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-300`} disabled={busy} onClick={() => setCancelTarget(detail)}>Cancel order</button>}</div>
+      <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"><button className={`${actionButton} border-blue-600 bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-300`} disabled={invoiceBusy || busy || (detail.invoicePolicy === "ON_CONFIRMATION" && !detail.statusHistory?.some(step => step.status === "CONFIRMED"))} title={detail.invoicePolicy === "ON_CONFIRMATION" && detail.status === "PLACED" ? "Invoice generates after confirmation" : undefined} onClick={invoice}>{invoiceBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}Download invoice</button>{detail.delivery?.partnerId && <button className={button} onClick={() => setTrail(detail.orderId)}><MapPin size={14} />View delivery trail</button>}{mayConfirm && canConfirm(detail) && <button className={`${actionButton} border-emerald-700 bg-emerald-700 hover:bg-emerald-800 focus-visible:ring-emerald-300`} disabled={busy} onClick={() => setConfirmTarget(detail)}>Confirm order</button>}{mayCancel && canCancel(detail) && <button className={`${actionButton} border-rose-600 bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-300`} disabled={busy} onClick={() => setCancelTarget(detail)}>Cancel order</button>}</div>
     </>}</div>
   </div>;
   return <div className="min-h-screen space-y-4 bg-slate-50 px-5 pb-8 pt-5 lg:px-8">

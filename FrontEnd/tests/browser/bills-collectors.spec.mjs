@@ -79,8 +79,7 @@ for (const role of ["ADMIN", "EMPLOYEE"]) test(`${role} Orders uses existing per
   const endpoint = `/agent/store/${stores[0].consumerId}/delivery-code`;
   const network = await installFixtures(context, { role, overrides: { "/employee/profile": route => route.fulfill({ json: { employee: { ...employees[0], permissions: { canGetAllOrders: true, canViewDeliveryCodes: true } } } }), [endpoint]: route => route.fulfill({ json: { deliveryCode: "654321" } }) } });
   await page.goto(role === "ADMIN" ? "/admin/order-management" : "/employee/order-management");
-  if (role === "ADMIN") await page.getByRole("button", { name: `Open order ${orders[0].orderId}`, exact: true }).click();
-  else { await page.getByRole("button", { name: `Select Test Store 1 ${stores[0].consumerId}`, exact: true }).click(); await page.locator(`#order-${orders[0]._id}`).getByRole("button", { name: new RegExp(orders[0].orderId) }).click(); }
+  await page.getByRole("button", { name: `Open order ${orders[0].orderId}`, exact: true }).click();
   await page.getByRole("button", { name: "Reveal delivery code", exact: true }).first().click();
   await expect(page.getByText("654321", { exact: true })).toBeVisible();
   expect(network.requests.filter(r => r.path === endpoint)).toHaveLength(1);

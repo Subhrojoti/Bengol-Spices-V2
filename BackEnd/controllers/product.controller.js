@@ -77,8 +77,8 @@ const EDITABLE_FIELDS = [
 ];
 
 const categoryMinimums = (req, product) => {
-  if (req.user?.role !== "ADMIN" && Object.values(CATEGORY_MINIMUM_FIELDS).some(key => req.body[key] !== undefined)) {
-    throw new Error("Only Admin can change category minimum quantities");
+  if (req.user?.role !== "ADMIN" && !(req.user?.role === "EMPLOYEE" && req.user.permissions?.canManageProducts === true) && Object.values(CATEGORY_MINIMUM_FIELDS).some(key => req.body[key] !== undefined)) {
+    throw new Error("Product management permission is required to change category minimum quantities");
   }
   return parseCategoryMinimums(req.body, product);
 };
@@ -419,7 +419,10 @@ export const deleteProduct = async (req, res) => {
 // Now includes tiered pricing fields so agent can display correct price per store type
 export const getAllPublicProducts = async (req, res) => {
   try {
-    const products = await Product.find({ status: "ACTIVE" })
+    // Keep the public showcase unchanged; an authenticated agent's ordering
+    // catalogue must not offer products with no available inventory.
+    if (req.user?.role === "AGENT") res.setHeader("Cache-Control", "no-store");
+    const products = await Product.find({ status: "ACTIVE", ...(req.user?.role === "AGENT" && { stock: { $gt: 0 } }) })
       .select(catalogueFields(req))
       .sort({ createdAt: -1 });
 

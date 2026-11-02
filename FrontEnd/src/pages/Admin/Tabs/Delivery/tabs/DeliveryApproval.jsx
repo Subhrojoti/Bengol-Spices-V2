@@ -1,8 +1,8 @@
+import usePanelPermission from "../../../../../hooks/usePanelPermission";
 import reportAdminError from "../../../../../utils/reportAdminError";
 import { safeExternalUrl } from "../../../../../utils/safeExternalUrl";
 import useLatestRequest from "../../../../../hooks/useLatestRequest";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import DeliveryPartnerDeletion from "./DeliveryPartnerDeletion";
 import { toast } from "sonner";
 import {
@@ -117,7 +117,7 @@ const TableSkeleton = () => (
 );
 
 export default function DeliveryApproval() {
-  const admin = useLocation().pathname.startsWith("/admin/");
+  const mayCleanup = usePanelPermission("canManageDeliveryPartners");
   const [cleanup, setCleanup] = useState(null);
   const [partners, setPartners] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -244,7 +244,7 @@ export default function DeliveryApproval() {
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        {admin && <button className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" onClick={() => setCleanup({ partner: null })}>Cleanup history</button>}
+        {mayCleanup && <button className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" onClick={() => setCleanup({ partner: null })}>Cleanup history</button>}
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => {
             const selected = statusFilter === f.key;
@@ -373,7 +373,7 @@ export default function DeliveryApproval() {
 
                         <td className="px-5 py-3.5">
                           <div className="flex items-center justify-end gap-2">
-                            {admin && <button onClick={() => setCleanup({ partner })} className="rounded-lg border border-rose-200 px-3 py-1.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50">Delete test partner</button>}
+                            {mayCleanup && <button onClick={() => setCleanup({ partner })} className="rounded-lg border border-rose-200 px-3 py-1.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50">Delete test partner</button>}
                             {partner.status === "PENDING" && (
                               <>
                                 <button
@@ -541,7 +541,7 @@ export default function DeliveryApproval() {
         )}
       </div>
 
-      {admin && cleanup && <DeliveryPartnerDeletion key={cleanup.partner?._id || "history"} partner={cleanup.partner} onClose={() => setCleanup(null)} onDeleted={id => { setPartners(current => current.filter(p => p._id !== id)); setOpenRow(null); }} />}
+      {mayCleanup && cleanup && <DeliveryPartnerDeletion key={cleanup.partner?._id || "history"} partner={cleanup.partner} onClose={() => setCleanup(null)} onDeleted={id => { setPartners(current => current.filter(p => p._id !== id)); setOpenRow(null); }} />}
       <ConfirmDialog
         open={Boolean(pendingAction)}
         busy={busy}

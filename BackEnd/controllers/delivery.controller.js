@@ -233,7 +233,7 @@ export const getSettings = async (req, res) => {
   }
 };
 
-// Admin only: block far-away deliveries or only flag them, and the distance
+// Admin or delegated delivery-assignment staff: geofence policy and distance.
 export const updateSettings = async (req, res) => {
   try {
     const { blockFarDeliveries, radiusMetres } = req.body || {};

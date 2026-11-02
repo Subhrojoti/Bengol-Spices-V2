@@ -96,8 +96,8 @@ test("employee permission cancellation resets draft and saving preserves all per
   const payload = JSON.parse(mutations(network)[0].body);
   expect(payload.permissions.canGetAllOrders).toBe(true);
   expect(payload.permissions.canConfirmOrders).toBe(true);
-  expect(Object.keys(payload.permissions)).toHaveLength(21);
-  for (const key of ["canViewBills", "canViewStoreReports", "canViewDeliveryCodes", "canReviewStoreChanges", "canExtendDueDates"]) expect(payload.permissions[key]).toBe(false);
+  expect(Object.keys(payload.permissions)).toHaveLength(22);
+  for (const key of ["canResolvePaymentIssues", "canViewBills", "canViewStoreReports", "canViewDeliveryCodes", "canReviewStoreChanges", "canExtendDueDates"]) expect(payload.permissions[key]).toBe(false);
   expect(network.unknown).toEqual([]);
 });
 

@@ -5,7 +5,7 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import Groups3Icon from "@mui/icons-material/Groups3";
 import AdminDashboard from "../pages/Admin/Tabs/AdminDashboard/AdminDashboard";
 import Delivery from "../pages/Admin/Tabs/Delivery/Delivery";
-import OrderManagement from "../pages/Admin/Tabs/Orders/OrderManagement";
+import OrderManagement from "../pages/Admin/Tabs/Orders/AdminOrdersWorkspace";
 import ReturnManagement from "../pages/Admin/Tabs/Returns/ReturnManagement";
 import ProductCreation from "../pages/Admin/Tabs/ProductCreation/ProductCreation";
 import AllProducts from "../pages/Admin/Tabs/AllProducts/AllProducts";
@@ -56,7 +56,7 @@ export const employeeRoutes = [
     icon: Groups3Icon,
     // was `permissions:` (plural) — the guard reads `permission`, so this tab
     // was reachable by every employee regardless of their access.
-    permission: ["canManageAgents", "canPayoutIncentives", "canViewStoreReports", "canReviewStoreChanges"],
+    permission: ["canManageAgents", "canPayoutIncentives", "canViewStoreReports", "canReviewStoreChanges", "canSeePaymentInfo"],
     component: Agent,
   },
   {
@@ -64,7 +64,7 @@ export const employeeRoutes = [
     path: "delivery",
     group: "People",
     icon: LocalShipping,
-    permission: ["canGetAllDeliveryPartners", "canManageDeliveryPartners"],
+    permission: ["canGetAllDeliveryPartners", "canManageDeliveryPartners", "canAssignDelivery", "canAssignReturn"],
     component: Delivery,
   },
   {

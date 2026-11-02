@@ -66,11 +66,13 @@ test("a rejected cleanup keeps its request ID for a safe retry and the review fi
   await page.getByRole("button", { name: "Cancel", exact: true }).click(); await expect(dialog).not.toBeVisible();
 });
 
-test("employees with delivery permissions cannot see permanent partner cleanup controls", async ({ context, page }) => {
-  const network = await setup(context, { "/employee/profile": route => route.fulfill({ json: { success: true, employee: { ...employees[0], status: "ACTIVE", permissions: { canGetAllDeliveryPartners: true } } } }) }, { role: "EMPLOYEE" });
+test("employees with view-only delivery permission get Performance without partner management or cleanup controls", async ({ context, page }) => {
+  const network = await setup(context, { "/employee/profile": route => route.fulfill({ json: { success: true, employee: { ...employees[0], status: "ACTIVE", permissions: { canGetAllDeliveryPartners: true } } } }), "/admin/delivery-performance": route => route.fulfill({ json: { success: true, unassignedPending: 0, partners: [] } }) }, { role: "EMPLOYEE" });
   await page.goto("/employee/delivery?tab=approval");
-  await expect(page.getByText(partner.name, { exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Performance", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Partner Approval", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Delete test partner", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Cleanup history", exact: true })).toHaveCount(0);
   expect(network.requests.some(request => request.path.includes("/purge"))).toBe(false);
+  expect(network.unknown).toEqual([]);
 });

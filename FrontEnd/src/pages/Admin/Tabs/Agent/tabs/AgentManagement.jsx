@@ -1,3 +1,4 @@
+import usePanelPermission from "../../../../../hooks/usePanelPermission";
 import reportAdminError from "../../../../../utils/reportAdminError";
 import { safeExternalUrl } from "../../../../../utils/safeExternalUrl";
 import useLatestRequest from "../../../../../hooks/useLatestRequest";
@@ -147,7 +148,7 @@ export default function AgentManagement({ onViewStores }) {
   const [busy, setBusy] = useState(false);
   const [administration, setAdministration] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const isAdminPanel = window.location.pathname.startsWith("/admin");
+  const canManageAccounts = usePanelPermission("canManageAgents");
 
   const beginRequest = useLatestRequest();
   const load = useCallback(async (isRefresh = false) => {
@@ -271,7 +272,7 @@ export default function AgentManagement({ onViewStores }) {
     <>
       {/* ===== TOOLBAR ===== */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        {isAdminPanel && <button className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" onClick={() => setAdministration({})}>Manage agents &amp; stores</button>}
+        {canManageAccounts && <button className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" onClick={() => setAdministration({})}>Manage agents &amp; stores</button>}
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => {
             const selected = statusFilter === f.key;
@@ -406,7 +407,7 @@ export default function AgentManagement({ onViewStores }) {
                         <td className="px-5 py-3.5">
                           <div className="flex items-center justify-end gap-2">
                             {onViewStores && <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-blue-600" onClick={() => onViewStores(agent.agentId)}>Store Details</button>}
-                            {isAdminPanel && <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700" onClick={() => setAdministration(agent)}>Manage</button>}
+                            {canManageAccounts && <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700" onClick={() => setAdministration(agent)}>Manage</button>}
                             {agent.status === "PENDING" && (
                               <>
                                 <button

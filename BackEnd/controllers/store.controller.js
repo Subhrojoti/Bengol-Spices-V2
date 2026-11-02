@@ -21,7 +21,7 @@ import {
 
 // The same fields the public catalogue exposes
 const CATALOGUE_FIELDS =
-  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage minOrderQty retailerMinOrderQty wholesalerMinOrderQty distributorMinOrderQty horecaMinOrderQty";
+  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage stock minOrderQty retailerMinOrderQty wholesalerMinOrderQty distributorMinOrderQty horecaMinOrderQty";
 
 /**
  * THE CATALOGUE AS ONE STORE SEES IT (Agent, own store only)
@@ -33,6 +33,7 @@ const CATALOGUE_FIELDS =
  * store's type and `priceSource` says where it came from.
  */
 export const getStoreCatalog = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   try {
     const { consumerId } = req.params;
 
@@ -48,14 +49,16 @@ export const getStoreCatalog = async (req, res) => {
     }
 
     const [products, overrides] = await Promise.all([
-      Product.find({ status: "ACTIVE" })
+      Product.find({ status: "ACTIVE", stock: { $gt: 0 } })
         .select(CATALOGUE_FIELDS)
         .sort({ createdAt: -1 })
         .lean(),
       getLocationOverrides(req.user.agentId, store.address?.state),
     ]);
 
-    const priced = products.map((product) => {
+    // Existing clients need no update: unavailable products never enter their
+    // picker. Transactional reservation still rechecks stale/concurrent carts.
+    const priced = products.filter(product => Number.isFinite(product.stock) && product.stock >= effectiveMinimum(product, store.storeType)).map((product) => {
       const override = overrides.get(String(product._id));
       const { fromLocation, ...tierPrices } = applyLocationPrices(
         product,

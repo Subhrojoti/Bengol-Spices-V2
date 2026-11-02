@@ -36,7 +36,7 @@ router.post("/logout", protect, isDeliveryPartner, logoutDeliveryPartner);
 router.get(
   "/all",
   protect,
-  checkPermission("canGetAllDeliveryPartners"),
+  checkPermission(["canGetAllDeliveryPartners", "canManageDeliveryPartners", "canAssignDelivery", "canAssignReturn"]),
   getAllDeliveryPartners,
 );
 router.get("/orders", protect, isDeliveryPartner, getMyAssignedOrders);

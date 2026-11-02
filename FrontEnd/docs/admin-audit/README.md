@@ -1,5 +1,19 @@
 # Admin frontend audit and continuation guide
 
+**Active delivery-code lookup (2 November, local only):** Orders now has an
+additional Delivery codes view for authorized office users, using existing
+styling, bounded active-order search and deliberate audited reveals. Existing
+All orders / By store and detail reveals stay intact. Backend 106/106, units
+13/13, affected browser checks 26/26 and lint/build pass; mobile/desktop visuals
+checked. See [implementation and scope](../../../BackEnd/docs/ACTIVE_DELIVERY_CODES_2026-11-02.md).
+
+**Employee parity and stock correction (2 November, local only):** shared
+permission-controlled Admin workflows now work in the Employee panel, including
+the Orders workspace, account/store management, mapping and category minima.
+Refund actions require a new default-off permission; employee administration
+stays Admin-only. No mobile code or unrelated visual design changes. See
+[backend/UI behavior and validation](../../../BackEnd/docs/EMPLOYEE_ACCESS_STOCK_FIX_2026-11-02.md).
+
 **Bills and collector tabs (1 November, local only):** added Bills navigation,
 default-off employee billing access, issued-bill filters/details/PDFs/ZIPs and
 collector-scoped Cash Verification tabs. Existing Orders code reveal reused and

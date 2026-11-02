@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import PanelLayout from "../../components/layout/PanelLayout";
@@ -70,12 +70,8 @@ const EmployeeBase = () => {
 
   /* Only advertise tabs this employee can actually open — the sidebar used
      to list every tab and walk them into an "Access Restricted" wall. */
-  const visibleItems = useMemo(
-    () =>
-      employeeRoutes.filter(
-        (route) => route.path !== "profile" && canAccessRoute(route),
-      ),
-    [loading],
+  const visibleItems = employeeRoutes.filter(
+    (route) => route.path !== "profile" && canAccessRoute(route),
   );
 
   if (loading) {
