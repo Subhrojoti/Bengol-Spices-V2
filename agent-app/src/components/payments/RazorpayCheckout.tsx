@@ -1,4 +1,5 @@
 import { Modal, View } from "react-native";
+import { useRef } from "react";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 export interface RazorpaySuccessPayload {
@@ -24,6 +25,7 @@ interface RazorpayCheckoutProps {
 const inScript = (value: string) => JSON.stringify(String(value)).replace(/</g, "\\u003c");
 
 export function RazorpayCheckout({ visible, orderId, amountInPaise, keyId, onSuccess, onDismiss }: RazorpayCheckoutProps) {
+  const handled = useRef<string | null>(null);
   // 🔥 FIX: the session amount is already in paise (the backend passes on
   // Razorpay's own order.amount). Multiplying it by 100 again handed the
   // checkout 100× the real figure, which no longer matched the order.
@@ -59,6 +61,8 @@ export function RazorpayCheckout({ visible, orderId, amountInPaise, keyId, onSuc
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === "success") {
+        if (handled.current === orderId || data.razorpay_order_id !== orderId || typeof data.razorpay_payment_id !== "string" || !data.razorpay_payment_id || typeof data.razorpay_signature !== "string" || !data.razorpay_signature) return;
+        handled.current = orderId;
         onSuccess({
           razorpay_payment_id: data.razorpay_payment_id,
           razorpay_order_id: data.razorpay_order_id,

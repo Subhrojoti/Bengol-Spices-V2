@@ -2,7 +2,23 @@ import { api } from "./client";
 import { unwrapList } from "./unwrap";
 import type { ReturnRequest } from "@/types/api";
 
+export interface ReturnableItem {
+  lineIndex: number;
+  orderLineId?: string;
+  name: string;
+  uom: string;
+  orderedQuantity: number;
+  remainingQuantity: number;
+}
+export interface ItemReturnInput {
+  reason: string;
+  requestId: string;
+  items: { lineIndex: number; orderLineId?: string; quantity: number }[];
+}
+
 export const returnApi = {
+  getReturnOptions: (orderId: string, signal?: AbortSignal): Promise<ReturnableItem[]> => api.get(`/returns/${encodeURIComponent(orderId)}/options`, { signal }).then(r => r.data.items),
+  initiateItemsReturn: (orderId: string, input: ItemReturnInput): Promise<{ returnId: string }> => api.post(`/returns/${encodeURIComponent(orderId)}/initiate`, input).then(r => r.data),
   getMyReturns: (): Promise<ReturnRequest[]> => api.get("/returns/my-returns").then((r) => unwrapList<ReturnRequest>(r.data)),
 
   // Backend route: POST /returns/:orderId/initiate  { reason }

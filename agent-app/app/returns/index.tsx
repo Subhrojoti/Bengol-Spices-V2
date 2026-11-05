@@ -98,6 +98,8 @@ function ReturnRow({ item, onCancel }: { item: ReturnRequest; onCancel: () => vo
         <Badge label={item.status.replace(/_/g, " ")} variant={STATUS_VARIANT[item.status] ?? "neutral"} />
       </View>
       <Text className="mt-2 font-sans text-xs text-ink-700">{item.reason}</Text>
+      {item.items?.map(line => <Text key={line.lineIndex} className="mt-1 font-sans text-xs text-ink-500">{line.name} · {line.quantity} {line.uom}</Text>)}
+      {item.accountingPolicy === "OFFICE_REVIEW" && <Text className="mt-2 font-sans text-xs text-ink-500">Financial adjustments are reviewed by the office.</Text>}
       {canCancel ? <Button label="Cancel Return" variant="outline" size="sm" onPress={onCancel} className="mt-3" /> : null}
     </View>
   );

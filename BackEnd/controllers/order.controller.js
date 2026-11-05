@@ -143,7 +143,7 @@ const alreadyPlacedAnswer = (order) => ({
   orderId: order.orderId,
   alreadyPlaced: true,
   // Only cash orders are placed this way, and cash waits for the office
-  paymentVerification: "PENDING",
+  paymentVerification: order.paidAmount > 0 ? "PENDING" : null,
 });
 
 // A completed gateway request must respect today's assignment on every replay.
@@ -342,7 +342,7 @@ export const placeOrder = async (req, res) => {
         agentId,
         clientRequestId: requestId,
       })
-        .select("orderId consumerId")
+        .select("orderId consumerId paidAmount")
         .lean();
 
       if (already) {
@@ -509,21 +509,15 @@ export const placeOrder = async (req, res) => {
 
     // The apps add up the cart with the same float error, so what they send
     // as "paid in full" is rounded the same way before it is compared.
+    if (!["number", "string"].includes(typeof paidAmount) || typeof paidAmount === "string" && !/^\d+(?:\.\d{1,2})?$/.test(paidAmount.trim())) {
+      return res.status(400).json({ success: false, message: "Enter a valid advance amount, or 0 for no advance" });
+    }
     const paid = roundRupees(paidAmount);
 
     if (!Number.isFinite(paid) || paid < 0 || paid > totalAmount) {
       return res.status(400).json({
         success: false,
         message: "Invalid paid amount",
-      });
-    }
-
-    /* The Order model requires at least ₹1 paid. Anything less used to pass
-       here and then fail validation after stock had been reserved. */
-    if (paid < 1) {
-      return res.status(400).json({
-        success: false,
-        message: "Paid amount must be at least ₹1",
       });
     }
 
@@ -656,7 +650,7 @@ export const placeOrder = async (req, res) => {
     let initialPayment = null;
     let invoice = null;
     const paymentMethod = paymentMode === "ONLINE" || razorpay_payment_id || razorpay_order_id ? "RAZORPAY" : "CASH";
-    const awaitingVerification = needsVerification(paymentMethod);
+    const awaitingVerification = paid > 0 && needsVerification(paymentMethod);
     let placedByTwin = false;
 
     for (let attempt = 0; attempt < 5 && !order && !placedByTwin; attempt++) {
@@ -693,7 +687,7 @@ export const placeOrder = async (req, res) => {
         agentId,
         clientRequestId: requestId,
       })
-        .select("orderId")
+        .select("orderId paidAmount")
         .lean();
 
       if (first) return res.status(201).json(alreadyPlacedAnswer(first));
@@ -708,7 +702,7 @@ export const placeOrder = async (req, res) => {
     }
 
     // Order, payment, invoice metadata and stock have committed together.
-    if (awaitingVerification) announceCashToVerify(initialPayment);
+    if (awaitingVerification && initialPayment) announceCashToVerify(initialPayment);
 
     /* Tell every open admin/employee panel now, before the invoice PDF is
        built and uploaded, which can take a few seconds */

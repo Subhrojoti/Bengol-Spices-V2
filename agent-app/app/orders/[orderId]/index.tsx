@@ -1,17 +1,17 @@
+import { ReturnItemsModal } from "@/components/ReturnItemsModal";
 import { OrderChanges } from "@/components/payments/OrderChanges";
 import { useState } from "react";
 import { OrderPayments } from "@/components/payments/OrderPayments";
-import { View, Text, Image, ScrollView, RefreshControl, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Image, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, CircleCheck, MapPin, FileDown, Wallet2, Navigation, Package, Undo2, X } from "lucide-react-native";
+import { ChevronLeft, CircleCheck, MapPin, FileDown, Wallet2, Navigation, Package, Undo2 } from "lucide-react-native";
 import { IconButton, Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useOrder } from "@/hooks/useOrders";
-import { useInitiateReturn, useMyReturns } from "@/hooks/useReturns";
-import { returnApi } from "@/api/return.api";
+import { useMyReturns } from "@/hooks/useReturns";
 import { useInvoiceDownload } from "@/hooks/useInvoiceDownload";
 import { formatCurrency } from "@/utils/currency";
 import { formatQuantity } from "@/utils/uom";
@@ -44,7 +44,6 @@ const RETURN_STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "
   RECEIVED_AT_WAREHOUSE: "warning",
 };
 
-const MIN_REASON_LENGTH = 5;
 
 export default function OrderDetailScreen() {
   // `placed` is "1" when this screen is opened straight after placing the order
@@ -59,62 +58,16 @@ export default function OrderDetailScreen() {
   const { data: order, isLoading, isError, refetch, error } = useOrder(orderId, { live: focused });
   const { data: returns, refetch: refetchReturns } = useMyReturns();
   const { downloadInvoice, downloading } = useInvoiceDownload();
-  const initiateReturn = useInitiateReturn();
 
   const [returnModalVisible, setReturnModalVisible] = useState(false);
-  const [reason, setReason] = useState("");
-  const [reasonError, setReasonError] = useState<string | null>(null);
 
   // What is paid and verified, what is cash still waiting on the office, and what is owed
   const payment = order ? paymentStateOf(order) : null;
 
   const { pulling, onPull } = usePullToRefresh(refetch);
 
-  // The backend allows one open return per order. The list is newest first,
-  // so this is the latest one; once that is cancelled, a new return can be
-  // requested.
   const existingReturn = returns?.find((r) => r.orderId === orderId);
-  const canRequestReturn = order?.status === "DELIVERED" && (!existingReturn || existingReturn.status === "CANCELLED");
-
-  const closeReturnModal = () => {
-    if (initiateReturn.isPending) return;
-    setReturnModalVisible(false);
-    setReason("");
-    setReasonError(null);
-  };
-
-  const submitReturn = async () => {
-    if (!order) return;
-    const trimmed = reason.trim();
-    if (trimmed.length < MIN_REASON_LENGTH) {
-      setReasonError(`Please describe the reason (at least ${MIN_REASON_LENGTH} characters).`);
-      return;
-    }
-    try {
-      const result = await initiateReturn.mutateAsync({ orderId: order.orderId, reason: trimmed });
-      setReturnModalVisible(false);
-      setReason("");
-      setReasonError(null);
-      toast.success("Return requested", `Return ${result.returnId} has been initiated.`);
-    } catch (e) {
-      /* The request may have gone through with its answer lost, or been
-         sent twice by the phone (the second copy is refused as "already
-         initiated"). An open return for this order means it did. */
-      const opened = await returnApi
-        .getMyReturns()
-        .then((list) => list.find((r) => r.orderId === order.orderId && r.status !== "CANCELLED" && r.reason === trimmed))
-        .catch(() => undefined);
-      if (opened) {
-        void refetchReturns();
-        setReturnModalVisible(false);
-        setReason("");
-        setReasonError(null);
-        toast.success("Return requested", `Return ${opened.returnId} has been initiated.`);
-        return;
-      }
-      toast.error("Couldn't request return", getErrorMessage(e));
-    }
-  };
+  const canRequestReturn = order?.status === "DELIVERED";
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
@@ -265,10 +218,11 @@ export default function OrderDetailScreen() {
                     <Badge label={existingReturn.status.replace(/_/g, " ")} variant={RETURN_STATUS_VARIANT[existingReturn.status] ?? "info"} />
                   </View>
                   <Text className="mt-2 font-sans text-xs text-ink-700">{existingReturn.reason}</Text>
+                  {existingReturn.items?.map(item => <Text key={item.lineIndex} className="mt-1 font-sans text-xs text-ink-500">{item.name} · {item.quantity} {item.uom}</Text>)}
                   <Button label="View My Returns" variant="outline" size="sm" onPress={() => router.push("/returns")} className="mt-3" />
                   {canRequestReturn ? (
                     <Button
-                      label="Request Return Again"
+                      label="Return More Items"
                       variant="outline"
                       icon={<Undo2 size={15} color={colors.ink.DEFAULT} />}
                       onPress={() => setReturnModalVisible(true)}
@@ -281,7 +235,7 @@ export default function OrderDetailScreen() {
                 <>
                   <Text className="font-sans text-xs text-ink-500">This order was delivered. If the store needs to send products back, request a return here.</Text>
                   <Button
-                    label="Request Return"
+                    label="Return Specific Items"
                     variant="outline"
                     icon={<Undo2 size={15} color={colors.ink.DEFAULT} />}
                     onPress={() => setReturnModalVisible(true)}
@@ -311,53 +265,7 @@ export default function OrderDetailScreen() {
         </ScrollView>
       )}
 
-      <Modal visible={returnModalVisible && canRequestReturn} transparent animationType="fade" onRequestClose={closeReturnModal}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1 justify-end bg-black/50">
-          <Pressable className="flex-1" onPress={closeReturnModal} />
-          <View className="rounded-t-3xl bg-white px-5 pb-8 pt-4">
-            <View className="mb-3 flex-row items-center justify-between">
-              <View>
-                <Text className="font-display-bold text-lg text-ink">Request Return</Text>
-                <Text className="font-sans text-xs text-ink-500">Order {order?.orderId}</Text>
-              </View>
-              <IconButton onPress={closeReturnModal} className="bg-cream-100">
-                <X size={18} color={colors.ink.DEFAULT} />
-              </IconButton>
-            </View>
-
-            <Text className="mb-1.5 font-sans-semibold text-sm text-ink-700">
-              Reason for return<Text className="text-chili-600"> *</Text>
-            </Text>
-            <View className={`rounded-xl border bg-white px-3.5 ${reasonError ? "border-chili-600" : "border-sand-dark"}`}>
-              <TextInput
-                value={reason}
-                onChangeText={(t) => {
-                  setReason(t);
-                  if (reasonError) setReasonError(null);
-                }}
-                placeholder="e.g. Damaged packaging, wrong items delivered…"
-                placeholderTextColor={colors.ink[300]}
-                multiline
-                numberOfLines={4}
-                maxLength={500}
-                editable={!initiateReturn.isPending}
-                className="py-3 font-sans text-base text-ink"
-                style={{ minHeight: 100, textAlignVertical: "top" }}
-              />
-            </View>
-            {reasonError ? <Text className="mt-1.5 font-sans-medium text-xs text-chili-600">{reasonError}</Text> : null}
-
-            <View className="mt-4 flex-row gap-3">
-              <View className="flex-1">
-                <Button label="Cancel" variant="outline" onPress={closeReturnModal} disabled={initiateReturn.isPending} fullWidth />
-              </View>
-              <View className="flex-1">
-                <Button label="Submit Return" onPress={submitReturn} loading={initiateReturn.isPending} fullWidth />
-              </View>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <ReturnItemsModal key={orderId} orderId={orderId} visible={returnModalVisible && canRequestReturn} onClose={() => setReturnModalVisible(false)} onRecorded={() => { void refetchReturns(); }} />
     </SafeAreaView>
   );
 }

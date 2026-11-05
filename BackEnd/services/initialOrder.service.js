@@ -18,12 +18,12 @@ export const createInitialOrderRecords = ({ fields, stockLines, storeType, payme
     if (!taken) throw Object.assign(new Error(`Not enough stock for ${product.name}. Refresh the catalogue and retry.`), { status: 400, expose: true });
   }
   const [order] = await Order.create([fields], { session });
-  const [payment] = await Payment.create([{
+  const [payment = null] = order.paidAmount > 0 ? await Payment.create([{
     orderId: order.orderId, consumerId: order.consumerId, agentId: order.agentId,
     amount: order.paidAmount, method: paymentMethod, collectionKind: "INITIAL", ...gateway,
     collectedBy: { id: order.agentId, role: "AGENT" },
     ...(needsVerification(paymentMethod) && { verification: pendingVerification(order.agentId) }),
-  }], { session });
+  }], { session }) : [];
   const invoice = order.invoicePolicy === "ON_CONFIRMATION" ? null : await createInvoiceFromOrder(order, { session, generatePdf: false, throwOnError: true, initialPayment: payment });
   return { order, payment, invoice };
 });

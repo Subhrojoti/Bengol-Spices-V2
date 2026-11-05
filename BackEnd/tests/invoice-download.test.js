@@ -91,7 +91,16 @@ test("Admin HttpOnly-cookie invoice requests retain credentialed CORS and return
 
 test("invoice download still refuses unpermitted staff, another agent and an unassigned partner", async () => {
   for (const headers of [bearer("EMPLOYEE", restricted), bearer("AGENT", stranger), bearer("DELIVERY_PARTNER", otherPartner)]) {
-    const response = await request(headers); assert.equal(response.status, 404); assert.deepEqual(await response.json(), { message: "Invoice not found" });
+    // A preceding streamed PDF can finish on the client just before its
+    // store lock is released. Retry admission, never an authorization result.
+    let response;
+    for (let retry = 0; retry < 4; retry++) {
+      response = await request(headers);
+      if (response.status !== 409) break;
+      await response.arrayBuffer();
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    assert.equal(response.status, 404); assert.deepEqual(await response.json(), { message: "Invoice not found" });
   }
   assert.equal((await request({})).status, 401);
 });

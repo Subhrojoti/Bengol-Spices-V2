@@ -612,7 +612,7 @@ async function fetchPartnerHistory(partnerId, { forPartner = false } = {}) {
 
   if (forPartner) {
     orders.select(PARTNER_ORDER_FIELDS).lean();
-    returns.select("-refund").lean();
+    returns.select("-refund -items.unitPrice -items.totalPrice -items.productId").lean();
   }
 
   const [deliveredOrders, completedReturns] = await Promise.all([orders, returns]);

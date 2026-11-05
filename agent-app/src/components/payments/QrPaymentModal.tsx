@@ -37,6 +37,14 @@ interface QrPaymentModalProps {
   onPaid: () => Promise<boolean>;
 }
 
+interface Confirmation {
+  id: string;
+  record: () => Promise<boolean>;
+  running: boolean;
+  started: boolean;
+  done: boolean;
+}
+
 export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, onClose, onPaid }: QrPaymentModalProps) {
   const [paid, setPaid] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
@@ -48,26 +56,39 @@ export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, 
   const paidHandledRef = useRef(false);
   const onPaidRef = useRef(onPaid);
   onPaidRef.current = onPaid;
+  const currentQr = useRef(qrCodeId);
+  currentQr.current = qrCodeId;
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const confirmation = useRef<Confirmation | null>(null);
+  const [expired, setExpired] = useState(false);
 
-  const confirmPayment = async () => {
-    setConfirming(true);
-    setConfirmFailed(false);
-    const recorded = await onPaidRef.current().catch(() => false);
-    setConfirming(false);
-    if (!recorded) setConfirmFailed(true);
+  const confirmPayment = async (attempt = confirmation.current) => {
+    if (!attempt || attempt.running || attempt.done) return;
+    attempt.running = true; attempt.started = true;
+    const isCurrent = () => mounted.current && currentQr.current === attempt.id;
+    if (isCurrent()) { setConfirming(true); setConfirmFailed(false); }
+    // Bind the callback to the paid QR. A newer session must never replace it
+    // while the success display or a slow confirmation is in progress.
+    const recorded = await Promise.resolve().then(attempt.record).catch(() => false);
+    attempt.running = false; attempt.done = recorded;
+    if (isCurrent()) { setConfirming(false); setConfirmFailed(!recorded); }
   };
 
   useEffect(() => {
+    let active = true;
+    setAspectRatio(DEFAULT_QR_ASPECT_RATIO);
     if (!imageUrl) return;
     Image.getSize(
       imageUrl,
       (width, height) => {
-        if (width > 0 && height > 0) setAspectRatio(width / height);
+        if (active && width > 0 && height > 0) setAspectRatio(width / height);
       },
       () => {
         // Keep the default ratio if this fails — still looks reasonable.
       },
     );
+    return () => { active = false; };
   }, [imageUrl]);
 
   useEffect(() => {
@@ -75,9 +96,18 @@ export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, 
       return;
     }
 
-    setPaid(false);
     setPollError(null);
-    setConfirmFailed(false);
+    setExpired(false);
+    const saved = confirmation.current;
+    if (saved?.id === qrCodeId) {
+      // Hiding/reopening a paid QR keeps its in-flight confirmation and retry.
+      setPaid(true); paidHandledRef.current = true;
+      setConfirming(saved.running);
+      setConfirmFailed(saved.started && !saved.running && !saved.done);
+      return;
+    }
+    confirmation.current = null;
+    setPaid(false); setConfirmFailed(false); setConfirming(false);
     paidHandledRef.current = false;
 
     // 🔥 FIX: a status check slower than the 3s interval overlapped the next
@@ -91,14 +121,21 @@ export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, 
       pollInFlight = true;
       try {
         const result = await orderApi.checkQrPaymentStatus(qrCodeId);
-        if (stopped || !result.paid || paidHandledRef.current) return;
+        if (stopped || paidHandledRef.current) return;
+        setPollError(null);
+        if (!result.paid) {
+          if (result.status === "closed") { clearInterval(interval); setExpired(true); }
+          return;
+        }
         paidHandledRef.current = true;
+        const attempt: Confirmation = { id: qrCodeId, record: onPaidRef.current, running: false, started: false, done: false };
+        confirmation.current = attempt;
         clearInterval(interval);
         setPaid(true);
         // Brief pause so the person sees the "Paid" confirmation before we move on.
         // Not cancelled by closing the modal: the money has been received and
         // still has to be recorded.
-        setTimeout(() => void confirmPayment(), 900);
+        setTimeout(() => void confirmPayment(attempt), 900);
       } catch (e) {
         // Transient network hiccups shouldn't stop polling — just surface a
         // quiet hint and keep trying on the next tick.
@@ -175,12 +212,12 @@ export function QrPaymentModal({ visible, qrCodeId, imageUrl, amount, subtitle, 
                 )}
               </View>
 
-              <View className="mt-5 flex-row items-center gap-2">
+              {!expired && <View className="mt-5 flex-row items-center gap-2">
                 <ActivityIndicator size="small" color={colors.saffron[600]} />
                 <Text className="font-sans-medium text-sm text-ink-500">Waiting for payment…</Text>
-              </View>
+              </View>}
               <Text className="mt-2 text-center font-sans text-xs text-ink-500">
-                Ask the store owner to scan this with any UPI app (Google Pay, PhonePe, Paytm). This updates automatically the moment they pay — no need to confirm manually.
+                {expired ? "This QR has expired or closed without payment. Close it and generate a new code." : "Ask the store owner to scan this with any UPI app (Google Pay, PhonePe, Paytm). This updates automatically the moment they pay — no need to confirm manually."}
               </Text>
               {pollError ? <Text className="mt-2 text-center font-sans text-xs text-chili-600">{pollError}</Text> : null}
             </>

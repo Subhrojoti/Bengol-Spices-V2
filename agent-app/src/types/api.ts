@@ -279,6 +279,8 @@ export interface ReturnRequest {
   reason: string;
   status: ReturnStatus;
   createdAt: string;
+  items?: { lineIndex: number; name: string; quantity: number; uom: string }[];
+  accountingPolicy?: "OFFICE_REVIEW";
 }
 
 // ---------- Monthly sales target ----------

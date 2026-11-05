@@ -4,7 +4,7 @@ import Agent from "../models/Agent.js";
 import Store from "../models/store.js";
 import { COUNTED_ON, COUNTS_AS_COLLECTED } from "../utils/paymentVerification.js";
 import { dateKeyOf, dayRange, monthKeyOf, monthRange } from "../utils/salesTarget.js";
-import { RETURNED_STATUSES } from "./sales.service.js";
+import { RETURNED_STATUSES, FINANCIAL_RETURN_FILTER } from "./sales.service.js";
 
 export const salesRanges = (now = new Date()) => {
   const day = dayRange(dateKeyOf(now));
@@ -21,7 +21,11 @@ export const salesRanges = (now = new Date()) => {
 // a collection cannot be multiplied by the number of products or returns.
 const returnLookup = () => ({ $lookup: {
   from: "returns", localField: "orderId", foreignField: "orderId",
-  pipeline: [{ $match: { status: { $in: RETURNED_STATUSES } } }, { $project: { "refund.amount": 1 } }, { $limit: 1 }], as: "returned",
+  pipeline: [
+    { $match: { status: { $in: RETURNED_STATUSES }, ...FINANCIAL_RETURN_FILTER } },
+    { $group: { _id: null, amount: { $sum: "$refund.amount" }, full: { $max: { $cond: [{ $gt: ["$refund.amount", 0] }, 0, 1] } } } },
+    { $project: { refund: { amount: { $cond: ["$full", 0, "$amount"] } } } },
+  ], as: "returned",
 } });
 const rangeFacet = (ranges, date, group) => Object.fromEntries(Object.entries(ranges).map(([key, range]) => [key, [
   { $match: { [date]: { $gte: range.start, $lte: range.end } } }, { $group: { _id: null, ...group } },

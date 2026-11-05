@@ -6,10 +6,12 @@ import { productApi } from "@/api/product.api";
  * (location prices the admin set for the territory, defaults otherwise).
  * Without one it is the public catalogue at default prices.
  */
-export function useCatalog(consumerId?: string) {
+export function useCatalog(consumerId?: string, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: consumerId ? ["catalog", consumerId] : ["catalog"],
     queryFn: () => (consumerId ? productApi.getStoreCatalog(consumerId) : productApi.getPublicCatalog()),
-    staleTime: 10 * 60 * 1000,
+    enabled,
+    // Prices may change rarely, but available stock changes with every order.
+    staleTime: 30 * 1000,
   });
 }

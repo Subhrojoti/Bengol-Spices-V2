@@ -67,6 +67,12 @@ export const RETURNED_STATUSES = [
   "REFUND_PROCESSED",
 ];
 
+// New item returns are physical-goods records, not financial approvals.
+// Receiving a parcel must not erase the whole order's collected sales.
+export const FINANCIAL_RETURN_FILTER = {
+  $or: [{ accountingPolicy: { $ne: "OFFICE_REVIEW" } }, { "refund.amount": { $gt: 0 } }],
+};
+
 const IST = "+05:30";
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
@@ -131,6 +137,7 @@ export const eligibilityOf = async (orderIds) => {
     Return.find({
       orderId: { $in: orderIds },
       status: { $in: RETURNED_STATUSES },
+      ...FINANCIAL_RETURN_FILTER,
     })
       .select("orderId refund.amount")
       .lean(),
@@ -149,13 +156,21 @@ export const eligibilityOf = async (orderIds) => {
       )
     : new Map();
 
+  const byOrder = new Map();
   for (const entry of returned) {
+    const state = byOrder.get(entry.orderId) || { full: false, refund: 0 };
     const refund = Number(entry.refund?.amount) || 0;
-    const paid = collected.get(entry.orderId) || 0;
+    state.full ||= refund <= 0;
+    state.refund += refund;
+    byOrder.set(entry.orderId, state);
+  }
+  for (const [orderId, state] of byOrder) {
+    const refund = state.refund;
+    const paid = collected.get(orderId) || 0;
 
     fractions.set(
-      entry.orderId,
-      refund > 0 && paid > 0 ? Math.max(0, 1 - refund / paid) : 0,
+      orderId,
+      !state.full && refund > 0 && paid > 0 ? Math.max(0, 1 - refund / paid) : 0,
     );
   }
 
@@ -394,6 +409,7 @@ export const productSales = async ({
   // Orders that have come back count for nothing, unless part-refunded
   const returnedIds = await Return.distinct("orderId", {
     status: { $in: RETURNED_STATUSES },
+    ...FINANCIAL_RETURN_FILTER,
     ...scope,
   });
   const returnedFractions = await eligibilityOf(returnedIds);

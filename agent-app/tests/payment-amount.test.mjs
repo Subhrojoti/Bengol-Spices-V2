@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { explicitPaymentAmount, collectionMonth } from "../src/utils/paymentAmount.ts";
+import { explicitPaymentAmount, advancePaymentAmount, collectionMonth } from "../src/utils/paymentAmount.ts";
+
+test("advance accepts zero, partial and full amounts and never silently clamps invalid input", () => {
+  for (const [text, expected] of [["0", 0], ["0.00", 0], ["20.50", 20.5], ["200", 200], [" 10 ", 10], ["0.50", 0.5]]) assert.equal(advancePaymentAmount(text, 200), expected);
+  for (const text of ["", " ", "-1", "1e2", "1.001", "200.01", "Infinity", "bad"]) assert.equal(advancePaymentAmount(text, 200), null, text);
+  assert.equal(advancePaymentAmount("150", 100), null, "a smaller cart must not silently alter the amount being collected");
+});
 test("Agent collection requires an explicit exact amount within the outstanding balance", () => {
   for (const value of ["", " ", "0", "-2", "1e2", "1.234", "201", "bad", "Infinity"]) assert.equal(explicitPaymentAmount(value, 200, true), null, value);
   assert.equal(explicitPaymentAmount("20.50", 200, true), 20.5); assert.equal(explicitPaymentAmount("200", 200, false), 200);

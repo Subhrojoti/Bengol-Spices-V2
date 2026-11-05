@@ -53,6 +53,114 @@ import { mediaAssetOf, assetIsReferenced } from "../services/mediaCleanup.servic
 import { createStore } from "../controllers/store.controller.js";
 import { getLocationOverrides } from "../utils/pricing.js";
 import { guardPartnerAssignment } from "../services/deliveryPartnerActivity.service.js";
+import { eligibilityOf } from "../services/sales.service.js";
+
+test("orders can start with zero advance without a fake payment; retries reserve stock once and later instalments still work", async () => {
+  const a = await person("ZERO-A"), s = await shop("ZERO-S", a);
+  const p = await Product.create({ name: "Zero advance spice", title: "Spice", category: "Spice", sku: "ZERO", uom: "packet", price: 10, stock: 100, minOrderQty: 10, images: { front: { url: "f", publicId: "f" }, back: { url: "b", publicId: "b" } } });
+  const body = { consumerId: s.consumerId, products: [{ productId: String(p._id), name: p.name, uom: p.uom, quantity: 10, unitPrice: 10 }], paymentMode: "CASH", paidAmount: 0, requestId: id() };
+  const placed = await call("/agent/orders", token(a), "POST", body);
+  assert.equal(placed.status, 201, JSON.stringify(placed.data)); assert.equal(placed.data.paymentVerification, null);
+  const order = await Order.findOne({ orderId: placed.data.orderId }).lean();
+  assert.equal(order.paidAmount, 0); assert.equal(order.dueAmount, 100); assert.equal(order.paymentStatus, "PENDING");
+  assert.equal(await Payment.countDocuments(), 0); assert.equal(await Invoice.countDocuments(), 0); assert.equal((await Product.findById(p._id)).stock, 90);
+  const retry = await call("/agent/orders", token(a), "POST", body);
+  assert.equal(retry.data.orderId, placed.data.orderId); assert.equal(retry.data.paymentVerification, null); assert.equal(await Order.countDocuments(), 1); assert.equal((await Product.findById(p._id)).stock, 90);
+  const paid = await applyDuePayment({ orderId: order.orderId, agentId: a.agentId, amount: 30, method: "CASH", clientRequestId: id() });
+  assert.equal(paid.ok, true);
+  const updated = await Order.findById(order._id).lean(); assert.equal(updated.paidAmount, 30); assert.equal(updated.dueAmount, 70); assert.equal(await Payment.countDocuments(), 1);
+});
+
+test("advance validation rejects malformed, negative and over-total amounts before changing stock", async () => {
+  const a = await person("INVALID-A"), s = await shop("INVALID-S", a);
+  const p = await Product.create({ name: "Advance spice", title: "Spice", category: "Spice", sku: "INVALID", uom: "packet", price: 10, stock: 100, minOrderQty: 10, images: { front: { url: "f", publicId: "f" }, back: { url: "b", publicId: "b" } } });
+  const body = { consumerId: s.consumerId, products: [{ productId: String(p._id), name: p.name, uom: p.uom, quantity: 10, unitPrice: 10 }], paymentMode: "CASH" };
+  for (const paidAmount of [null, false, [], {}, "", "-1", 101, "1.234"]) {
+    // The HTTP reply can reach the test before the store lock's finish
+    // callback releases it. Retry only that transient admission conflict.
+    let refused;
+    for (let retry = 0; retry < 4; retry++) {
+      refused = await call("/agent/orders", token(a), "POST", { ...body, paidAmount });
+      if (refused.status !== 409) break;
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    assert.equal(refused.status, 400, JSON.stringify(paidAmount));
+  }
+  assert.equal(await Order.countDocuments(), 0); assert.equal(await Payment.countDocuments(), 0); assert.equal((await Product.findById(p._id)).stock, 100);
+});
+
+test("item returns reserve exact order-line quantities, preserve money, and enforce ownership and replay integrity", async () => {
+  const a = await person("ITEM-A"), b = await person("ITEM-B"), s = await shop("ITEM-S", a);
+  const products = [{ name: "Spice", quantity: 10, uom: "packet", unitPrice: 5, totalPrice: 50 }, { name: "Other spice", quantity: 5, uom: "packet", unitPrice: 10, totalPrice: 50 }];
+  await rawOrder("ITEM-O", s, a, { products, totalAmount: 100, paidAmount: 30, dueAmount: 70 });
+  const input = { reason: "Damaged packets", requestId: id(), items: [{ lineIndex: 1, quantity: 2, unitPrice: 0.01, name: "tampered" }] };
+  assert.equal((await call("/returns/ITEM-O/options", token(b))).status, 403);
+  const created = await call("/returns/ITEM-O/initiate", token(a), "POST", input); assert.equal(created.status, 201, JSON.stringify(created.data));
+  const record = await Return.findOne({ returnId: created.data.returnId }).lean();
+  assert.equal(record.items.length, 1); assert.equal(record.items[0].quantity, 2); assert.equal(record.items[0].name, "Other spice"); assert.equal(record.items[0].totalPrice, 20); assert.equal(record.accountingPolicy, "OFFICE_REVIEW");
+  const options = await call("/returns/ITEM-O/options", token(a)); assert.deepEqual(options.data.items.map(i => i.remainingQuantity), [10, 3]);
+  assert.equal((await call("/returns/ITEM-O/initiate", token(a), "POST", input)).data.returnId, record.returnId); assert.equal(await Return.countDocuments(), 1);
+  assert.equal((await call("/returns/ITEM-O/initiate", token(a), "POST", { ...input, items: [{ lineIndex: 1, quantity: 1 }] })).status, 409);
+  const order = await Order.findOne({ orderId: "ITEM-O" }).lean(); assert.equal(order.totalAmount, 100); assert.equal(order.paidAmount, 30); assert.equal(order.dueAmount, 70); assert.deepEqual(order.products, products);
+  assert.equal((await call("/returns/ITEM-O/initiate", token(a), "POST", { reason: "Too many", items: [{ lineIndex: 1, quantity: 4 }] })).status, 400);
+  assert.equal((await call("/returns/ITEM-O/initiate", token(a), "POST", { reason: "Another item", items: [{ lineIndex: 0, quantity: 3 }] })).status, 201);
+  assert.equal((await call(`/returns/${record.returnId}/cancel`, token(a), "PUT", {})).status, 200);
+  assert.deepEqual((await call("/returns/ITEM-O/options", token(a))).data.items.map(i => i.remainingQuantity), [7, 5]);
+});
+
+test("return selection rejects invalid quantities, duplicate lines, stale IDs and unsupported stages", async () => {
+  const a = await person("VALID-A"), s = await shop("VALID-S", a);
+  await rawOrder("VALID-O", s, a, { products: [{ name: "Spice", quantity: 10, uom: "packet", unitPrice: 10, totalPrice: 100 }] });
+  for (const items of [[], null, {}, [{ lineIndex: 0, quantity: -1 }], [{ lineIndex: 0, quantity: 0 }], [{ lineIndex: 0, quantity: 1.5 }], [{ lineIndex: 0, quantity: "1" }], [{ lineIndex: 99, quantity: 1 }], [{ lineIndex: 0, quantity: 1 }, { lineIndex: 0, quantity: 2 }], [{ lineIndex: 0, quantity: 1, orderLineId: "stale" }]]) assert.equal((await call("/returns/VALID-O/initiate", token(a), "POST", { reason: "Damaged", items })).status, 400, JSON.stringify(items));
+  for (const status of ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "CANCELLED"]) {
+    await Order.updateOne({ orderId: "VALID-O" }, { $set: { status } });
+    assert.equal((await call("/returns/VALID-O/initiate", token(a), "POST", { reason: "Damaged", items: [{ lineIndex: 0, quantity: 1 }] })).status, 400, status);
+  }
+  assert.equal(await Return.countDocuments(), 0);
+});
+
+test("delivery partner can take back selected items only on their current out-for-delivery order, with no price leak or automatic settlement", async () => {
+  const a = await person("DELRET-A"), s = await shop("DELRET-S", a), p = await partner("DELRET-P"), other = await partner("DELRET-OTHER");
+  await rawOrder("DELRET-O", s, a, { status: "OUT_FOR_DELIVERY", delivery: { partnerId: p._id }, products: [{ name: "Spice", quantity: 10, uom: "packet", unitPrice: 10, totalPrice: 100 }] });
+  const path = "/returns/delivery/DELRET-O/initiate", input = { reason: "Two damaged packets", requestId: id(), items: [{ lineIndex: 0, quantity: 2 }] };
+  assert.equal((await call(path, partnerToken(other), "POST", input)).status, 403);
+  assert.equal((await call(path, token(a), "POST", input)).status, 403);
+  assert.equal((await call(path, partnerToken(p), "POST", { reason: "Damaged" })).status, 400);
+  const recorded = await call(path, partnerToken(p), "POST", input); assert.equal(recorded.status, 201, JSON.stringify(recorded.data));
+  const ret = await Return.findOne({ returnId: recorded.data.returnId }).lean(); assert.equal(ret.status, "PICKED_UP"); assert.equal(String(ret.pickup.partnerId), String(p._id)); assert.equal(ret.initiatedBy.role, "DELIVERY_PARTNER"); assert.equal(ret.source, "AT_DELIVERY"); assert.equal(ret.agentId, a.agentId);
+  assert.equal((await call(path, partnerToken(p), "POST", input)).data.returnId, ret.returnId);
+  assert.equal((await Order.findOne({ orderId: "DELRET-O" })).status, "OUT_FOR_DELIVERY");
+  const assigned = await call("/returns/delivery/assigned", partnerToken(p)); assert.equal(assigned.data.data[0].items[0].quantity, 2);
+  assert(!JSON.stringify(assigned.data).includes("unitPrice")); assert(!JSON.stringify(assigned.data).includes("totalPrice"));
+  const opts = await call("/returns/DELRET-O/options", partnerToken(p)); assert.equal(opts.data.items[0].remainingQuantity, 8); assert(!JSON.stringify(opts.data).includes("unitPrice"));
+  assert.equal((await call(`/returns/${ret.returnId}/cancel`, token(a), "PUT", {})).status, 400);
+  for (const status of ["RECEIVED_AT_WAREHOUSE", "COMPLETED"]) assert.equal((await call(`/returns/delivery/${ret.returnId}/status`, partnerToken(p), "PUT", { status })).status, 200);
+  const history = await call("/delivery-partner/history", partnerToken(p)); assert.equal(history.status, 200); assert(!JSON.stringify(history.data).includes("unitPrice"));
+  await Order.updateOne({ orderId: "DELRET-O" }, { $set: { status: "DELIVERED" } });
+  assert.equal((await call(path, partnerToken(p), "POST", { ...input, requestId: id() })).status, 400);
+});
+
+test("concurrent returns cannot reserve the same last quantities twice and legacy whole-order returns block item over-return", async () => {
+  const a = await person("RACE-A"), s = await shop("RACE-S", a);
+  await rawOrder("RACE-O", s, a, { products: [{ name: "Spice", quantity: 5, uom: "packet", unitPrice: 20, totalPrice: 100 }] });
+  const results = await Promise.all([0, 1].map(() => call("/returns/RACE-O/initiate", token(a), "POST", { reason: "Damage", requestId: id(), items: [{ lineIndex: 0, quantity: 4 }] })));
+  assert.equal(results.filter(r => r.status === 201).length, 1); assert.equal(await Return.countDocuments(), 1); assert(results.every(r => [201, 400, 409].includes(r.status)));
+  await Return.deleteMany({});
+  await Return.collection.insertOne({ returnId: "LEGACY", orderId: "RACE-O", status: "COMPLETED" });
+  assert.equal((await call("/returns/RACE-O/options", token(a))).data.items[0].remainingQuantity, 0);
+  assert.equal((await call("/returns/RACE-O/initiate", token(a), "POST", { reason: "Damage", items: [{ lineIndex: 0, quantity: 1 }] })).status, 400);
+});
+
+test("received item returns await office review without removing the entire collected sale from reports", async () => {
+  const a = await person("REPORTRET-A"), s = await shop("REPORTRET-S", a);
+  await rawOrder("REPORTRET-O", s, a);
+  await Payment.create({ orderId: "REPORTRET-O", consumerId: s.consumerId, agentId: a.agentId, amount: 100, method: "RAZORPAY" });
+  const ret = await call("/returns/REPORTRET-O/initiate", token(a), "POST", { reason: "Damaged item", items: [{ lineIndex: 0, quantity: 1 }] }); assert.equal(ret.status, 201);
+  await Return.updateOne({ returnId: ret.data.returnId }, { $set: { status: "COMPLETED" } });
+  assert.equal((await eligibilityOf(["REPORTRET-O"])).has("REPORTRET-O"), false);
+  const overview = await getSalesOverview(new Date(Date.now() + 1000)); assert.equal(overview.allTime.collected, 100); assert.equal(overview.allTime.orderValue, 100);
+  assert.equal((await Order.findOne({ orderId: "REPORTRET-O" })).totalAmount, 100);
+});
 
 // Never load dotenv/server.js or accept a configured database URL in this suite.
 process.env.JWT_SECRET = crypto.randomBytes(48).toString("hex");
@@ -61,6 +169,13 @@ delete process.env.RAZORPAY_KEY_ID;
 delete process.env.RAZORPAY_KEY_SECRET;
 let replica, server, origin;
 const id = () => crypto.randomUUID();
+const waitForStoreRelease = async consumerId => {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (!await mongoose.model("OperationLock").exists({ key: `store-management:${consumerId}` })) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.fail("The completed request did not release its store lock");
+};
 const admin = () => jwt.sign({ role: "ADMIN" }, process.env.JWT_SECRET);
 const token = (a) => jwt.sign({ id: String(a._id), agentId: a.agentId, role: "AGENT", sessionVersion: a.sessionVersion || 0 }, process.env.JWT_SECRET);
 const call = async (url, auth, method = "GET", body) => {
@@ -777,6 +892,7 @@ test("paid delivery QR after reassignment is tracked and refunded only once", as
   gateway.paid(); await Order.updateOne({ orderId: "QR-O" }, { "delivery.partnerId": other._id });
   const result = await call(`${url}/${qr}/verify`, auth, "POST", {});
   assert.equal(result.status, 400); assert.equal(result.data.refunded, true); assert.equal(gateway.refunds, 1);
+  await waitForStoreRelease(s.consumerId);
   assert.equal((await call(`${url}/${qr}/verify`, auth, "POST", {})).data.refunded, true); assert.equal(gateway.refunds, 1);
   assert.equal(await Payment.countDocuments(), 0); assert.equal((await Order.findOne({ orderId: "QR-O" })).dueAmount, 100);
   assert.equal((await GatewayPayment.findOne()).status, "REFUNDED");

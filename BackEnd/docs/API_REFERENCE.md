@@ -220,15 +220,17 @@ Router: [return.routes.js](../routes/return.routes.js).
 
 | Method | Full path | Pipeline and handler | Router line |
 |---|---|---|---|
-| POST | `/returns/:orderId/initiate` | `protect -> isAgent -> storeOperation(initiateReturn)` | 19 |
-| PUT | `/returns/:returnId/assign-pickup` | `protect -> checkPermission("canAssignReturn") -> storeOperation(assignReturnPickup)` | 20 |
-| GET | `/returns/my-returns` | `protect -> isAgent -> getMyReturns` | 27 |
-| GET | `/returns/delivery/assigned` | `protect -> isDeliveryPartner -> getAssignedReturns` | 30 |
-| PUT | `/returns/delivery/:returnId/status` | `protect -> isDeliveryPartner -> storeOperation(updateReturnStatus)` | 38 |
-| GET | `/returns/all` | `protect -> checkPermission("canAssignReturn") -> getAllReturns` | 46 |
-| GET | `/returns/active` | `protect -> checkPermission("canAssignReturn") -> getActiveReturns` | 49 |
-| PUT | `/returns/:returnId/cancel` | `protect -> isAgent -> storeOperation(cancelReturn)` | 57 |
-| POST | `/returns/:returnId/cancel` | `protect -> isAgent -> storeOperation(cancelReturn)` | 60 |
+| GET | `/returns/:orderId/options` | `protect -> getReturnOptions` | 21 |
+| POST | `/returns/delivery/:orderId/initiate` | `protect -> isDeliveryPartner -> storeOperation(initiateReturn)` | 22 |
+| POST | `/returns/:orderId/initiate` | `protect -> isAgent -> storeOperation(initiateReturn)` | 24 |
+| PUT | `/returns/:returnId/assign-pickup` | `protect -> checkPermission("canAssignReturn") -> storeOperation(assignReturnPickup)` | 25 |
+| GET | `/returns/my-returns` | `protect -> isAgent -> getMyReturns` | 32 |
+| GET | `/returns/delivery/assigned` | `protect -> isDeliveryPartner -> getAssignedReturns` | 35 |
+| PUT | `/returns/delivery/:returnId/status` | `protect -> isDeliveryPartner -> storeOperation(updateReturnStatus)` | 43 |
+| GET | `/returns/all` | `protect -> checkPermission("canAssignReturn") -> getAllReturns` | 51 |
+| GET | `/returns/active` | `protect -> checkPermission("canAssignReturn") -> getActiveReturns` | 54 |
+| PUT | `/returns/:returnId/cancel` | `protect -> isAgent -> storeOperation(cancelReturn)` | 62 |
+| POST | `/returns/:returnId/cancel` | `protect -> isAgent -> storeOperation(cancelReturn)` | 65 |
 
 ## /targets
 
@@ -299,4 +301,4 @@ Router: [events.routes.js](../routes/events.routes.js).
 |---|---|---|---|
 | GET | `/api/events/stream` | `protect -> isAdminOrEmployee -> openEventStream` | 10 |
 
-Registered method/path entries: **184**, including health. Commented routes are excluded.
+Registered method/path entries: **186**, including health. Commented routes are excluded.

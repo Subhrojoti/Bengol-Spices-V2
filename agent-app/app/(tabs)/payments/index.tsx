@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { View, Text, Image, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ReceiptText, Download, ChevronDown, Store as StoreIcon, Package } from "lucide-react-native";
+import { ReceiptText, Download, ChevronDown, ChevronUp, Store as StoreIcon, Package } from "lucide-react-native";
 import { Badge } from "@/components/ui/Badge";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { LoadingState, ErrorState, EmptyState } from "@/components/ui/States";
@@ -18,6 +18,8 @@ import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { Order } from "@/types/api";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useVisibleClock } from "@/hooks/useVisibleClock";
+import { groupPaymentStores, paymentBuckets, paymentListRows, type PaymentStoreGroup } from "@/utils/paymentList";
 
 type Tab = "DUE" | "OVERDUE" | "COMPLETED";
 
@@ -27,44 +29,12 @@ const EMPTY_COPY: Record<Tab, { title: string; subtitle: string }> = {
   COMPLETED: { title: "No completed payments yet", subtitle: "Fully paid orders will be listed here." },
 };
 
-interface StoreGroup {
-  consumerId: string;
-  storeName: string;
-  ownerName: string;
-  city: string;
-  state: string;
-  imageUrl?: string;
-  orders: Order[];
-}
-
-// 🔥 Groups orders by store, matching the organized "each store as its own
-// section" layout — deliveryAddress is a real, always-populated field on
-// every order (confirmed against the actual schema), so no extra API call
-// or cross-referencing against the stores list is needed to get store info.
-function groupByStore(orders: Order[], imagesByConsumerId: Map<string, string>): StoreGroup[] {
-  const map = new Map<string, StoreGroup>();
-  for (const order of orders) {
-    const existing = map.get(order.consumerId);
-    if (existing) {
-      existing.orders.push(order);
-    } else {
-      map.set(order.consumerId, {
-        consumerId: order.consumerId,
-        storeName: order.deliveryAddress?.storeName ?? order.consumerId,
-        ownerName: order.deliveryAddress?.ownerName ?? "",
-        city: order.deliveryAddress?.city ?? "",
-        state: order.deliveryAddress?.state ?? "",
-        imageUrl: imagesByConsumerId.get(order.consumerId),
-        orders: [order],
-      });
-    }
-  }
-  return Array.from(map.values());
-}
+const EMPTY_ORDERS: Order[] = [];
 
 export default function PaymentsScreen() {
   const [tab, setTab] = useState<Tab>("DUE");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const now = useVisibleClock();
   const dueQuery = useDueOrders();
   const myOrdersQuery = useMyOrders();
   const { data: stores } = useMyStores();
@@ -81,10 +51,7 @@ export default function PaymentsScreen() {
     return map;
   }, [stores]);
 
-  const dueOrders = dueQuery.data ?? [];
-  const due = dueOrders.filter((o) => !isOverdue(o.dueDate));
-  const overdue = dueOrders.filter((o) => isOverdue(o.dueDate));
-  const completed = (myOrdersQuery.data ?? []).filter((o) => o.dueAmount === 0 && o.status !== "CANCELLED");
+  const { due, overdue, completed } = useMemo(() => paymentBuckets(dueQuery.data ?? EMPTY_ORDERS, myOrdersQuery.data ?? EMPTY_ORDERS, now), [dueQuery.data, myOrdersQuery.data, now]);
 
   const isLoading = tab === "COMPLETED" ? myOrdersQuery.isLoading : dueQuery.isLoading;
   const isError = tab === "COMPLETED" ? myOrdersQuery.isError : dueQuery.isError;
@@ -92,7 +59,8 @@ export default function PaymentsScreen() {
   const refetch = tab === "COMPLETED" ? myOrdersQuery.refetch : dueQuery.refetch;
 
   const list = tab === "DUE" ? due : tab === "OVERDUE" ? overdue : completed;
-  const groups = useMemo(() => groupByStore(list, imagesByConsumerId), [list, imagesByConsumerId]);
+  const groups = useMemo(() => groupPaymentStores(list, imagesByConsumerId), [list, imagesByConsumerId]);
+  const rows = useMemo(() => paymentListRows(groups, expanded), [groups, expanded]);
 
   const toggleGroup = (consumerId: string) => {
     setExpanded((prev) => {
@@ -126,9 +94,9 @@ export default function PaymentsScreen() {
         <ErrorState message={getErrorMessage(error, "Couldn't load payments.")} onRetry={refetch} />
       ) : (
         <FlatList
-          data={groups}
-          keyExtractor={(item) => item.consumerId}
-          contentContainerStyle={{ padding: 20, paddingTop: 4, gap: 10 }}
+          data={rows}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={{ padding: 20, paddingTop: 0 }}
           refreshing={pulling}
           onRefresh={onPull}
           initialNumToRender={8}
@@ -136,16 +104,15 @@ export default function PaymentsScreen() {
           ListEmptyComponent={
             <EmptyState icon={<ReceiptText size={22} color={colors.ink[500]} />} title={EMPTY_COPY[tab].title} subtitle={EMPTY_COPY[tab].subtitle} />
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }) => item.kind === "store" ? (
             <StoreGroupCard
-              group={item}
-              isExpanded={expanded.has(item.consumerId)}
-              onToggle={() => toggleGroup(item.consumerId)}
-              onDownload={(orderId) => downloadInvoice(orderId)}
-              downloading={downloading}
-              showDue={tab !== "COMPLETED"}
+              group={item.group}
+              isExpanded={item.expanded}
+              onToggle={() => toggleGroup(item.group.consumerId)}
             />
-          )}
+          ) : <View className={`overflow-hidden border-x border-sand bg-white ${item.last ? "rounded-b-2xl border-b" : ""}`}>
+            <OrderLine order={item.order} last={item.last} onDownload={() => downloadInvoice(item.order.orderId)} downloading={downloading} showDue={tab !== "COMPLETED"} />
+          </View>}
         />
       )}
     </SafeAreaView>
@@ -156,20 +123,15 @@ function StoreGroupCard({
   group,
   isExpanded,
   onToggle,
-  onDownload,
-  downloading,
-  showDue,
 }: {
-  group: StoreGroup;
+  group: PaymentStoreGroup;
   isExpanded: boolean;
   onToggle: () => void;
-  onDownload: (orderId: string) => void;
-  downloading: boolean;
-  showDue: boolean;
 }) {
+  const ToggleIcon = isExpanded ? ChevronUp : ChevronDown;
   return (
-    <View className="overflow-hidden rounded-2xl border border-sand bg-white">
-      <Pressable onPress={onToggle} className="flex-row items-center gap-3 p-4 active:opacity-80">
+    <View className={`mt-2.5 overflow-hidden border border-sand bg-white ${isExpanded ? "rounded-t-2xl" : "rounded-2xl"}`}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${group.storeName}, ${group.consumerId}, ${group.orders.length} orders`} accessibilityState={{ expanded: isExpanded }} onPress={onToggle} className="flex-row items-center gap-3 p-4 active:opacity-80">
         {group.imageUrl ? (
           <Image source={{ uri: sizedImage(group.imageUrl, 44) }} className="h-11 w-11 rounded-full border border-sand-dark" />
         ) : (
@@ -191,21 +153,14 @@ function StoreGroupCard({
           <Text className="font-sans text-[10px] text-ink-500">Orders</Text>
           <Text className="font-sans-bold text-sm text-ink">{group.orders.length}</Text>
         </View>
-        <ChevronDown size={16} color={colors.ink[500]} style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }], marginLeft: 6 }} />
+        <ToggleIcon size={16} color={colors.ink[500]} style={{ marginLeft: 6 }} />
       </Pressable>
 
-      {isExpanded ? (
-        <View className="border-t border-sand">
-          {group.orders.map((order) => (
-            <OrderLine key={order._id} order={order} onDownload={() => onDownload(order.orderId)} downloading={downloading} showDue={showDue} />
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
 
-function OrderLine({ order, onDownload, downloading, showDue }: { order: Order; onDownload: () => void; downloading: boolean; showDue: boolean }) {
+function OrderLine({ order, onDownload, downloading, showDue, last }: { order: Order; onDownload: () => void; downloading: boolean; showDue: boolean; last: boolean }) {
   const router = useRouter();
   const firstProduct = order.products[0];
   const extraCount = order.products.length - 1;
@@ -213,7 +168,7 @@ function OrderLine({ order, onDownload, downloading, showDue }: { order: Order; 
   const payment = paymentStateOf(order);
 
   return (
-    <Pressable onPress={() => router.push(`/orders/${order.orderId}`)} className="flex-row items-center gap-3 border-b border-sand p-4 last:border-b-0 active:opacity-80">
+    <Pressable onPress={() => router.push(`/orders/${order.orderId}`)} className={`flex-row items-center gap-3 p-4 active:opacity-80 ${last ? "" : "border-b border-sand"}`}>
       {firstProduct?.image ? (
         <Image source={{ uri: sizedImage(firstProduct.image, 44) }} className="h-11 w-11 rounded-lg" />
       ) : (
@@ -245,7 +200,7 @@ function OrderLine({ order, onDownload, downloading, showDue }: { order: Order; 
         <Text className="font-sans-bold text-sm text-ink">{formatCurrency(order.totalAmount)}</Text>
       </View>
 
-      <Pressable onPress={onDownload} disabled={downloading} hitSlop={8} className="ml-2">
+      <Pressable accessibilityRole="button" accessibilityLabel={`Download invoice for ${order.orderId}`} onPress={event => { event.stopPropagation(); onDownload(); }} disabled={downloading} hitSlop={8} className="ml-2">
         <Download size={16} color={colors.ink[500]} />
       </Pressable>
     </Pressable>

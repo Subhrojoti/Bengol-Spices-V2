@@ -550,6 +550,11 @@ export default function ReturnsManagement() {
                           />
                         </div>
 
+                        {ret.items?.length > 0 && <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+                          <div className="bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-500">Returned items{ret.source === "AT_DELIVERY" ? " · Taken back during delivery" : ""}</div>
+                          {ret.items.map(item => <div key={item.lineIndex} className="flex items-start justify-between gap-3 border-t border-slate-100 px-3.5 py-2 text-sm"><span className="min-w-0 break-words text-slate-800">{item.name}</span><span className="shrink-0 font-medium tabular-nums text-slate-700">{item.quantity} {item.uom}</span></div>)}
+                          {ret.accountingPolicy === "OFFICE_REVIEW" && !ret.refund?.processedAt && <p className="border-t border-slate-100 px-3.5 py-2 text-xs text-slate-500">Financial adjustments await office review. Invoice, payments, balance and inventory remain unchanged.</p>}
+                        </div>}
                         {/* REASON */}
                         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3">
                           <p className="text-[11.5px] font-bold uppercase tracking-wide text-slate-400">

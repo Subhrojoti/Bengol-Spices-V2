@@ -11,6 +11,7 @@ import { useOrdersByStore } from "@/hooks/useOrders";
 import { useInvoiceDownload } from "@/hooks/useInvoiceDownload";
 import { formatCurrency } from "@/utils/currency";
 import { formatDate } from "@/utils/date";
+import { orderMonthKey, orderMonthLabel, groupOrderHistory } from "@/utils/orderHistory";
 import { matchesPaymentFilter, paymentStateOf, type PaymentFilter, type PaymentState } from "@/utils/paymentState";
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
@@ -28,12 +29,6 @@ const STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "info"> 
   OUT_FOR_DELIVERY: "warning",
 };
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-// The month an order was placed in, as in India whatever zone the phone is set to: "2026-10"
-const monthKeyOf = (instant: string) => new Date(new Date(instant).getTime() + 330 * 60 * 1000).toISOString().slice(0, 7);
-const monthLabel = (key: string) => `${MONTHS[Number(key.slice(5)) - 1]} ${key.slice(0, 4)}`;
-
 const FILTERS: { key: PaymentFilter; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "OUTSTANDING", label: "Outstanding" },
@@ -44,6 +39,7 @@ const FILTERS: { key: PaymentFilter; label: string }[] = [
 interface Row {
   order: Order;
   state: PaymentState;
+  monthKey: string;
 }
 
 interface Totals {
@@ -110,41 +106,35 @@ export default function StoreOrdersScreen() {
   // Months the agent has opened or closed by hand; otherwise only the newest is open
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
 
-  const rows = useMemo<Row[]>(() => (orders ?? []).map((order) => ({ order, state: paymentStateOf(order) })), [orders]);
+  const rows = useMemo<Row[]>(() => (orders ?? []).map(order => ({ order, state: paymentStateOf(order), monthKey: orderMonthKey(order.createdAt) })), [orders]);
   const overall = useMemo(() => totalsOf(rows), [rows]);
 
-  const narrowed = query.trim() !== "" || filter !== "ALL";
+  const searching = query.trim() !== "";
+  // Date/product search text is built only when searching starts, then reused
+  // for subsequent keystrokes. Opening an unfiltered history pays no such cost.
+  const searchIndex = useMemo(() => searching ? new Map(rows.map(row => [row, [row.order.orderId, formatDate(row.order.createdAt), orderMonthLabel(row.monthKey), row.state.label, row.order.status.replace(/_/g, " "), ...row.order.products.map(p => p.name)].join("\n").toLowerCase()])) : null, [rows, searching]);
+  const narrowed = searching || filter !== "ALL";
 
   const months = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    const matching = rows.filter(({ order, state }) => {
+    const matching = rows.filter(row => {
+      const { order, state } = row;
       // A cancelled order has no payment to chase: it is listed under All only
       if (filter !== "ALL" && order.status === "CANCELLED") return false;
       if (!matchesPaymentFilter(state, filter)) return false;
       if (!q) return true;
-      const key = monthKeyOf(order.createdAt);
-      return [order.orderId, formatDate(order.createdAt), monthLabel(key), state.label, order.status.replace(/_/g, " "), ...order.products.map((p) => p.name)].some((text) =>
-        text.toLowerCase().includes(q),
-      );
+      return searchIndex?.get(row)?.includes(q) || false;
     });
 
-    const byMonth = new Map<string, Row[]>();
-    for (const row of matching) {
-      const key = monthKeyOf(row.order.createdAt);
-      byMonth.set(key, [...(byMonth.get(key) ?? []), row]);
-    }
-
-    return [...byMonth.entries()]
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([key, list]) => ({
+    return groupOrderHistory(matching).map(({ key, rows: list }) => ({
         key,
-        title: monthLabel(key),
+        title: orderMonthLabel(key),
         totals: totalsOf(list),
         count: list.length,
-        rows: list.sort((a, b) => new Date(b.order.createdAt).getTime() - new Date(a.order.createdAt).getTime()),
+        rows: list,
       }));
-  }, [rows, query, filter]);
+  }, [rows, query, filter, searchIndex]);
 
   /* The newest month starts open. While a search or filter is on, every
      month it found is open, so a match is never hidden inside a closed one. */

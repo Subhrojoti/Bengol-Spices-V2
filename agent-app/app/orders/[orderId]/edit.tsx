@@ -13,6 +13,7 @@ import { useRefreshAfterOrderActivity } from "@/hooks/useOrders";
 import { Button } from "@/components/ui/Button";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { formatCurrency } from "@/utils/currency";
+import { initialEditQuantities } from "@/utils/orderEdit";
 import { toast } from "@/utils/toast";
 
 export default function EditOrder() {
@@ -24,13 +25,21 @@ export default function EditOrder() {
   const [quantities, setQuantities] = useState<Record<string, string>>({}), [pending, setPending] = useState<EditAttempt | null>(null);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const running = useRef(false), refresh = useRefreshAfterOrderActivity();
+  const seeded = useRef<{ key: string; revision: number } | null>(null);
   useEffect(() => {
     if (!storageKey) return;
     let active = true;
     SecureStore.getItemAsync(storageKey).then(saved => { if (active) { if (saved) setPending(JSON.parse(saved)); setReady(true); } }).catch(() => { if (active) setMessage("Could not read the saved edit. Retry reopening this screen before making another edit."); });
     return () => { active = false; };
   }, [storageKey]);
-  useEffect(() => { if (query.data && !pending) setQuantities(Object.fromEntries(query.data.order.products.filter(line => line.productId).map(line => [line.productId!, String(line.quantity)]))); }, [query.data, pending]);
+  useEffect(() => {
+    if (!query.data || !ready || pending || !storageKey) return;
+    const revision = query.data.order.revision || 0;
+    if (seeded.current?.key === storageKey && seeded.current.revision === revision) return;
+    if (seeded.current?.key === storageKey) setMessage("This order changed on another device. Review the latest quantities and prices before saving.");
+    seeded.current = { key: storageKey, revision };
+    setQuantities(initialEditQuantities(query.data.order.products));
+  }, [query.data, ready, pending, storageKey]);
   const chosen = (query.data?.products || []).filter(product => Number(quantities[product.productId]) > 0);
   const total = Math.round(chosen.reduce((sum, product) => sum + Math.round(product.unitPrice * Number(quantities[product.productId]) * 100) / 100, 0) * 100) / 100;
   const invalid = !chosen.length || total < (query.data?.order.paidAmount || 0) || (query.data?.products || []).some(product => {

@@ -5,6 +5,50 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Second Agent mobile review (5 November, local only):** virtualized expanded
+Payments orders and stabilized grouping, added focused/foreground deadline
+refresh, and prevented invoice taps from also opening order details. Fixed
+delayed QR session callbacks, paid-QR retry/reopen races, expired-code polling,
+stale image sizing, initial-payment cart/advance snapshots and duplicate or
+mismatched checkout messages. All mobile regressions (including `.test.cjs`)
+41/41, Agent typecheck and Android JS/Hermes export pass. A synthetic 601-order
+store rendered 7 order lines in its first expansion commit instead of 601;
+development/emulator timing details and limitations are recorded in the
+[second Agent review](agent-app/docs/AGENT_SECOND_REVIEW_2026-11-05.md).
+No backend/API change, push or deployment in this pass. A new Agent build is
+required; the earlier pending return/advance backend must deploy first.
+
+**Agent mobile review (5 November, local only):** fixed a store-order-history
+crash on invalid dates, replaced quadratic month grouping and cached search text
+only while searching. Added durable per-Agent/order return retry recovery,
+preserved unsaved draft quantities across background refreshes, combined legacy
+duplicate product lines correctly, refreshed stock catalogues after placement
+and guarded invoice downloads against rapid taps and session changes. Current
+design and backend/API behavior remain unchanged by this follow-up. See
+[Agent review, measurements and validation](agent-app/docs/AGENT_REVIEW_2026-11-05.md).
+Combined mobile regressions 21/21, Agent typecheck/Android JS export and emulator
+history, restart/retry and background-edit checks pass. Local grouping and
+search CPU measurements improved on 10,000 synthetic orders; these are not
+production timings or native frame-rate claims. No push/deployment performed.
+The earlier item-return/backend changes below remain pending deployment.
+
+**Item returns and optional advances (5 November, local only):** inspected the
+existing Agent typed/full-balance collection and PLACED-order editing flows;
+retained them. Added Agent item/quantity return requests after delivery and
+assigned-partner item returns during OUT_FOR_DELIVERY, with immutable snapshots,
+quantity reservations, replay protection and an office-review accounting policy.
+The owner explicitly chose to keep financial adjustments under office review;
+recording/receiving these returns does not change invoices, payments, balances,
+stock or incentives automatically. Order advances now default to zero in Agent
+mobile and the backend supports zero without creating a fake Payment record.
+Agent Web and Delivery Web remain unchanged. Both mobile apps need new builds;
+deploy the compatible backend first. Read
+[implementation and validation](BackEnd/docs/ITEM_RETURNS_ADVANCES_2026-11-05.md).
+Backend 113/113, mobile offline 15/15, frontend units 13/13 and focused browser
+3/3 pass; Admin lint/build, both mobile typechecks/Android JS exports and native
+emulator return/zero-advance flows pass against disposable data.
+No push, deployment or production-data change has been performed for this work.
+
 **Production employee/code release (2 November):** application `2c40b98` pushed
 and backend/website deployed. Final recheck found no additional bug: backend
 106/106, full browser suite 168/168, units 13/13 and lint/build pass. All 184 API

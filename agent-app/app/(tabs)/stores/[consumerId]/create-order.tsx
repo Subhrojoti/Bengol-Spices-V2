@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { advancePaymentAmount } from "@/utils/paymentAmount";
 import { View, Text, Image, FlatList, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -15,7 +17,7 @@ import { UnrecordedPaymentModal } from "@/components/payments/UnrecordedPaymentM
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useCatalog } from "@/hooks/useCatalog";
 import { usePlaceOrder, useRefreshAfterOrderActivity } from "@/hooks/useOrders";
-import { orderApi, type PlaceOrderInput } from "@/api/order.api";
+import { orderApi, type PlaceOrderInput, type RazorpaySessionResponse, type QrSessionResponse } from "@/api/order.api";
 import { formatCurrency } from "@/utils/currency";
 import { unitForCounting } from "@/utils/uom";
 import { isLocationPrice, resolveProductPrice } from "@/utils/pricing";
@@ -42,6 +44,7 @@ interface UnrecordedOnlinePayment {
 export default function CreateOrderScreen() {
   const { consumerId, storeName, storeType } = useLocalSearchParams<{ consumerId: string; storeName: string; storeType: StoreType }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const refreshAfterOrderActivity = useRefreshAfterOrderActivity();
   const resolvedStoreType = (storeType ?? "RETAILER") as StoreType;
 
@@ -50,10 +53,10 @@ export default function CreateOrderScreen() {
   const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [submitting, setSubmitting] = useState(false);
 
-  const [razorpaySession, setRazorpaySession] = useState<{ razorpayOrderId: string; amount: number; key: string } | null>(null);
+  const [razorpaySession, setRazorpaySession] = useState<(RazorpaySessionResponse & { orderPayload: PlaceOrderInput; paidNow: number }) | null>(null);
   const [razorpayVisible, setRazorpayVisible] = useState(false);
 
-  const [qrSession, setQrSession] = useState<{ qrCodeId: string; imageUrl: string; amount: number } | null>(null);
+  const [qrSession, setQrSession] = useState<(QrSessionResponse & { orderPayload: PlaceOrderInput; paidNow: number }) | null>(null);
   const [qrVisible, setQrVisible] = useState(false);
 
   const [unrecorded, setUnrecorded] = useState<UnrecordedOnlinePayment | null>(null);
@@ -79,21 +82,11 @@ export default function CreateOrderScreen() {
     [cart],
   );
 
-  // 🔥 Partial payment at order creation — agent can collect any amount up
-  // to the full total now, with the rest tracked as due for later
-  // collection. Defaults to the full cart total, but editable. Resets
-  // whenever the cart total changes so it doesn't get stuck at a stale
-  // value from before items were added/removed.
-  const [payNowText, setPayNowText] = useState(String(cartTotal));
-  useEffect(() => {
-    setPayNowText(String(cartTotal));
-  }, [cartTotal]);
-
-  const payNowAmount = useMemo(() => {
-    const parsed = Math.round(Number(payNowText) * 100) / 100;
-    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-    return Math.min(parsed, cartTotal);
-  }, [payNowText, cartTotal]);
+  // An order starts with no advance. Cart changes never increase the amount
+  // collected or silently clamp an amount the agent explicitly typed.
+  const [payNowText, setPayNowText] = useState("0");
+  const enteredAdvance = advancePaymentAmount(payNowText, cartTotal);
+  const payNowAmount = enteredAdvance ?? 0;
 
   const buildOrderPayload = (): PlaceOrderInput => ({
     consumerId,
@@ -104,7 +97,7 @@ export default function CreateOrderScreen() {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
     })),
-    paymentMode: method,
+    paymentMode: payNowAmount === 0 ? "CASH" : method,
     paidAmount: payNowAmount,
   });
 
@@ -148,8 +141,8 @@ export default function CreateOrderScreen() {
       );
       return true;
     }
-    if (payNowAmount <= 0) {
-      toast.error("Enter an amount", "Enter how much is being paid now.");
+    if (enteredAdvance === null) {
+      toast.error("Check the advance", "Enter 0 for no advance, or an amount up to the order total (maximum two decimal places).");
       return true;
     }
     return false;
@@ -165,6 +158,7 @@ export default function CreateOrderScreen() {
      that store's orders) and never to a cart that still held the order and
      could be placed a second time. */
   const finishOrder = (orderId: string) => {
+    void queryClient.invalidateQueries({ queryKey: ["catalog"] });
     setCart([]);
     setRazorpaySession(null);
     setQrSession(null);
@@ -181,7 +175,7 @@ export default function CreateOrderScreen() {
       const payload = buildOrderPayload();
       const result = await placeOrder.mutateAsync({ ...payload, requestId: requestIdFor(payload) });
       // Cash counts toward the agent's sales only once the office has verified it
-      toast.success("Order placed", `${result.orderId} · ${formatCurrency(payNowAmount)} cash will count toward your target once the office verifies it`);
+      toast.success("Order placed", payNowAmount === 0 ? `${result.orderId} · No advance collected. ${formatCurrency(cartTotal)} remains due.` : `${result.orderId} · ${formatCurrency(payNowAmount)} cash will count toward your target once the office verifies it`);
       finishOrder(result.orderId);
     } catch (e) {
       toast.error("Couldn't place order", getErrorMessage(e));
@@ -192,10 +186,13 @@ export default function CreateOrderScreen() {
 
   const handleOnlineSubmit = async () => {
     if (cartProblem()) return;
+    if (payNowAmount === 0) return handleCashSubmit();
+    if (payNowAmount < 1) { toast.error("Minimum online payment is ₹1", "Choose Cash for a smaller advance, or enter 0 to place without payment."); return; }
     setSubmitting(true);
     try {
-      const session = await orderApi.createInitialPayment(payNowAmount, buildOrderPayload());
-      setRazorpaySession(session);
+      const orderPayload = buildOrderPayload(), paidNow = payNowAmount;
+      const session = await orderApi.createInitialPayment(paidNow, orderPayload);
+      setRazorpaySession({ ...session, orderPayload, paidNow });
       setRazorpayVisible(true);
     } catch (e) {
       toast.error("Couldn't start payment", getErrorMessage(e));
@@ -247,21 +244,24 @@ export default function CreateOrderScreen() {
     await confirmOnlineOrder({
       payment: payload,
       sessionAmount: razorpaySession.amount,
-      orderPayload: buildOrderPayload(),
-      paidNow: payNowAmount,
+      orderPayload: razorpaySession.orderPayload,
+      paidNow: razorpaySession.paidNow,
     });
   };
 
   // 🔥 QR payment flow — agent generates a QR for the amount being paid
-  // now (defaults to the full cart total, but editable for partial
+  // now (starts at zero and is editable for partial
   // payment), store owner scans and pays via their own UPI app. Verified
   // server-side against Razorpay before the order is placed.
   const handleGenerateQr = async () => {
     if (cartProblem()) return;
+    if (payNowAmount === 0) return handleCashSubmit();
+    if (payNowAmount < 1) { toast.error("Minimum QR payment is ₹1", "Choose Cash for a smaller advance, or enter 0 to place without payment."); return; }
     setSubmitting(true);
     try {
-      const session = await orderApi.createInitialPaymentQr(payNowAmount, buildOrderPayload());
-      setQrSession(session);
+      const orderPayload = buildOrderPayload(), paidNow = payNowAmount;
+      const session = await orderApi.createInitialPaymentQr(paidNow, orderPayload);
+      setQrSession({ ...session, orderPayload, paidNow });
       setQrVisible(true);
     } catch (e) {
       toast.error("Couldn't generate QR code", getErrorMessage(e));
@@ -274,10 +274,10 @@ export default function CreateOrderScreen() {
   // for a payment that was received but not yet recorded.
   const handleQrPaid = async (): Promise<boolean> => {
     if (!qrSession) return false;
-    const amountPaidNow = payNowAmount;
+    const amountPaidNow = qrSession.paidNow;
     setSubmitting(true);
     try {
-      const result = await orderApi.verifyQrAndPlaceOrder(qrSession.qrCodeId, qrSession.amount, buildOrderPayload());
+      const result = await orderApi.verifyQrAndPlaceOrder(qrSession.qrCodeId, qrSession.amount, qrSession.orderPayload);
       setQrVisible(false);
       toast.success("Payment received", `${formatCurrency(amountPaidNow)} · Order ${result.orderId} placed`);
       refreshAfterOrderActivity();
@@ -354,16 +354,17 @@ export default function CreateOrderScreen() {
 
               <View className="mt-4">
                 <Input
-                  label="Amount to Collect Now"
-                  required
+                  label="Advance to Collect Now"
                   keyboardType="decimal-pad"
                   value={payNowText}
                   onChangeText={setPayNowText}
                   leftIcon={<Wallet2 size={16} color={colors.ink[500]} />}
                   hint={
-                    payNowAmount > 0 && payNowAmount < cartTotal
+                    enteredAdvance === null
+                      ? "Enter a valid amount between 0 and the order total."
+                      : payNowAmount < cartTotal
                       ? `${formatCurrency(cartTotal - payNowAmount)} will be tracked as due for later collection.`
-                      : "Defaults to the full order total — reduce it if the store owner is only paying part now."
+                      : "The full order amount will be collected now."
                   }
                 />
               </View>
@@ -380,8 +381,8 @@ export default function CreateOrderScreen() {
                 />
               </View>
 
-              {method === "CASH" ? (
-                <Button label="Place Order" icon={<Wallet2 size={16} color={colors.white} />} onPress={handleCashSubmit} loading={submitting} fullWidth size="lg" className="mt-4" />
+              {method === "CASH" || payNowAmount === 0 ? (
+                <Button label={payNowAmount === 0 ? "Place Order Without Advance" : "Place Order"} icon={<Wallet2 size={16} color={colors.white} />} onPress={handleCashSubmit} loading={submitting} fullWidth size="lg" className="mt-4" />
               ) : method === "ONLINE" ? (
                 <View className="mt-4">
                   <View className="mb-3 flex-row items-center gap-2.5 rounded-xl bg-saffron-50 p-3.5">
@@ -471,7 +472,7 @@ function ProductPickerModal({
 }) {
   // Priced for this store, so a location price the admin set shows here and
   // matches what the server charges
-  const { data: products, isLoading, isError, error, refetch } = useCatalog(consumerId);
+  const { data: products, isLoading, isError, error, refetch } = useCatalog(consumerId, { enabled: visible });
   const [query, setQuery] = useState("");
   const [detailProduct, setDetailProduct] = useState<PublicProduct | null>(null);
 

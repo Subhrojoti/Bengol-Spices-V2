@@ -41,12 +41,30 @@ const returnSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Legacy returns have no items and mean the entire order. New requests
+    // preserve immutable line snapshots; amounts await office review.
+    items: { type: [{
+      _id: false,
+      lineIndex: { type: Number, required: true, min: 0 },
+      orderLineId: String,
+      productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+      name: { type: String, required: true },
+      quantity: { type: Number, required: true, min: 1 },
+      uom: { type: String, required: true },
+      image: String,
+      unitPrice: Number,
+      totalPrice: Number,
+    }], default: undefined },
+    accountingPolicy: { type: String, enum: ["OFFICE_REVIEW"] },
+    source: { type: String, enum: ["AGENT", "AT_DELIVERY"] },
+    clientRequestId: String,
+
     initiatedBy: {
       id: String,
       name: String,
       role: {
         type: String,
-        enum: ["AGENT"],
+        enum: ["AGENT", "DELIVERY_PARTNER"],
       },
     },
 
@@ -157,5 +175,6 @@ const returnSchema = new mongoose.Schema(
 returnSchema.index({ status: 1 });
 // One delivery partner's pickups, by status: the delivery app's return list
 returnSchema.index({ "pickup.partnerId": 1, status: 1 });
+returnSchema.index({ orderId: 1, clientRequestId: 1 }, { unique: true, partialFilterExpression: { clientRequestId: { $type: "string" } } });
 
 export default mongoose.model("Return", returnSchema);

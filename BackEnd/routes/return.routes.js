@@ -8,6 +8,7 @@ import {
   getAssignedReturns,
   getMyReturns,
   initiateReturn,
+  getReturnOptions,
   updateReturnStatus,
 } from "../controllers/return.controller.js";
 import { protect } from "../middleware/auth.js";
@@ -15,6 +16,10 @@ import { isAgent, isDeliveryPartner } from "../middleware/role.js";
 import { checkPermission } from "../middleware/permission.js";
 
 const router = express.Router();
+
+// Each controller independently scopes agent management / current delivery assignment.
+router.get("/:orderId/options", protect, getReturnOptions);
+router.post("/delivery/:orderId/initiate", protect, isDeliveryPartner, storeOperation(initiateReturn));
 
 router.post("/:orderId/initiate", protect, isAgent, storeOperation(initiateReturn));
 router.put(

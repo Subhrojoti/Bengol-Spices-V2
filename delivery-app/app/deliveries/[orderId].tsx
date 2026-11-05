@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ReturnItemsModal } from "@/components/ReturnItemsModal";
 import { OrderCollections } from "@/components/payments/OrderCollections";
 import { StorePhotoViewer } from "@/components/StorePhotoViewer";
 import { View, Text, ScrollView, RefreshControl, Alert, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, Linking } from "react-native";
@@ -92,6 +93,7 @@ function DeliveryDetailScreen({ orderId }: { orderId: string }) {
   const [failReason, setFailReason] = useState<string | null>(null);
   const [failNote, setFailNote] = useState("");
   const [failError, setFailError] = useState<string | null>(null);
+  const [returnVisible, setReturnVisible] = useState(false);
 
   // 🔥 FIX: an order disappears from useAssignedOrders() the moment it's
   // marked DELIVERED (that query only returns active work). Falling back
@@ -419,6 +421,10 @@ function DeliveryDetailScreen({ orderId }: { orderId: string }) {
                 <Text className="font-sans-bold text-sm text-ink">{formatQuantity(item.quantity, item.uom)}</Text>
               </View>
             ))}
+            {order.status === "OUT_FOR_DELIVERY" && <View className="mt-3 gap-2 border-t border-sand pt-3">
+              <Text className="font-sans text-xs text-ink-500">Taking back a specific item? Record its quantity before completing delivery. Financial adjustments await office review.</Text>
+              <Button label="Return Specific Items" variant="outline" icon={<PackageX size={16} color={colors.ink.DEFAULT} />} disabled={busy} onPress={() => setReturnVisible(true)} fullWidth />
+            </View>}
           </Card>
 
           <Card>
@@ -464,6 +470,7 @@ function DeliveryDetailScreen({ orderId }: { orderId: string }) {
 
       {/* The sheet sits near the top of the screen so the number pad, which
           covers the lower half, never hides the code box or the buttons. */}
+      <ReturnItemsModal orderId={orderId} visible={returnVisible} atDelivery onClose={() => setReturnVisible(false)} />
       <Modal visible={codeModalVisible} transparent animationType="fade" onRequestClose={closeCodeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1 bg-black/50">
           <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingTop: 72, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { tokenStorage } from "@/utils/tokenStorage";
@@ -19,6 +19,7 @@ function invoiceProblem(error: unknown): string {
 
   if (status === 503) return "The invoice is still being prepared. Please try again in a minute.";
   if (status === 404) return "No invoice was found for this order.";
+  if (status === 409) return "The invoice isn't ready yet. Try again shortly, or wait for office confirmation.";
   if (status === 401 || status === 403) return "Your session has ended. Please sign in again.";
   if (status >= 500) return "The invoice could not be downloaded just now. Please try again in a minute.";
   if (!status) return "Can't reach the server. Check your internet connection and try again.";
@@ -27,6 +28,7 @@ function invoiceProblem(error: unknown): string {
 
 export function useInvoiceDownload() {
   const [downloading, setDownloading] = useState(false);
+  const running = useRef(false);
 
   // 🔥 FIX: no longer takes a baseUrl parameter — every call site was
   // passing "" (an empty placeholder that never got filled in), which
@@ -34,9 +36,12 @@ export function useInvoiceDownload() {
   // "URI is not absolute". Resolving it internally means there's no longer
   // a value for a caller to forget to pass.
   const downloadInvoice = async (orderId: string) => {
+    if (running.current) return;
+    running.current = true;
     setDownloading(true);
     try {
       const token = await tokenStorage.get();
+      if (!token) { toast.error("Sign in required", "Please sign in again to download the invoice."); return; }
       const url = `${API_URL}/api/invoice/download/${encodeURIComponent(orderId)}`;
       // Only what an order number is made of goes into the file's name
       const destination = new File(Paths.cache, `invoice-${orderId.replace(/[^A-Za-z0-9_-]/g, "_")}.pdf`);
@@ -44,7 +49,11 @@ export function useInvoiceDownload() {
         headers: { Authorization: `Bearer ${token}` },
         idempotent: true,
       });
-      if (await Sharing.isAvailableAsync()) {
+      // A download started in a previous login must not open a share sheet
+      // after the phone has switched to a different Agent session.
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (await tokenStorage.get() !== token) return;
+      if (sharingAvailable) {
         await Sharing.shareAsync(downloaded.uri, { mimeType: "application/pdf" });
       }
     } catch (e) {
@@ -53,6 +62,7 @@ export function useInvoiceDownload() {
       // promise rejection instead of a clean, user-facing message.
       toast.error("Couldn't download invoice", invoiceProblem(e));
     } finally {
+      running.current = false;
       setDownloading(false);
     }
   };
