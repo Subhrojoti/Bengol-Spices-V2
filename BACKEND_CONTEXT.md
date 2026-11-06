@@ -5,6 +5,17 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Production returns/advances and Agent release (6 November):** application
+`73a7a61` pushed; backend and Admin website deployed and verified. Full backend
+113/113, Admin/Employee browser 170/170, frontend units 13/13 and lint/build pass.
+All 186 API and 220 website files match release hashes; health, read-only live
+Admin checks, unchanged production configuration and backups verified. Added
+only the partial unique return retry index after a duplicate audit; no business
+record backfill. Office financial review remains intact. Agent/Delivery source
+is pushed, but both mobile apps need new builds; no signed binaries or Play
+Store release performed. See [release evidence and recovery](deploy/releases/2026-11-06-item-returns-agent.md).
+The local-only entries below describe their earlier implementation stage.
+
 **Second Agent mobile review (5 November, local only):** virtualized expanded
 Payments orders and stabilized grouping, added focused/foreground deadline
 refresh, and prevented invoice taps from also opening order details. Fixed
