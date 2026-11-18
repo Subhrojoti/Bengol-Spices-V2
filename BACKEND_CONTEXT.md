@@ -5,6 +5,20 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Production office dues / Admin security release (18 November):** application
+`1797cc3` pushed; backend and Admin website deployed and verified. Store dues and
+office receipt/approval are live. Patched Mongoose 9.11.4, stale Employee-session
+response handling and new-employee password-byte validation. Backend 121/121,
+browser 176/176, units 16/16, candidate browser 21/21 and lint/build pass. All
+190 API / 220 website files match; health, backups and unchanged configuration
+verified. HR unchanged. No live business mutation was used for smoke. Runtime
+audits are zero; unpatched build tooling and legacy identity-storage privacy
+remain documented. Mobile source is pushed (Agent 45/45, Delivery 24/24 and
+typechecks pass), but both apps still require separate builds. Read
+[release evidence and rollback](deploy/releases/2026-11-18-office-dues-admin.md).
+Earlier local/preparation entries below describe their original implementation
+stage; this release establishes the live backend/website status.
+
 **Admin release review (18 November, preparing):** fixed stale Employee 401
 responses invalidating newer sessions and rejected newly created employee
 passwords exceeding bcrypt's 72-byte limit. Patched Mongoose 9.11.1 → 9.11.4 and
