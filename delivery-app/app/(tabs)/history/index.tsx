@@ -1,4 +1,3 @@
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { useState } from "react";
 import { MyCollections } from "@/components/payments/MyCollections";
 import { View, Text, FlatList, Pressable } from "react-native";
@@ -20,9 +19,8 @@ import type { AssignedOrder, CompletedReturn } from "@/types/api";
 type Tab = "DELIVERIES" | "RETURNS" | "COLLECTIONS";
 
 export default function HistoryScreen() {
-  useRefetchOnFocus(["history"], ["collections"]);
   const [tab, setTab] = useState<Tab>("DELIVERIES");
-  const { data, isLoading, isError, refetch, error } = useDeliveryHistory();
+  const { data, isLoading, isError, refetch, error } = useDeliveryHistory(tab !== "COLLECTIONS");
   const { pulling, onPull } = usePullToRefresh(refetch);
 
   const deliveries = data?.deliveredOrders ?? [];
@@ -50,6 +48,9 @@ export default function HistoryScreen() {
           <ErrorState message={getErrorMessage(error, "Couldn't load your history.")} onRetry={refetch} />
         ) : tab === "DELIVERIES" ? (
           <FlatList
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
             data={deliveries}
             keyExtractor={(item) => item._id}
             contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 10 }}
@@ -62,6 +63,9 @@ export default function HistoryScreen() {
           />
         ) : (
           <FlatList
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
             data={returns}
             keyExtractor={(item) => item._id}
             contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 10 }}

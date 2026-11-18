@@ -13,7 +13,6 @@ import { formatCurrency } from "@/utils/currency";
 import { formatDate, isOverdue } from "@/utils/date";
 import { paymentStateOf } from "@/utils/paymentState";
 import { sizedImage } from "@/utils/image";
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { Order } from "@/types/api";
@@ -35,13 +34,12 @@ export default function PaymentsScreen() {
   const [tab, setTab] = useState<Tab>("DUE");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const now = useVisibleClock();
-  const dueQuery = useDueOrders();
-  const myOrdersQuery = useMyOrders();
+  const dueQuery = useDueOrders({ enabled: tab !== "COMPLETED" });
+  const myOrdersQuery = useMyOrders({ enabled: tab === "COMPLETED" });
   const { data: stores } = useMyStores();
   const { downloadInvoice, downloading } = useInvoiceDownload();
   // Dues and payments change while the agent is elsewhere in the app
-  useRefetchOnFocus(["orders"]);
-  const { pulling, onPull } = usePullToRefresh(dueQuery.refetch, myOrdersQuery.refetch);
+  const { pulling, onPull } = usePullToRefresh(tab === "COMPLETED" ? myOrdersQuery.refetch : dueQuery.refetch);
 
   const imagesByConsumerId = useMemo(() => {
     const map = new Map<string, string>();
@@ -81,7 +79,7 @@ export default function PaymentsScreen() {
           segments={[
             { value: "DUE", label: "Due", count: due.length },
             { value: "OVERDUE", label: "Overdue", count: overdue.length },
-            { value: "COMPLETED", label: "Completed", count: completed.length },
+            { value: "COMPLETED", label: "Completed", count: myOrdersQuery.data ? completed.length : undefined },
           ]}
           value={tab}
           onChange={setTab}

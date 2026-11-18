@@ -1,10 +1,13 @@
+import { useIsFocused } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { storeApi, type CreateStoreInput } from "@/api/store.api";
 
 export function useMyStores() {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["stores", "mine"],
-    queryFn: storeApi.getMyStores,
+    queryFn: ({ signal }) => storeApi.getMyStores(signal),
+    enabled: focused,
   });
 }
 

@@ -16,7 +16,6 @@ import { getErrorMessage } from "@/api/client";
 import { openInMaps } from "@/utils/maps";
 import { sizedImage } from "@/utils/image";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { validStoreLocation } from "@/utils/storeCorrection";
 
 const STORE_TYPE_LABEL: Record<Store["storeType"], string> = {
@@ -39,7 +38,6 @@ export default function MyStoresScreen() {
   const router = useRouter();
   const { data: stores, isLoading, isError, refetch, error } = useMyStores();
   const { pulling, onPull } = usePullToRefresh(refetch);
-  useRefetchOnFocus(["stores"]);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
 
@@ -81,6 +79,9 @@ export default function MyStoresScreen() {
         <ErrorState message={getErrorMessage(error, "Couldn't load your stores.")} onRetry={refetch} />
       ) : (
         <FlatList
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={5}
           data={filtered}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 14 }}

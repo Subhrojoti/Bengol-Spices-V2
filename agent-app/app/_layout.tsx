@@ -1,4 +1,5 @@
 import "../global.css";
+export { AppRecovery as ErrorBoundary } from "@/components/AppRecovery";
 import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";

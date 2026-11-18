@@ -12,6 +12,7 @@ import { coverageForState, normalizePincode, normalizeSalesState } from "../util
 import { effectiveMinimum } from "../utils/orderMinimums.js";
 import { readGstNumber, registrationGps } from "../utils/storeDetails.js";
 import { withStorePhoneLock } from "../services/storePhone.service.js";
+
 import {
   STORE_TYPES,
   applyLocationPrices,
@@ -19,6 +20,21 @@ import {
   getLocationOverrides,
 } from "../utils/pricing.js";
 
+// Agent-owned registration choices. Never expose another agent's coverage,
+// assignment audit or price overrides through the registration form.
+export const getMySalesCoverage = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (typeof req.user.agentId !== "string" || !req.user.agentId.trim()) {
+    return res.status(401).json({ success: false, message: "Agent identity missing" });
+  }
+  try {
+    const locations = await AgentSalesLocation.find({ agentId: req.user.agentId })
+      .select("state city pincodes -_id").sort({ state: 1, city: 1 }).lean();
+    return res.json({ success: true, locations });
+  } catch {
+    return res.status(500).json({ success: false, message: "Could not load your assigned coverage" });
+  }
+};
 // The same fields the public catalogue exposes
 const CATALOGUE_FIELDS =
   "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage stock minOrderQty retailerMinOrderQty wholesalerMinOrderQty distributorMinOrderQty horecaMinOrderQty";

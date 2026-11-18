@@ -1,4 +1,3 @@
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { View, Text, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Package, Undo2, Clock3, Bell } from "lucide-react-native";
@@ -16,7 +15,6 @@ import { colors, gradients } from "@/theme/colors";
 import { getErrorMessage } from "@/api/client";
 
 export default function DashboardScreen() {
-  useRefetchOnFocus(["dashboard"]);
   const router = useRouter();
   const { data, isLoading, isError, isFetching, refetch, error } = useDashboard();
   const { data: partner } = useProfile();

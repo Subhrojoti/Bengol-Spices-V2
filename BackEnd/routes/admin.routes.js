@@ -37,6 +37,7 @@ import { getDispatchMappings, saveDispatchMapping, revokeDispatchMapping } from 
 import { getDeliveryPerformance, getPartnerOrders } from "../controllers/deliveryPerformance.controller.js";
 import { getPartnerCollections } from "../controllers/partnerCollections.controller.js";
 import { getBills, getBill, getBillOptions, downloadBills } from "../controllers/bills.controller.js";
+import { getStoreDues, getStoreDueOrders, getOfficeOrderPayments, recordOfficeCollection } from "../controllers/storeDues.controller.js";
 
 const router = express.Router();
 import { getDeliveryPartnerPurgePreview, executeDeliveryPartnerPurge } from "../controllers/adminManagement.controller.js";
@@ -44,6 +45,10 @@ import { setAgentAccess, getTransferPreview, executeTransfer, getRemovalPreview,
 
 // 🔒 All routes require login
 router.use(protect);
+router.get("/store-dues", checkPermission("canVerifyPayments"), getStoreDues);
+router.get("/store-dues/stores/:consumerId/orders", checkPermission("canVerifyPayments"), getStoreDueOrders);
+router.get("/store-dues/orders/:orderId/payments", checkPermission("canVerifyPayments"), getOfficeOrderPayments);
+router.post("/store-dues/orders/:orderId/payments", checkPermission("canVerifyPayments"), recordOfficeCollection);
 router.get("/delivery-codes", checkPermission("canGetAllOrders"), checkPermission("canViewDeliveryCodes"), getActiveDeliveryCodes);
 router.post("/delivery-codes/:orderId/reveal", checkPermission("canGetAllOrders"), checkPermission("canViewDeliveryCodes"), revealActiveOrderDeliveryCode);
 router.get("/bills", checkPermission("canViewBills"), getBills);

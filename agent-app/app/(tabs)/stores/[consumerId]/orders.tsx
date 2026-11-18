@@ -17,7 +17,6 @@ import { getErrorMessage } from "@/api/client";
 import { colors } from "@/theme/colors";
 import type { Order } from "@/types/api";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 
 const STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "info"> = {
   DELIVERED: "success",
@@ -98,7 +97,6 @@ export default function StoreOrdersScreen() {
   const { data: orders, isLoading, isError, refetch, error } = useOrdersByStore(consumerId);
   const { pulling, onPull } = usePullToRefresh(refetch);
   // Coming back from an order: its delivery or payment may have moved on
-  useRefetchOnFocus(["orders", "store", consumerId]);
   const { downloadInvoice, downloading } = useInvoiceDownload();
 
   const [query, setQuery] = useState("");

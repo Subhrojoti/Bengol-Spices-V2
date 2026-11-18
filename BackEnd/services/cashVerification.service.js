@@ -286,7 +286,7 @@ const tell = (agentId, title, message, meta, recipientModel = "Agent") =>
        reason to report it as failed. createNotification has logged it. */
   });
 
-const collectorOf = (payment) => payment.collectedBy?.id || payment.agentId;
+const collectorOf = (payment) => ["ADMIN", "EMPLOYEE"].includes(payment.collectedBy?.role) ? payment.agentId : payment.collectedBy?.id || payment.agentId;
 const collectorModel = (payment) => payment.collectedBy?.role === "DELIVERY_PARTNER" ? "DeliveryPartner" : "Agent";
 
 const announce = (payment) =>
@@ -412,7 +412,9 @@ const approveCashPaymentUnlocked = async ({ paymentId, note, actor, now = new Da
   await tell(
     collectorOf(payment),
     "✅ Cash payment verified",
-    collectorOf(payment) !== payment.agentId
+    ["ADMIN", "EMPLOYEE"].includes(payment.collectedBy?.role)
+      ? `The office recorded and verified ${inr(payment.amount)} for order ${payment.orderId}. Sales attribution remains with the original order agent; existing target eligibility still applies.`
+      : collectorOf(payment) !== payment.agentId
       ? `${inr(payment.amount)} you collected for order ${payment.orderId} has been verified. Historical sales attribution remains with the original order agent.`
       : isOwnMonth(payment, order)
       ? `${inr(payment.amount)} you collected for order ${payment.orderId} on ${day(payment.createdAt)} has been verified and now counts toward your sales.`
@@ -458,7 +460,7 @@ const rejectCashPaymentUnlocked = async ({ paymentId, reason, actor, now = new D
   await tell(
     collectorOf(payment),
     "Cash payment not verified",
-    `${inr(payment.amount)} you recorded for order ${payment.orderId} on ${day(payment.createdAt)} was not verified: ${why} It does not count toward your sales until this is settled with the office.`,
+    `${inr(payment.amount)} ${["ADMIN", "EMPLOYEE"].includes(payment.collectedBy?.role) ? "the office" : "you"} recorded for order ${payment.orderId} on ${day(payment.createdAt)} was not verified: ${why} It does not count toward your sales until this is settled with the office.`,
     { kind: "CASH_VERIFICATION", status: REJECTED, orderId: payment.orderId, paymentId: String(payment._id) },
     collectorModel(payment),
   );

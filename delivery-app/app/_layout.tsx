@@ -21,6 +21,8 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { toastConfig } from "@/theme/toastConfig";
 import { useReactQueryAppStateFocus } from "@/hooks/useReactQueryAppStateFocus";
 
+export { AppRecovery as ErrorBoundary } from "@/components/AppRecovery";
+
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Matches the top of assets/splash-screen.png so any gap between the native

@@ -1,9 +1,9 @@
 // Shared defensive helpers for unwrapping API responses. React Query
 // requires a query function to NEVER resolve to undefined — if it does,
 // the whole query crashes hard with "Query data cannot be undefined."
-// These helpers guarantee a safe fallback (empty array / null) no matter
-// what shape actually comes back from the server, so a wrong assumption
-// about response shape degrades gracefully instead of crashing the app.
+// Unsupported wrappers fall back to an empty array / null. Entity arrays
+// containing invalid rows become query errors before a renderer crashes;
+// records are never silently dropped to make a malformed list look valid.
 
 // 🔥 Widened significantly — a response wrapped as {stores: [...]} or
 // {orders: [...]} etc. was silently falling through to an empty array
@@ -39,32 +39,42 @@ function findArrayByKey(obj: Record<string, unknown>): unknown[] | null {
   return null;
 }
 
+function recordList<T>(rows: unknown[]): T[] {
+  // Every consumer is a list of entities. Do not pass null rows into a
+  // FlatList renderer or silently remove them and report an incorrect count.
+  if (!rows.every(row => row !== null && typeof row === "object" && !Array.isArray(row))) {
+    throw new Error("The server returned incomplete list data. Please refresh and try again.");
+  }
+  return rows as T[];
+}
+
 export function unwrapList<T>(responseData: unknown): T[] {
-  if (Array.isArray(responseData)) return responseData as T[];
+  if (Array.isArray(responseData)) return recordList<T>(responseData);
 
   const body = (responseData ?? {}) as Record<string, unknown>;
 
   const direct = findArrayByKey(body);
-  if (direct) return direct as T[];
+  if (direct) return recordList<T>(direct);
 
   // One level deeper, e.g. {success, data: {products: [...], total: 10}}.
   for (const key of LIST_KEYS) {
     const nested = body[key];
     if (nested && typeof nested === "object" && !Array.isArray(nested)) {
       const found = findArrayByKey(nested as Record<string, unknown>);
-      if (found) return found as T[];
+      if (found) return recordList<T>(found);
     }
   }
 
   const arrayValues = Object.values(body).filter(Array.isArray);
-  if (arrayValues.length === 1) return arrayValues[0] as T[];
+  if (arrayValues.length === 1) return recordList<T>(arrayValues[0]);
 
   return [];
 }
 
 export function unwrapObject<T>(responseData: unknown): T | null {
+  if (!responseData || typeof responseData !== "object" || Array.isArray(responseData)) return null;
   const body = (responseData ?? {}) as Record<string, unknown>;
   const candidate = "data" in body ? body.data : body;
-  if (candidate && typeof candidate === "object") return candidate as T;
+  if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) return candidate as T;
   return null;
 }

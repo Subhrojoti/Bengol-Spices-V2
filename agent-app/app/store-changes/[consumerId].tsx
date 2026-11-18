@@ -21,7 +21,7 @@ import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 const labels: Record<string, string> = { storeName: "Store name", ownerName: "Owner name", phone: "Phone", gstNumber: "GST number", state: "State", city: "City", street: "Street", pincode: "Pincode" };
 export default function StoreChangesScreen() {
   const { consumerId } = useLocalSearchParams<{ consumerId: string }>(), stores = useMyStores();
-  useRefetchOnFocus(["stores"], ["store-changes", consumerId]);
+  useRefetchOnFocus(["store-changes", consumerId]);
   const store = stores.data?.find(s => s.consumerId === consumerId);
   return <SafeAreaView className="flex-1 bg-cream" edges={["top"]}><AppHeader title="Request store changes" showBack />{stores.isPending ? <LoadingState message="Loading store…" /> : !store || stores.isError ? <ErrorState message="Store unavailable or no longer managed by you." onRetry={stores.refetch} /> : <ChangesForm key={`${consumerId}:${store.detailsVersion || 0}`} store={store} />}</SafeAreaView>;
 }

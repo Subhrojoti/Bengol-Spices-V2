@@ -65,10 +65,11 @@ function DeliveryDetailScreen({ orderId }: { orderId: string }) {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const { data: orders, isLoading, isError, refetch, error } = useAssignedOrders();
   const { data: rules } = useDeliveryRules();
-  const { data: history, isPending: historyLoading, isError: historyError, error: historyProblem, refetch: refetchHistory } = useDeliveryHistory();
+  const activeOrder = orders?.find(o => o.orderId === orderId);
+  const { data: history, isPending: historyLoading, isError: historyError, error: historyProblem, refetch: refetchHistory } = useDeliveryHistory(!isLoading && !activeOrder);
   const updateStatus = useUpdateDeliveryStatus();
   const reportFailure = useReportCouldNotDeliver();
-  const { pulling, onPull } = usePullToRefresh(refetch);
+  const { pulling, onPull } = usePullToRefresh(activeOrder ? refetch : refetchHistory);
 
   /* 🔥 FIX: the backend only marks an order delivered when it is sent the
      store's 6-digit delivery code, which the store owner reads out at
@@ -99,7 +100,7 @@ function DeliveryDetailScreen({ orderId }: { orderId: string }) {
   // marked DELIVERED (that query only returns active work). Falling back
   // to history data means this screen still resolves correctly if reached
   // from the History tab, or if the active list hasn't refetched yet.
-  const order = orders?.find((o) => o.orderId === orderId) ?? history?.deliveredOrders.find((o) => o.orderId === orderId);
+  const order = activeOrder ?? history?.deliveredOrders.find((o) => o.orderId === orderId);
 
   const storePoint = order ? deliveryPoint(order) : null;
   const report = order?.delivery?.couldNotDeliver;

@@ -1,10 +1,13 @@
+import { useIsFocused } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { returnApi } from "@/api/return.api";
 
 export function useMyReturns() {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["returns", "mine"],
-    queryFn: returnApi.getMyReturns,
+    queryFn: ({ signal }) => returnApi.getMyReturns(signal),
+    enabled: focused,
   });
 }
 

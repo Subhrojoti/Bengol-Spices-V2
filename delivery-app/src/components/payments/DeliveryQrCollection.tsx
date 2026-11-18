@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, Modal, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, AppState, Image, Modal, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,10 +7,12 @@ import { api, getErrorMessage } from "@/api/client";
 import { Button } from "@/components/ui/Button";
 import { qrAmount, savedQr, type DeliveryQr } from "@/utils/qrPayment";
 import { toast } from "@/utils/toast";
+import { useIsFocused } from "expo-router";
 
 interface Props { actorId?: string; orderId: string; amountText: string; dueAmount: number; disabled: boolean; onBlocked: (blocked: boolean) => void; onRecorded: () => void }
 const money = (amount: number) => `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 export function DeliveryQrCollection({ actorId, orderId, amountText, dueAmount, disabled, onBlocked, onRecorded }: Props) {
+  const focused = useIsFocused();
   const [qr, setQr] = useState<DeliveryQr | null>(null), [visible, setVisible] = useState(false), [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [revision, setRevision] = useState(0), [ratio, setRatio] = useState(0.77);
   const alive = useRef(true), running = useRef(false), client = useQueryClient(), window = useWindowDimensions();
   const key = `delivery-qr.${actorId || "unknown"}.${orderId}`.replace(/[^A-Za-z0-9._-]/g, "_");
@@ -25,7 +27,11 @@ export function DeliveryQrCollection({ actorId, orderId, amountText, dueAmount, 
     }).catch(() => { if (current) setError("Could not restore QR recovery. Retry before collecting another payment."); });
     return () => { current = false; };
   }, [actorId, key, base, revision, onBlocked]);
-  useEffect(() => { if (qr?.imageUrl) Image.getSize(qr.imageUrl, (width, height) => { if (alive.current && width > 0 && height > 0) setRatio(width / height); }, () => {}); }, [qr?.imageUrl]);
+  useEffect(() => {
+    let current = true; setRatio(0.77);
+    if (qr?.imageUrl) Image.getSize(qr.imageUrl, (width, height) => { if (current && alive.current && width > 0 && height > 0) setRatio(width / height); }, () => {});
+    return () => { current = false; };
+  }, [qr?.imageUrl]);
   const invalidate = useCallback(() => Promise.all(["collections", "orders", "dashboard", "history"].map(query => client.invalidateQueries({ queryKey: [query] }))), [client]);
   const remove = async () => {
     await SecureStore.deleteItemAsync(key);
@@ -52,10 +58,10 @@ export function DeliveryQrCollection({ actorId, orderId, amountText, dueAmount, 
   };
   const checkRef = useRef(check); checkRef.current = check;
   useEffect(() => {
-    if (!visible || !qr) return;
-    const timer = setInterval(() => { void checkRef.current(); }, 3000);
+    if (!visible || !qr || !focused) return;
+    const timer = setInterval(() => { if (AppState.currentState === "active") void checkRef.current(); }, 3000);
     return () => clearInterval(timer);
-  }, [visible, qr]);
+  }, [visible, qr, focused]);
   const open = async () => {
     if (!actorId || running.current || !ready) return;
     if (!qr && (disabled || qrAmount(amountText, dueAmount) === null)) return;
@@ -69,7 +75,11 @@ export function DeliveryQrCollection({ actorId, orderId, amountText, dueAmount, 
       if (alive.current) setQr(validated);
       await SecureStore.setItemAsync(key, JSON.stringify(validated));
       if (alive.current) setVisible(true);
-    } catch (e) { if (alive.current) { setError(getErrorMessage(e)); onBlocked(Boolean(created)); } }
+    } catch (e) {
+      // A timed-out create may already have produced a payable QR. Reconcile
+      // server/local recovery before allowing Cash, another QR or recorded UPI.
+      if (alive.current) { setError(getErrorMessage(e)); onBlocked(true); setReady(false); setRevision(n => n + 1); }
+    }
     finally { running.current = false; if (alive.current) setBusy(false); }
   };
   const closeUnpaid = async () => {

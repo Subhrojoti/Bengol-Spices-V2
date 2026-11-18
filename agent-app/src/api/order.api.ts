@@ -32,16 +32,16 @@ export interface PlaceOrderInput {
 }
 
 export const orderApi = {
-  getMyOrders: (): Promise<Order[]> => api.get("/agent/orders/my-orders").then((r) => unwrapList<Order>(r.data)),
+  getMyOrders: (signal?: AbortSignal): Promise<Order[]> => api.get("/agent/orders/my-orders", { signal }).then((r) => unwrapList<Order>(r.data)),
 
-  getOrdersByStore: (consumerId: string): Promise<Order[]> =>
-    api.get(`/agent/orders/store/${encodeURIComponent(consumerId)}`).then((r) => unwrapList<Order>(r.data)),
+  getOrdersByStore: (consumerId: string, signal?: AbortSignal): Promise<Order[]> =>
+    api.get(`/agent/orders/store/${encodeURIComponent(consumerId)}`, { signal }).then((r) => unwrapList<Order>(r.data)),
 
-  getDueOrders: (): Promise<Order[]> => api.get("/agent/orders/due-orders").then((r) => unwrapList<Order>(r.data)),
+  getDueOrders: (signal?: AbortSignal): Promise<Order[]> => api.get("/agent/orders/due-orders", { signal }).then((r) => unwrapList<Order>(r.data)),
 
   /** One of the agent's own orders, without downloading the whole list. */
-  getOrder: (orderId: string): Promise<Order> =>
-    api.get<{ success: true; order: Order }>(`/agent/orders/mine/${encodeURIComponent(orderId)}`).then((r) => {
+  getOrder: (orderId: string, signal?: AbortSignal): Promise<Order> =>
+    api.get<{ success: true; order: Order }>(`/agent/orders/mine/${encodeURIComponent(orderId)}`, { signal }).then((r) => {
       if (!r.data?.order) throw new Error("Couldn't find this order.");
       return r.data.order;
     }),

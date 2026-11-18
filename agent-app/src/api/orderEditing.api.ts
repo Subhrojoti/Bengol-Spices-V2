@@ -7,5 +7,5 @@ export interface OrderChange { _id: string; revision: number; agentId: string; c
 export const orderEditingApi = {
   details: (orderId: string) => api.get<EditDetails>(`/agent/orders/mine/${encodeURIComponent(orderId)}/edit`).then(r => r.data),
   save: (orderId: string, body: EditAttempt) => api.put(`/agent/orders/mine/${encodeURIComponent(orderId)}/edit`, body).then(r => r.data),
-  history: (orderId: string, page: number) => api.get<{ history: OrderChange[]; pages: number }>(`/agent/orders/mine/${encodeURIComponent(orderId)}/modifications`, { params: { page } }).then(r => r.data),
+  history: (orderId: string, page: number, signal?: AbortSignal) => api.get<{ history: OrderChange[]; pages: number }>(`/agent/orders/mine/${encodeURIComponent(orderId)}/modifications`, { params: { page }, signal }).then(r => r.data),
 };

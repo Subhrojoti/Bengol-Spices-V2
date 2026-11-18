@@ -126,10 +126,15 @@ axiosInstance.interceptors.response.use(
 
     if (panel) {
       const hadSession = Boolean(error.config?.headers?.Authorization);
+      // A delayed response belongs to the session used to send it, not a
+      // replacement login or a different panel opened while it was in flight.
+      const matchingSession = panel.login === "/employee/login" &&
+        error.config?.headers?.Authorization === `Bearer ${localStorage.getItem("employeeToken")}`;
 
       if (
         status === 401 &&
         hadSession &&
+        matchingSession &&
         !leavingForSignIn &&
         window.location.pathname !== panel.login
       ) {

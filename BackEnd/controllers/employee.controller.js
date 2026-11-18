@@ -62,11 +62,11 @@ export const createEmployee = async (req, res) => {
     }
 
     // bcrypt reads only the first 72 bytes; a longer one is a mistake or an attack
-    if (password.length > 128) {
+    if (Buffer.byteLength(password, "utf8") > 72) {
       await discardUpload(req.file);
       return res.status(400).json({
         success: false,
-        message: "Password must be 128 characters or fewer",
+        message: "Password must be 72 bytes or fewer (use fewer characters for accented letters or emoji)",
       });
     }
 

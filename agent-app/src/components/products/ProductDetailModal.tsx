@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, Image, Modal, Pressable, ScrollView, Dimensions } from "react-native";
+import { View, Text, Image, Modal, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { X, Tag, Percent, Plus } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/Button";
@@ -9,9 +9,8 @@ import { resolveProductPrice } from "@/utils/pricing";
 import { unitForCounting } from "@/utils/uom";
 import { htmlToText } from "@/utils/htmlToText";
 import { colors } from "@/theme/colors";
+import { sizedImage } from "@/utils/image";
 import type { PublicProduct, StoreType } from "@/types/api";
-
-const { width: screenWidth } = Dimensions.get("window");
 
 interface ProductDetailModalProps {
   visible: boolean;
@@ -22,6 +21,7 @@ interface ProductDetailModalProps {
 }
 
 export function ProductDetailModal({ visible, product, storeType, onClose, onAdd }: ProductDetailModalProps) {
+  const { width: screenWidth } = useWindowDimensions();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
 
@@ -31,9 +31,10 @@ export function ProductDetailModal({ visible, product, storeType, onClose, onAdd
   const productId = product?._id;
   useEffect(() => {
     setQuantity(minQuantity);
+    setActiveImage(0);
   }, [productId, minQuantity]);
 
-  if (!product) return null;
+  if (!product || !visible) return null;
 
   const images = [product.images?.front?.url, product.images?.back?.url].filter(Boolean) as string[];
   const price = resolveProductPrice(product, storeType);
@@ -70,7 +71,7 @@ export function ProductDetailModal({ visible, product, storeType, onClose, onAdd
                   }}
                 >
                   {images.map((uri, idx) => (
-                    <Image key={idx} source={{ uri }} style={{ width: screenWidth, height: 300 }} resizeMode="contain" />
+                    <Image key={idx} source={{ uri: sizedImage(uri, screenWidth) }} style={{ width: screenWidth, height: 300 }} resizeMode="contain" resizeMethod="resize" />
                   ))}
                 </ScrollView>
                 {images.length > 1 ? (

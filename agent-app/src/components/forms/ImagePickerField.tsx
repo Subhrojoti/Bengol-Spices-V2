@@ -86,7 +86,7 @@ export function ImagePickerField({ label, uri, onChange, error, mode = "library"
         }`}
       >
         {uri ? (
-          <Image source={{ uri }} className="h-12 w-12 rounded-lg" />
+          <Image source={{ uri }} resizeMethod="resize" className="h-12 w-12 rounded-lg" />
         ) : (
           <View className="h-12 w-12 items-center justify-center rounded-lg bg-saffron-50">
             <Camera size={18} color={colors.saffron[600]} />

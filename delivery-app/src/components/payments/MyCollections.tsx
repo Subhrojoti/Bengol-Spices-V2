@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { View, Text, FlatList, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useRouter, useIsFocused } from "expo-router";
+import { collectionData } from "@/utils/responseData";
 import { api, getErrorMessage } from "@/api/client";
 import { Button } from "@/components/ui/Button";
 import { ErrorState, LoadingState } from "@/components/ui/States";
@@ -12,8 +13,9 @@ interface Collections {
 }
 const money = (value: number) => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 export function MyCollections() {
+  const focused = useIsFocused();
   const [page, setPage] = useState(1), router = useRouter();
-  const query = useQuery({ queryKey: ["collections", "mine", page], queryFn: () => api.get<Collections>("/delivery-partner/collections", { params: { page } }).then(r => r.data) });
+  const query = useQuery({ queryKey: ["collections", "mine", page], enabled: focused, gcTime: 60 * 1000, queryFn: ({ signal }) => api.get<Collections>("/delivery-partner/collections", { params: { page }, signal }).then(r => collectionData<Collections>(r.data, true)) });
   if (query.isPending) return <LoadingState message="Loading your collections…" />;
   if (query.isError) return <ErrorState message={getErrorMessage(query.error)} onRetry={query.refetch} />;
   const data = query.data;

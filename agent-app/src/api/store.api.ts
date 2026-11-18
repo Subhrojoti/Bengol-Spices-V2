@@ -1,6 +1,7 @@
 import { api } from "./client";
 import { unwrapList, unwrapObject } from "./unwrap";
 import type { Store, StoreType } from "@/types/api";
+import type { CoverageLocation } from "@/utils/coverageChoices";
 
 export interface CreateStoreInput {
   storeName: string;
@@ -21,7 +22,9 @@ export interface CreateStoreInput {
 }
 
 export const storeApi = {
-  getMyStores: (): Promise<Store[]> => api.get("/agent/store/my-stores").then((r) => unwrapList<Store>(r.data)),
+  getMyCoverage: (signal?: AbortSignal): Promise<CoverageLocation[]> =>
+    api.get("/agent/store/my-coverage", { signal }).then(r => unwrapList<CoverageLocation>(r.data)),
+  getMyStores: (signal?: AbortSignal): Promise<Store[]> => api.get("/agent/store/my-stores", { signal }).then((r) => unwrapList<Store>(r.data)),
 
   createStore: (input: CreateStoreInput): Promise<Store> => {
     const form = new FormData();

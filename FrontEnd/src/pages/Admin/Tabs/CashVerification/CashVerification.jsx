@@ -1,3 +1,4 @@
+import StoreDues from "./StoreDues";
 import reportAdminError from "../../../../utils/reportAdminError";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -196,6 +197,7 @@ export default function CashVerification() {
   const load = useCallback(
     async (isRefresh = false) => {
       const request = beginRequest();
+      if (collectorRole === "DUES") { setRefreshing(false); return; }
       setRefreshing(true);
       if (!isRefresh) setPhase((current) => current === "ready" ? "ready" : "loading");
 
@@ -333,9 +335,18 @@ export default function CashVerification() {
     }
   };
 
+  const collectorTabs = (
+      <div role="tablist" aria-label="Payment collectors" className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-200/60 p-1">
+        {[["ALL", "All collectors"], ["AGENT", "Agents"], ["DELIVERY_PARTNER", "Delivery partners"], ["DUES", "Store dues"]].map(([role, label]) => <button key={role} role="tab" aria-selected={collectorRole === role} disabled={busy} onClick={() => { setCollectorRole(role); setSelected(new Set()); setAgentId(""); setRecord({ open: false, row: null }); }} className={`rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${collectorRole === role ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{label}</button>)}
+      </div>
+
+  );
+  if (collectorRole === "DUES") return <Page>{collectorTabs}<StoreDues /></Page>;
+
   if (phase === "loading") {
     return (
       <Page>
+        {collectorTabs}
         <Skeleton />
       </Page>
     );
@@ -344,6 +355,7 @@ export default function CashVerification() {
   if (phase === "error") {
     return (
       <Page>
+        {collectorTabs}
         <Card className="p-12 text-center">
           <AlertCircle size={26} className="mx-auto text-slate-400" />
           <h3 className="mt-3 font-semibold text-slate-800">
@@ -370,9 +382,7 @@ export default function CashVerification() {
   return (
     <Page>
       {/* ===== HOW MUCH IS WHERE ===== */}
-      <div role="tablist" aria-label="Payment collectors" className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-200/60 p-1">
-        {[["ALL", "All collectors"], ["AGENT", "Agents"], ["DELIVERY_PARTNER", "Delivery partners"]].map(([role, label]) => <button key={role} role="tab" aria-selected={collectorRole === role} disabled={busy} onClick={() => { setCollectorRole(role); setSelected(new Set()); setAgentId(""); setRecord({ open: false, row: null }); }} className={`rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${collectorRole === role ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{label}</button>)}
-      </div>
+      {collectorTabs}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Tile
           label="Waiting to be verified"
@@ -642,7 +652,7 @@ export default function CashVerification() {
                       <p className="font-mono text-[12px] tabular-nums text-slate-500">
                         {row.agentId}
                       </p>
-                      {row.collector && <p className="mt-1 text-[11px] text-slate-500">Collector: {row.collector.role === "DELIVERY_PARTNER" ? "Delivery partner" : row.collector.role === "AGENT" ? "Agent" : "Not recorded"} · {row.collector.name || row.collector.id || "Unknown collector"}</p>}
+                      {row.collector && <p className="mt-1 text-[11px] text-slate-500">Collector: {row.collector.role === "DELIVERY_PARTNER" ? "Delivery partner" : row.collector.role === "AGENT" ? "Agent" : ["ADMIN", "EMPLOYEE"].includes(row.collector.role) ? "Office" : "Not recorded"} · {row.collector.name || row.collector.id || "Unknown collector"}</p>}
                     </td>
 
                     <td className="px-3 py-3.5 text-right">
@@ -879,7 +889,7 @@ export default function CashVerification() {
                 </dl>
                 {record.row.agentNote && (
                   <p className="mt-2.5 text-[13px] text-slate-600">
-                    Agent&apos;s note: {record.row.agentNote}
+                    Receipt note: {record.row.agentNote}
                   </p>
                 )}
               </section>

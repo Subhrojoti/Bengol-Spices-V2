@@ -169,6 +169,29 @@ delete process.env.RAZORPAY_KEY_ID;
 delete process.env.RAZORPAY_KEY_SECRET;
 let replica, server, origin;
 const id = () => crypto.randomUUID();
+
+test("registration coverage exposes only the signed-in agent's address choices, without prices or assignment metadata", async () => {
+  const a = await person("CHOICES-A"), b = await person("CHOICES-B");
+  const product = new mongoose.Types.ObjectId();
+  await AgentSalesLocation.create([
+    { agentId: a.agentId, state: "WEST BENGAL", city: "Kolkata", pincodes: ["743503", "700001"], assignedByModel: "Admin", priceOverrides: [{ productId: product, retailerPrice: 25 }] },
+    { agentId: b.agentId, state: "BIHAR", city: "Patna", pincodes: ["800001"], assignedByModel: "Admin" },
+  ]);
+  const own = await call(`/agent/store/my-coverage?agentId=${b.agentId}`, token(a));
+  assert.equal(own.status, 200); assert.equal(own.data.locations.length, 1);
+  assert.deepEqual(own.data.locations[0], { state: "WEST BENGAL", city: "Kolkata", pincodes: ["743503", "700001"] });
+  assert.equal((await call("/agent/store/locations", token(a))).status, 403);
+  assert.equal(await AgentSalesLocation.countDocuments(), 2);
+});
+
+test("registration coverage is Agent-only and an unassigned agent gets an empty list", async () => {
+  const a = await person("NO-CHOICES"), p = await partner("CHOICES-PARTNER");
+  assert.equal((await fetch(`${origin}/agent/store/my-coverage`)).status, 401);
+  assert.equal((await call("/agent/store/my-coverage", admin())).status, 403);
+  assert.equal((await call("/agent/store/my-coverage", partnerToken(p))).status, 403);
+  const result = await call("/agent/store/my-coverage", token(a));
+  assert.equal(result.status, 200); assert.deepEqual(result.data.locations, []);
+});
 const waitForStoreRelease = async consumerId => {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (!await mongoose.model("OperationLock").exists({ key: `store-management:${consumerId}` })) return;
@@ -188,6 +211,85 @@ const rawOrder = async (code, store, agent, extra = {}) => {
   const result = { orderId: code, consumerId: store.consumerId, store: store._id, agentId: agent.agentId, status: "DELIVERED", totalAmount: 100, paidAmount: 100, dueAmount: 0, paymentStatus: "COMPLETED", paymentMode: "CASH", dueDate: new Date(Date.now() + 86400000), orderLocation: { latitude: 22.5, longitude: 88.3 }, deliveryAddress: { storeName: store.storeName, ownerName: "Owner", phone: store.phone, state: "WEST BENGAL", city: "Kolkata", street: "Test", pincode: "700001" }, createdAt: new Date(), products: [{ name: "Spice", quantity: 1, unitPrice: 100, totalPrice: 100, uom: "packet" }], ...extra };
   await Order.collection.insertOne(result); return result;
 };
+
+test("office dues group non-cancelled orders once, include archived/clear stores on request and expose no delivery codes", async () => {
+  const a = await person("DUES-A"), s = await shop("DUES-S", a, { storeName: "Store [one]", status: "INACTIVE" }), clear = await shop("DUES-CLEAR", a);
+  await rawOrder("DUES-1", s, a, { totalAmount: 100, paidAmount: 20, dueAmount: 80 });
+  await rawOrder("DUES-2", s, a, { totalAmount: 50, paidAmount: 0, dueAmount: 50 });
+  await rawOrder("DUES-CANCEL", s, a, { status: "CANCELLED", dueAmount: 999 });
+  await rawOrder("DUES-CLEAR-O", clear, a);
+  const list = await call("/admin/store-dues", admin()); assert.equal(list.status, 200, JSON.stringify(list.data));
+  assert.equal(list.data.total, 1); assert.equal(list.data.summary.dueAmount, 130); assert.equal(list.data.summary.pendingOrders, 2);
+  assert.equal(list.data.stores[0].billAmount, 150); assert.equal(list.data.stores[0].recordedAmount, 20); assert(!JSON.stringify(list.data).includes("deliveryCode"));
+  assert.equal((await call("/admin/store-dues?balance=ALL", admin())).data.total, 2);
+  assert.equal((await call("/admin/store-dues?q=%5Bone%5D", admin())).data.total, 1);
+  assert.equal((await call("/admin/store-dues?q=%2E%2A", admin())).data.total, 0);
+  const details = await call("/admin/store-dues/stores/DUES-S/orders", admin()); assert.equal(details.data.total, 2); assert(!JSON.stringify(details.data).includes("deliveryCode"));
+  for (const query of ["?page=0", "?page[]=1", "?balance=wrong", "?q[x]=y"]) assert.equal((await call(`/admin/store-dues${query}`, admin())).status, 400);
+});
+
+test("office collections require live verification permission and ignore spoofed collector, sales owner and approval", async () => {
+  const a = await person("OFFICE-A"), s = await shop("OFFICE-S", a), p = await partner("OFFICE-P");
+  await rawOrder("OFFICE-O", s, a, { paidAmount: 0, dueAmount: 100 });
+  const employee = await Employee.create({ employeeId: "OFFICE-E", name: "Accounts employee", email: "office@test.invalid", password: "hash", permissions: { canSeePaymentInfo: true } });
+  const auth = jwt.sign({ id: String(employee._id), role: "EMPLOYEE" }, process.env.JWT_SECRET), path = "/admin/store-dues/orders/OFFICE-O/payments";
+  const input = { amount: 25.5, method: "BANK_TRANSFER", note: "Bank reference TEST-1", clientRequestId: id(), collector: { role: "AGENT", id: "fake" }, agentId: "fake", verification: { status: "APPROVED" } };
+  for (const user of [auth, token(a), partnerToken(p)]) { assert.equal((await call("/admin/store-dues", user)).status, 403); assert.equal((await call(path, user, "POST", input)).status, 403); }
+  assert.equal((await fetch(`${origin}/admin/store-dues`)).status, 401);
+  await Employee.updateOne({ _id: employee._id }, { $set: { "permissions.canVerifyPayments": true } });
+  const result = await call(path, auth, "POST", input); assert.equal(result.status, 201, JSON.stringify(result.data));
+  const saved = await Payment.findOne({ orderId: "OFFICE-O" }).lean(); assert.equal(saved.agentId, a.agentId); assert.equal(saved.collectedBy.role, "EMPLOYEE"); assert.equal(saved.collectedBy.id, String(employee._id)); assert.equal(saved.collectedBy.name, "Accounts employee"); assert.equal(saved.verification.status, "PENDING"); assert.equal(saved.verification.history[0].note, "Recorded by the office");
+  const history = await call(path, auth); assert.equal(history.data.recordedAmount, 25.5); assert.equal(history.data.verifiedAmount, 0); assert.equal(history.data.pendingVerificationAmount, 25.5); assert.equal(history.data.order.dueAmount, 74.5);
+  const approval = await call(`/admin/cash-payments/${saved._id}/approve`, auth, "POST", { note: "Bank credited" }); assert.equal(approval.status, 200, JSON.stringify(approval.data));
+  assert.equal((await call(path, auth)).data.verifiedAmount, 25.5);
+  assert.equal((await call(`/admin/cash-payments/${saved._id}/approve`, auth, "POST", {})).status, 409);
+  const all = await call("/admin/cash-payments?status=APPROVED", auth); assert.equal(all.data.data[0].collector.role, "EMPLOYEE");
+  await Employee.updateOne({ _id: employee._id }, { $set: { "permissions.canVerifyPayments": false } });
+  assert.equal((await call(path, auth)).status, 403); assert.equal((await call(path, auth, "POST", { ...input, clientRequestId: id() })).status, 403);
+});
+
+test("office receipt retries preserve balances and invoices exactly once; pending approval survives full settlement", async () => {
+  const storage = storageFixture();
+  try {
+    const a = await person("RECEIPT-A"), s = await shop("RECEIPT-S", a);
+    await rawOrder("RECEIPT-O", s, a, { paidAmount: 0, dueAmount: 100 });
+    await Invoice.create({ orderId: "RECEIPT-O", invoiceNumber: "OFFICE-TEST", buyer: { name: "Original buyer" }, totalAmount: 100, paidAmount: 0, dueAmount: 100 });
+    const path = "/admin/store-dues/orders/RECEIPT-O/payments", input = { amount: 100, method: "CASH", note: "Office cash receipt TEST", clientRequestId: id() };
+    const first = await call(path, admin(), "POST", input); assert.equal(first.status, 201, JSON.stringify(first.data));
+    const retry = await call(path, admin(), "POST", input); assert.equal(retry.status, 200); assert.equal(retry.data.replayed, true); assert.equal(retry.data.payment.id, first.data.payment.id);
+    assert.equal(await Payment.countDocuments(), 1); const order = await Order.findOne({ orderId: "RECEIPT-O" }).lean(); assert.equal(order.dueAmount, 0); assert.equal(order.paidAmount, 100);
+    const invoice = await Invoice.findOne({ orderId: "RECEIPT-O" }).lean(); assert.equal(invoice.invoiceNumber, "OFFICE-TEST"); assert.equal(invoice.buyer.name, "Original buyer"); assert.equal(invoice.paidAmount, 100); assert.equal(invoice.payments.length, 1);
+    assert.equal((await call("/admin/store-dues", admin())).data.total, 0);
+    assert.equal((await call(path, admin())).data.pendingVerificationAmount, 100);
+    assert.equal((await call(path, admin(), "POST", { ...input, amount: 50 })).status, 409);
+    assert.equal((await call(`/admin/cash-payments/${first.data.payment.id}/approve`, admin(), "POST", {})).status, 200);
+    assert.equal((await call(path, admin())).data.verifiedAmount, 100);
+  } finally { storage.restore(); }
+});
+
+test("office receipts reject overpayments, malformed input, unresolved gateway attempts and store-lock conflicts without writes", async () => {
+  const a = await person("SAFE-A"), s = await shop("SAFE-S", a);
+  await rawOrder("SAFE-O", s, a, { paidAmount: 0, dueAmount: 100 });
+  const path = "/admin/store-dues/orders/SAFE-O/payments", input = { amount: 20, method: "UPI", note: "UTR test reference", clientRequestId: id() };
+  for (const patch of [{ amount: 101 }, { amount: -1 }, { amount: true }, { amount: 0 }, { amount: "1.234" }, { amount: "1e1" }, { method: "RAZORPAY" }, { method: "CARD" }, { note: "" }, { clientRequestId: undefined }]) assert.equal((await call(path, admin(), "POST", { ...input, ...patch })).status, 400, JSON.stringify(patch));
+  const gateway = await GatewayPayment.create({ key: "qr:office-test", purpose: "ORDER_DUE", orderId: "SAFE-O", status: "QR_OPEN" });
+  assert.equal((await call(path, admin(), "POST", input)).status, 409); await GatewayPayment.deleteOne({ _id: gateway._id });
+  const locked = await withStoreLocks([s.consumerId], () => call(path, admin(), "POST", input)); assert.equal(locked.status, 409);
+  await Order.updateOne({ orderId: "SAFE-O" }, { status: "CANCELLED" }); assert.equal((await call(path, admin(), "POST", input)).status, 400);
+  assert.equal(await Payment.countDocuments(), 0); assert.equal((await Order.findOne({ orderId: "SAFE-O" })).paidAmount, 0);
+});
+
+test("office and agent simultaneous collections cannot spend the same due and failed invoice writes roll the receipt back", async () => {
+  const a = await person("ATOMIC-A"), s = await shop("ATOMIC-S", a);
+  await rawOrder("ATOMIC-O", s, a, { paidAmount: 0, dueAmount: 100 });
+  const path = "/admin/store-dues/orders/ATOMIC-O/payments", input = { amount: 70, method: "CASH", note: "Atomic receipt", clientRequestId: id() };
+  const original = Invoice.updateOne;
+  try { Invoice.updateOne = async () => { throw new Error("Synthetic invoice-write failure"); }; assert.equal((await call(path, admin(), "POST", input)).status, 500); }
+  finally { Invoice.updateOne = original; }
+  assert.equal(await Payment.countDocuments(), 0); assert.equal((await Order.findOne({ orderId: "ATOMIC-O" })).dueAmount, 100);
+  const outcomes = await Promise.all([call(path, admin(), "POST", input), call("/agent/orders/ATOMIC-O/collect-payment", token(a), "POST", { amount: 70, method: "CASH", clientRequestId: id() })]);
+  assert.equal(outcomes.filter(r => [200, 201].includes(r.status)).length, 1); assert.equal(await Payment.countDocuments(), 1); assert.equal((await Order.findOne({ orderId: "ATOMIC-O" })).dueAmount, 30);
+});
 
 test("delegated employees can use Admin workflows, while employee administration and revoked rights stay protected", async () => {
   const a = await person("DELEGATE-A"), s = await shop("DELEGATE-S", a), p = await partner("DELEGATE-P");

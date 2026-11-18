@@ -3,6 +3,7 @@ import { Image, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { IconButton } from "@/components/ui/Button";
 import { useProfile } from "@/hooks/useAgent";
+import { sizedImage } from "@/utils/image";
 
 export function initialsOf(name?: string): string {
   return (name ?? "")
@@ -31,7 +32,7 @@ export function ProfileAvatar({ size = 40 }: { size?: number }) {
   return (
     <IconButton onPress={() => router.push("/profile")} className="overflow-hidden bg-maroon-700">
       {showPhoto ? (
-        <Image source={{ uri: photo }} style={{ width: size, height: size }} resizeMode="cover" onError={() => setFailedUri(photo)} />
+        <Image source={{ uri: sizedImage(photo, size) }} style={{ width: size, height: size }} resizeMode="cover" resizeMethod="resize" onError={() => setFailedUri(photo)} />
       ) : (
         <Text className="font-sans-bold text-xs text-white">{initialsOf(agent?.name)}</Text>
       )}

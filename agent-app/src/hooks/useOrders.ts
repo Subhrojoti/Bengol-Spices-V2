@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useIsFocused } from "expo-router";
 import { isAxiosError } from "axios";
 import { orderApi, type PlaceOrderInput } from "@/api/order.api";
 import type { Order } from "@/types/api";
@@ -8,27 +9,33 @@ import type { Order } from "@/types/api";
    the order screen read its one order out of it. That screen now reads its
    order on its own (useOrder below), so this list is fetched when a screen
    that shows it opens, when one comes back into view with data that has
-   gone stale (useRefetchOnFocus), after anything that changes an order, and
+   gone stale, after anything that changes an order while visible, and
    on pull to refresh. */
-export function useMyOrders() {
+export function useMyOrders({ enabled = true }: { enabled?: boolean } = {}) {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["orders", "mine"],
-    queryFn: orderApi.getMyOrders,
+    queryFn: ({ signal }) => orderApi.getMyOrders(signal),
+    enabled: focused && enabled,
   });
 }
 
 export function useOrdersByStore(consumerId: string) {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["orders", "store", consumerId],
-    queryFn: () => orderApi.getOrdersByStore(consumerId),
-    enabled: !!consumerId,
+    queryFn: ({ signal }) => orderApi.getOrdersByStore(consumerId, signal),
+    gcTime: 60 * 1000,
+    enabled: !!consumerId && focused,
   });
 }
 
-export function useDueOrders() {
+export function useDueOrders({ enabled = true }: { enabled?: boolean } = {}) {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["orders", "due"],
-    queryFn: orderApi.getDueOrders,
+    queryFn: ({ signal }) => orderApi.getDueOrders(signal),
+    enabled: focused && enabled,
   });
 }
 
@@ -67,11 +74,12 @@ const SETTLED = ["DELIVERED", "CANCELLED"];
 
 export function useOrder(orderId: string, { live = false }: { live?: boolean } = {}) {
   const queryClient = useQueryClient();
+  const focused = useIsFocused();
 
   return useQuery({
     queryKey: ["orders", "one", orderId],
-    queryFn: () => orderApi.getOrder(orderId),
-    enabled: !!orderId,
+    queryFn: ({ signal }) => orderApi.getOrder(orderId, signal),
+    enabled: !!orderId && focused,
     initialData: () => orderFromLists(queryClient, orderId)?.order,
     initialDataUpdatedAt: () => orderFromLists(queryClient, orderId)?.readAt,
     // An order that is not there will not be there on a second try either

@@ -1,4 +1,4 @@
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
+import { useMemo } from "react";
 import { View, Text, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Truck, MapPin, Phone, TriangleAlert, ChevronRight } from "lucide-react-native";
@@ -15,12 +15,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const STATUS_ORDER: Record<string, number> = { ASSIGNED: 0, SHIPPED: 1, OUT_FOR_DELIVERY: 2 };
 
 export default function DeliveriesScreen() {
-  useRefetchOnFocus(["orders"]);
   const router = useRouter();
   const { data, isLoading, isError, refetch, error } = useAssignedOrders();
   const { pulling, onPull } = usePullToRefresh(refetch);
 
-  const sorted = [...(data ?? [])].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
+  const sorted = useMemo(() => [...(data ?? [])].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)), [data]);
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
@@ -33,6 +32,9 @@ export default function DeliveriesScreen() {
         <ErrorState message={getErrorMessage(error, "Couldn't load your deliveries.")} onRetry={refetch} />
       ) : (
         <FlatList
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
           data={sorted}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 4, gap: 10 }}

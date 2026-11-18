@@ -79,7 +79,7 @@ const paymentSchema = new mongoose.Schema(
       id: String,
       role: {
         type: String,
-        enum: ["AGENT", "DELIVERY_PARTNER"],
+        enum: ["AGENT", "DELIVERY_PARTNER", "ADMIN", "EMPLOYEE"],
         default: "AGENT",
       },
       name: String,

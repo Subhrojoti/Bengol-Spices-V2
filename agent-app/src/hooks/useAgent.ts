@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { agentApi } from "@/api/agent.api";
 
@@ -10,15 +11,19 @@ export function useProfile() {
 }
 
 export function useDashboard() {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["dashboard"],
-    queryFn: () => agentApi.getDashboard(),
+    queryFn: ({ signal }) => agentApi.getDashboard(undefined, undefined, signal),
+    enabled: focused,
   });
 }
 
 export function useLeaderboard() {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["leaderboard"],
-    queryFn: () => agentApi.getLeaderboard(),
+    queryFn: ({ signal }) => agentApi.getLeaderboard(undefined, undefined, 10, signal),
+    enabled: focused,
   });
 }

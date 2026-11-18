@@ -26,6 +26,9 @@ export function sizedImage(url: string | null | undefined, points: number): stri
   if (at < 0 || !url.includes("res.cloudinary.com")) return url;
 
   const rest = url.slice(at + UPLOAD.length);
+  // Rewriting a signed path or query can invalidate its signature. Keep it
+  // intact; native resizeMethod still bounds decoding at the rendering sites.
+  if (rest.startsWith("s--") || url.includes("?") || url.includes("#")) return url;
   // Already has instructions of its own (they come before the version or folder)
   if (/^[a-z]{1,3}_[^/]+\//.test(rest) && !/^v\d+\//.test(rest)) return url;
 

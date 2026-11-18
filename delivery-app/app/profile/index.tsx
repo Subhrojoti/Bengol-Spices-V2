@@ -86,8 +86,8 @@ export default function ProfileScreen() {
                   number on screen could be read by anyone looking at the phone */}
               <InfoRow
                 icon={<IdCard size={14} color={colors.saffron[700]} />}
-                label={partner.documents.idType.replace(/_/g, " ")}
-                value={`•••• ${String(partner.documents.idNumber ?? "").slice(-4)}`}
+                label={partner.documents?.idType?.replace(/_/g, " ") || "Identity document"}
+                value={`•••• ${String(partner.documents?.idNumber ?? "").slice(-4)}`}
               />
               <InfoRow
                 icon={<MapPin size={14} color={colors.saffron[700]} />}

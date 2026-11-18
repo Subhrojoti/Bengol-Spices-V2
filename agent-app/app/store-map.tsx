@@ -9,12 +9,10 @@ import { LoadingState, ErrorState, EmptyState } from "@/components/ui/States";
 import { useMyStores } from "@/hooks/useStores";
 import { openInMaps } from "@/utils/maps";
 import { validStoreLocation } from "@/utils/storeCorrection";
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { MapPin, ChevronRight, Navigation, FileText } from "lucide-react-native";
 import { colors } from "@/theme/colors";
 export default function StoreMapScreen() {
   const query = useMyStores(), router = useRouter(), [selected, setSelected] = useState("");
-  useRefetchOnFocus(["stores"]);
   const points = useMemo(() => (query.data || []).filter(store => validStoreLocation(store.location)).map(store => ({ id: store.consumerId, name: store.storeName, ...store.location, detail: [store.address?.street, store.address?.city].filter(Boolean).join(", ") })), [query.data]);
   const store = query.data?.find(store => store.consumerId === selected && validStoreLocation(store.location));
 

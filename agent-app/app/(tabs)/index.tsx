@@ -36,7 +36,6 @@ import { colors, gradients } from "@/theme/colors";
 import { getErrorMessage } from "@/api/client";
 import type { LeaderboardEntry } from "@/types/api";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 
 const styles = StyleSheet.create({
   tileShadow: { shadowColor: colors.maroon[900], shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
@@ -62,7 +61,6 @@ export default function OverviewScreen() {
   const { data, isLoading, isError, refetch, error } = useDashboard();
   const { pulling, onPull } = usePullToRefresh(refetch);
   // What the office does (confirming an order, approving cash) moves these too
-  useRefetchOnFocus(["dashboard"], ["notifications"], ["leaderboard"]);
   const { data: agent } = useProfile();
   const { data: notifications } = useNotifications();
   const { data: board } = useLeaderboard();

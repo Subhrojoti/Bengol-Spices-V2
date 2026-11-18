@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orderApi } from "@/api/order.api";
 import type { OrderStatus } from "@/types/api";
 import type { Fix } from "@/utils/location";
+import { useIsFocused } from "expo-router";
 
 /* The partner's active orders arrive together with the delivery rules, in
    one request. Both hooks below read that one request; whichever screen
@@ -12,17 +13,19 @@ import type { Fix } from "@/utils/location";
    be every 20 seconds. */
 const assignedQuery = {
   queryKey: ["orders", "assigned"],
-  queryFn: orderApi.getMyAssignedOrders,
+  queryFn: ({ signal }: { signal: AbortSignal }) => orderApi.getMyAssignedOrders(signal),
   refetchInterval: 60 * 1000,
 } as const;
 
 export function useAssignedOrders() {
-  return useQuery({ ...assignedQuery, select: (data) => data.orders });
+  const focused = useIsFocused();
+  return useQuery({ ...assignedQuery, enabled: focused, select: (data) => data.orders });
 }
 
 /** Must the partner be at the store to deliver, how close, and the reasons a delivery can fail. */
 export function useDeliveryRules() {
-  return useQuery({ ...assignedQuery, select: (data) => data.rules });
+  const focused = useIsFocused();
+  return useQuery({ ...assignedQuery, enabled: focused, select: (data) => data.rules });
 }
 
 function useRefreshAfterDeliveryAction() {

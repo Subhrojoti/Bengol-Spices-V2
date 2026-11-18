@@ -1,14 +1,15 @@
 import { api } from "./client";
 import type { AssignedOrder, DeliveryRules, OrderStatus } from "@/types/api";
 import type { Fix } from "@/utils/location";
+import { orderList } from "@/utils/responseData";
 
 export const orderApi = {
   /* The partner's active orders, with the rules the app follows when one is
      delivered (must the partner be at the store, and how close). */
-  getMyAssignedOrders: () =>
+  getMyAssignedOrders: (signal?: AbortSignal) =>
     api
-      .get<{ success: true; count: number; data: AssignedOrder[]; rules?: DeliveryRules }>("/delivery-partner/orders")
-      .then((r) => ({ orders: r.data.data, rules: r.data.rules ?? null })),
+      .get<{ success: true; count: number; data: AssignedOrder[]; rules?: DeliveryRules }>("/delivery-partner/orders", { signal })
+      .then((r) => ({ orders: orderList(r.data.data), rules: r.data.rules ?? null })),
 
   // NOTE: this route lives under /agent/orders in the backend's routing
   // even though it's the delivery-partner status-update endpoint.

@@ -1,4 +1,5 @@
 import { View, Text, Image, ScrollView, Alert } from "react-native";
+import { sizedImage } from "@/utils/image";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { KeyRound, LogOut, HelpCircle, Undo2, ChevronRight, ChevronLeft, User, IdCard, Mail, Phone, MapPin, Flame } from "lucide-react-native";
@@ -60,8 +61,8 @@ export default function ProfileScreen() {
 
             <View className="mt-3 flex-row items-center gap-4">
               <View style={{ marginBottom: -30 }}>
-                {agent.documents.photo ? (
-                  <Image source={{ uri: agent.documents.photo }} className="h-[84px] w-[84px] rounded-full border-[3px] border-saffron-400" />
+                {agent.documents?.photo ? (
+                  <Image source={{ uri: sizedImage(agent.documents.photo, 84) }} resizeMethod="resize" className="h-[84px] w-[84px] rounded-full border-[3px] border-saffron-400" />
                 ) : (
                   <View className="h-[84px] w-[84px] items-center justify-center rounded-full border-[3px] border-saffron-400 bg-saffron-600">
                     <Text className="font-display-bold text-2xl text-white">{agent.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}</Text>

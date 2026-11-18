@@ -1,55 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const vm = require('node:vm');
-const ts = require('typescript');
-
 // Runs the actual component effects/callbacks with deterministic hooks/timers.
 // No WebView, payment provider, native bridge, credentials or network is used.
-function component(relative, extra = {}) {
-  let cursor = 0, dirty = false, effects = [], tree;
-  const slots = [], intervals = new Map(), timeouts = new Map(), images = [];
-  let timer = 0;
-  const same = (a,b) => a && b && a.length === b.length && a.every((v,i) => Object.is(v,b[i]));
-  const react = {
-    useState(initial) { const index = cursor++; if (!slots[index]) slots[index] = { value: typeof initial === 'function' ? initial() : initial }; const slot = slots[index]; return [slot.value, value => { const next = typeof value === 'function' ? value(slot.value) : value; if (!Object.is(next,slot.value)) { slot.value=next;dirty=true; } }]; },
-    useRef(initial) { const index = cursor++; if (!slots[index]) slots[index] = { current: initial }; return slots[index]; },
-    useMemo(factory,deps) { const index=cursor++;const previous=slots[index];if(!previous||!same(previous.deps,deps))slots[index]={deps,value:factory()};return slots[index].value; },
-    useCallback(fn,deps) { return react.useMemo(()=>fn,deps); },
-    useEffect(effect,deps) { const index=cursor++; const previous=slots[index]; if (!previous || !same(previous.deps,deps)) { slots[index]={deps};effects.push(()=>{previous?.cleanup?.();slots[index].cleanup=effect();}); } },
-  };
-  const Image = Object.assign(function Image(){}, { getSize(url, success) { images.push({url,success}); } });
-  const native={ Image, useWindowDimensions:()=>({width:390,height:844}), FlatList:'FlatList', Modal:'Modal', View:'View',Text:'Text',Pressable:'Pressable',ActivityIndicator:'Spinner',ScrollView:'ScrollView' };
-  const source=ts.transpileModule(fs.readFileSync(require.resolve(relative),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
-  const module={exports:{}};
-  vm.runInNewContext(source,{
-    module,exports:module.exports,Promise,...extra.__globals,
-    setInterval(fn){intervals.set(++timer,fn);return timer;},clearInterval(id){intervals.delete(id);},
-    setTimeout(fn){timeouts.set(++timer,fn);return timer;},clearTimeout(id){timeouts.delete(id);},
-    require(name){
-      if (extra[name])return extra[name];
-      if(name==='react')return react;
-      if(name==='react/jsx-runtime')return require('react/jsx-runtime');
-      if(name==='react-native')return native;
-      if(name==='react-native-safe-area-context')return {SafeAreaView:'SafeAreaView'};
-      if(name==='react-native-webview')return {WebView:'WebView'};
-      if(name==='lucide-react-native')return new Proxy({}, {get:(_,key)=>key});
-      if(name==='@/components/ui/Button')return {Button:'Button'};
-      if(name.startsWith('@/components/'))return new Proxy({}, {get:(_,key)=>key});
-      if(name==='@/utils/currency')return {formatCurrency:n=>String(n)};
-      if(name==='@/api/client')return {getErrorMessage:e=>e.message};
-      if(name==='@/theme/colors')return {colors:new Proxy({}, {get:()=>({})})};
-      throw Error('Unexpected import '+name);
-    },
-  });
-  const Component=Object.values(module.exports)[0];
-  const render=props=>{let count=0;do{dirty=false;cursor=0;effects=[];tree=Component(props);effects.forEach(fn=>fn());if(++count>10)throw Error('Render loop');}while(dirty);return tree;};
-  const nodesOf=node=>!node||typeof node!=='object'?[]:[node,...[node.props?.children,node.props?.ListHeaderComponent,node.props?.ListFooterComponent].flat(Infinity).flatMap(n=>nodesOf(n))];
-  const textOf=node=>!node?'':typeof node==='string'?node:typeof node!=='object'?'':[node.props?.children].flat(Infinity).map(n=>textOf(n)).join(' ');
-  const nodes=(node=tree)=>nodesOf(node),text=(node=tree)=>textOf(node);
-  const settle=()=>new Promise(resolve=>setImmediate(resolve));
-  return {render,nodes,text,images,Image,intervals, async tick(){for(const fn of [...intervals.values()])await fn();await settle();},async confirm(){const pending=[...timeouts.values()];timeouts.clear();pending.forEach(fn=>fn());await settle();},settle};
-}
+const {component}=require('./helpers/component.cjs');
+
 const qrProps=(id,onPaid)=>({visible:true,qrCodeId:id,imageUrl:'https://fixture.invalid/'+id,amount:25,onClose(){},onPaid});
 
 test('delayed QR A confirmation keeps its original callback after QR B replaces the screen', async()=>{
@@ -141,4 +95,105 @@ test('the overdue clock refreshes on resume and releases its timer when Payments
   AppState.currentState='background';now=300;await c.tick();assert.equal(c.render({}),200);
   AppState.currentState='active';now=400;resume('active');assert.equal(c.render({}),400);
   cleanup();assert.equal(c.intervals.size,0);assert.equal(removed,1);
+});
+
+test('map renderer termination offers manual recovery and hidden screens release the WebView', () => {
+  let focused = true;
+  const c = component('../src/components/maps/StoreMap.tsx', {
+    'expo-router': { useIsFocused: () => focused },
+    './mapHtml': { mapHtml: () => '<html></html>' }, './vendor/leaflet': { leafletLicense: 'fixture licence' },
+  });
+  const props = { points: [{ id: 'S', name: 'Store', latitude: 22, longitude: 88 }], selectedId: 'S', onSelect() {} };
+  c.render(props);
+  c.nodes().find(node => node.type === 'WebView').props.onRenderProcessGone();
+  c.render(props); assert(!c.nodes().some(node => node.type === 'WebView'));
+  const retry = c.nodes().find(node => node.type === 'Pressable' && c.text(node).includes('Retry map'));
+  assert(retry); retry.props.onPress(); c.render(props);
+  assert(c.nodes().some(node => node.type === 'WebView'));
+  focused = false; c.render(props); assert(!c.nodes().some(node => node.type === 'WebView'));
+  focused = true; c.render(props); assert(c.nodes().some(node => node.type === 'WebView'));
+});
+
+test('product preview releases hidden images and follows current screen dimensions', () => {
+  let width = 390;
+  const c = component('../src/components/products/ProductDetailModal.tsx', {
+    'react-native': { View:'View', Text:'Text', Image:'Image', Modal:'Modal', Pressable:'Pressable', ScrollView:'ScrollView', useWindowDimensions: () => ({ width, height: 844 }) },
+    '@/utils/pricing': { resolveProductPrice: () => 20 }, '@/utils/uom': { unitForCounting: () => 'packets' },
+    '@/utils/htmlToText': { htmlToText: () => '' }, '@/utils/image': { sizedImage: (url, points) => `${url}?width=${points}` },
+  });
+  const props = { visible:false, product:{ _id:'P', name:'Spice', minOrderQty:10, images:{ front:{url:'https://fixture.invalid/photo'} } }, storeType:'RETAILER', onClose(){}, onAdd(){} };
+  assert.equal(c.render(props), null);
+  c.render({...props,visible:true});
+  let image = c.nodes().find(node => node.type === 'Image'); assert.equal(image.props.style.width,390); assert(image.props.source.uri.endsWith('width=390'));
+  width=700; c.render({...props,visible:true}); image=c.nodes().find(node=>node.type==='Image'); assert.equal(image.props.style.width,700);
+  c.render(props); assert(!c.nodes().some(node=>node.type==='Image'));
+});
+
+test('Payments downloads and pull-refreshes only the selected history, without inventing an unloaded completed count', async () => {
+  let dueEnabled, completedEnabled, dueReads=0, completedReads=0;
+  const c=component('../app/(tabs)/payments/index.tsx', {
+    'expo-router':{useRouter:()=>({})},
+    '@/hooks/useOrders':{
+      useDueOrders:opts=>{dueEnabled=opts?.enabled;return {data:[],refetch:async()=>{dueReads++;}};},
+      useMyOrders:opts=>{completedEnabled=opts?.enabled;return {refetch:async()=>{completedReads++;}};},
+    },
+    '@/hooks/useStores':{useMyStores:()=>({data:[]})},
+    '@/hooks/useInvoiceDownload':{useInvoiceDownload:()=>({})},
+    '@/hooks/useVisibleClock':{useVisibleClock:()=>100},
+    '@/hooks/usePullToRefresh':{usePullToRefresh:(...reads)=>({pulling:false,onPull:()=>Promise.all(reads.map(read=>read()))})},
+    '@/utils/date':{},'@/utils/paymentState':{},'@/utils/image':{},
+    '@/utils/paymentList':{paymentBuckets:()=>({due:[],overdue:[],completed:[]}),groupPaymentStores:()=>[],paymentListRows:()=>[]},
+  });
+  c.render({});assert.equal(dueEnabled,true);assert.equal(completedEnabled,false);
+  let tabs=c.nodes().find(node=>node.props?.segments);
+  assert.equal(tabs.props.segments.find(s=>s.value==='COMPLETED').count,undefined);
+  await c.nodes().find(node=>node.type==='FlatList').props.onRefresh();assert.equal(dueReads,1);assert.equal(completedReads,0);
+  tabs.props.onChange('COMPLETED');c.render({});assert.equal(dueEnabled,false);assert.equal(completedEnabled,true);
+  await c.nodes().find(node=>node.type==='FlatList').props.onRefresh();assert.equal(dueReads,1);assert.equal(completedReads,1);
+});
+
+test('screen recovery never submits anything automatically and a rejected retry remains usable', async () => {
+  let attempts=0;
+  const c=component('../src/components/AppRecovery.tsx');
+  const props={error:new Error('private diagnostic details'),retry:async()=>{attempts++;throw Error('still unavailable');}};
+  c.render(props);assert.equal(attempts,0);assert(!c.text().includes('private diagnostic details'));
+  await c.nodes().find(node=>node.props?.label==='Reopen screen').props.onPress();c.render(props);
+  assert.equal(attempts,1);assert.equal(c.nodes().find(node=>node.props?.label==='Reopen screen').props.loading,false);
+});
+
+test('address choices search assigned options and city allows a deliberate custom value', () => {
+  const chosen=[];let blurred=0;
+  const c=component('../src/components/forms/ChoiceField.tsx',{'@/components/ui/Input':{Input:'Input'}});
+  const props={label:'City',value:'',options:['Kolkata','Howrah'],allowCustom:true,onChange:value=>chosen.push(value),onBlur:()=>{blurred++;}};
+  c.render(props);c.nodes().find(node=>node.props?.accessibilityLabel==='Select City').props.onPress();c.render(props);
+  c.nodes().find(node=>node.type==='Input').props.onChangeText('how');c.render(props);
+  let list=c.nodes().find(node=>node.type==='FlatList');assert.equal(list.props.data.length,1);assert.equal(list.props.data[0],'Howrah');
+  list.props.renderItem({item:'Howrah'}).props.onPress();c.render(props);assert.deepEqual(chosen,['Howrah']);assert.equal(blurred,1);
+  c.nodes().find(node=>node.props?.accessibilityLabel==='Select City').props.onPress();c.render(props);
+  c.nodes().find(node=>node.type==='Input').props.onChangeText(' Behala ');c.render(props);
+  c.nodes().find(node=>node.props?.label==='Use this city').props.onPress();assert.deepEqual(chosen,['Howrah','Behala']);
+  c.render({...props,label:'Pincode',allowCustom:false});assert(!c.nodes().some(node=>node.props?.label==='Use this city'));
+});
+
+test('registration state changes clear dependent address fields and failed choice reads retain manual entry', () => {
+  const values={state:'WEST BENGAL',city:'Kolkata',pincode:'700001'};
+  const coverage={isSuccess:true,data:[{state:'WEST BENGAL',city:'Kolkata',pincodes:['700001']},{state:'BIHAR',city:'Patna',pincodes:['800001']},{state:'BIHAR',city:'Gaya',pincodes:['823001']}]};
+  const form={control:{},handleSubmit:fn=>fn,setValue:(key,value)=>{values[key]=value;},getValues:key=>values[key]||'',watch:key=>values[key]||''};
+  const c=component('../app/new-store.tsx',{
+    'react-hook-form':{useForm:()=>form,Controller:'Controller'},'@hookform/resolvers/zod':{zodResolver:()=>({})},
+    'expo-router':{useRouter:()=>({}),useIsFocused:()=>true},
+    '@tanstack/react-query':{useQuery:()=>coverage,useQueryClient:()=>({})},
+    '@/hooks/useStores':{useCreateStore:()=>({})},'@/api/store.api':{},
+    '@/hooks/useLocationCapture':{useLocationCapture:()=>({capturing:false})},
+    '@/utils/validators':{createStoreSchema:{}},'@/utils/toast':{},
+    '@/utils/coverageChoices':require('../src/utils/coverageChoices.ts'),
+  });
+  c.render({});
+  const state=c.nodes().find(node=>node.type==='Controller'&&node.props.name==='state');
+  state.props.render({field:{value:values.state,onBlur(){}},fieldState:{}}).props.onChange('BIHAR');
+  assert.deepEqual(values,{state:'BIHAR',city:'',pincode:''});
+  values.city='Custom locality';values.pincode='800001';coverage.data=[...coverage.data];c.render({});
+  assert.equal(values.city,'Custom locality');assert.equal(values.pincode,'800001');
+  coverage.isError=true;coverage.isSuccess=false;c.render({});
+  for(const name of ['state','city','pincode'])assert(c.nodes().some(node=>node.type==='FormInput'&&node.props.name===name));
 });

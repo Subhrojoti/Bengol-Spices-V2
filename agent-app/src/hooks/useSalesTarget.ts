@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { salesTargetApi } from "@/api/salesTarget.api";
@@ -21,9 +22,11 @@ export function useSalesTarget() {
 }
 
 export function useSalesTargetHistory() {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["targets", "sales", "history"],
     queryFn: salesTargetApi.getHistory,
+    enabled: focused,
   });
 }
 
@@ -42,17 +45,21 @@ export function useStartIncentive() {
 /* The agent's own cash payments and whether the office has verified each.
    Under "sales", so taking a payment or placing an order refreshes it. */
 export function useCashPayments() {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["sales", "cash"],
     queryFn: salesTargetApi.getCashPayments,
+    enabled: focused,
   });
 }
 
 /** The agent's own sales, product by product, for one month ("2026-10"). */
 export function useProductSales(month: string) {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["sales", "products", month],
     queryFn: () => salesTargetApi.getProductSales(month),
+    enabled: focused,
   });
 }
 

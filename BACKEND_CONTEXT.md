@@ -5,6 +5,62 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Admin release review (18 November, preparing):** fixed stale Employee 401
+responses invalidating newer sessions and rejected newly created employee
+passwords exceeding bcrypt's 72-byte limit. Patched Mongoose 9.11.1 → 9.11.4 and
+removed an unused Tailwind/Vite plugin. Backend 121/121, full browser 176/176,
+frontend units 16/16,
+Agent 45/45 and Delivery 24/24/typechecks pass. Runtime dependency audits are
+zero; the unpatched build-only Picomatch chain and legacy public identity-file
+migration remain explicitly documented. Read [review and scope](BackEnd/docs/ADMIN_RELEASE_REVIEW_2026-11-18.md).
+Deployment/live verification is not established by this preparation entry.
+
+**Store dues / office receipts (18 November, local only):** Cash Verification
+now has Store dues with paged store balances, outstanding orders and receipt
+history. Admin/employees with existing `canVerifyPayments` can record a partial
+or full office Cash/UPI/bank receipt, then approve it through existing verification.
+Server-derived office collectors preserve original sales-agent attribution,
+transaction/lock safety and retry references. No grants/backfill/mobile changes.
+Backend 120/120, full Admin/Employee browser 175/175, final focused browser 14/14,
+frontend units 13/13 and lint/build pass.
+Read [workflow, accounting, APIs and validation](BackEnd/docs/OFFICE_STORE_DUES_2026-11-18.md).
+Inventory now 191 endpoints. Not pushed/deployed; earlier local work below remains
+pending too.
+
+**Delivery runtime/registration review (7 November, local only):** made hidden
+screen reads focus-aware, removed active-detail history downloads, bounded list
+and photo work, added response/render/map recovery and durable item-return retry
+storage. Lost QR creation reconciles recovery before another collection. Delivery
+registration now has searchable offline State suggestions with custom entry;
+city/pincode remain editable. API/business rules and Delivery Web unchanged.
+Delivery 24/24 regressions, typecheck and Android JS/Hermes export pass; emulator
+checks used 103 active/501 delivered orders and synthetic collections. Read
+[findings, measurements and rollout](delivery-app/docs/DELIVERY_RUNTIME_REVIEW_2026-11-07.md).
+Not pushed/deployed; a new Delivery build is required. Earlier local Agent/backend
+work below remains pending too.
+
+**Agent registration dropdowns (6 November, local only):** Create Store now uses
+searchable assigned State/Pincode choices, optional/custom City suggestions and
+unambiguous defaults without overwriting drafts. Added Agent-only own-coverage
+read `/agent/store/my-coverage`; office permissions and registration/GPS rules
+remain intact. Older-backend/network failure keeps manual entry. Backend
+115/115, mobile 56/56, Agent typecheck/export and Android choice/keyboard checks
+pass. Inventory now 187 endpoints. Read [behavior, privacy and rollout](BackEnd/docs/STORE_REGISTRATION_CHOICES_2026-11-06.md).
+Not pushed/deployed; deploy backend then rebuild Agent. Earlier local Agent
+runtime fixes below remain pending too.
+
+**Agent runtime/performance review (6 November, local only):** reduced hidden
+screen query work and redundant Payments history downloads, propagated read
+cancellation, bounded list/image work, added malformed-response guards and
+manual render/map recovery. Existing financial rules and backend APIs are
+unchanged. Mobile regressions 52/52, Agent typecheck and final Android JS/Hermes
+export pass. Disposable emulator checks used 500 stores/605 initial orders and
+verified placement/back navigation, hidden-query suppression, malformed overview
+recovery and map/order navigation. No customer crash trace/device details were
+available; no blanket crash-free claim. Read [scope, evidence and rollout](agent-app/docs/AGENT_RUNTIME_REVIEW_2026-11-06.md).
+Not pushed/deployed; a new Agent build is required. Production remains the
+verified release below.
+
 **Production returns/advances and Agent release (6 November):** application
 `73a7a61` pushed; backend and Admin website deployed and verified. Full backend
 113/113, Admin/Employee browser 170/170, frontend units 13/13 and lint/build pass.

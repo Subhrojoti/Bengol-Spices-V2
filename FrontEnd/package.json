@@ -19,7 +19,6 @@
     "@mui/icons-material": "^7.3.6",
     "@mui/material": "^7.3.6",
     "@reduxjs/toolkit": "^2.11.1",
-    "@tailwindcss/vite": "^4.1.17",
     "axios": "^1.13.2",
     "lucide-react": "^1.7.0",
     "react": "^19.2.0",

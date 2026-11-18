@@ -26,6 +26,7 @@ import { cloudinaryStorage } from "../utils/cloudinaryStorage.js";
 import { limitLoginAttempts } from "../middleware/loginLimiter.js";
 import { createStore } from "../controllers/store.controller.js";
 import { createProduct, updateProduct } from "../controllers/product.controller.js";
+import { createEmployee } from "../controllers/employee.controller.js";
 
 // Isolated DB only. Never load server.js, dotenv or configured live credentials.
 process.env.JWT_SECRET = crypto.randomBytes(48).toString("hex");
@@ -38,6 +39,15 @@ const call = async (path, token, body) => {
 };
 const person = (extra = {}) => Agent.create({ agentId: "TEST-A", name: "Test", email: "test@example.invalid", phone: "9000000000", documents: { aadhaar: "a", pan: "p", photo: "f" }, status: "APPROVED", ...extra });
 const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+test("new employee passwords reject bcrypt-truncated ASCII and multibyte suffixes before creating accounts", async () => {
+  for (const password of ["Aa1!" + "x".repeat(69), "Aa1!" + "é".repeat(35)]) {
+    let status = 200, data;
+    const res = { status(value) { status = value; return res; }, json(value) { data = value; return this; } };
+    await createEmployee({ body: { name: "Test employee", email: "employee@test.invalid", password } }, res);
+    assert.equal(status, 400); assert.match(data.message, /72 bytes/); assert.equal(await Employee.countDocuments(), 0);
+  }
+});
 
 before(async () => {
   replica = await MongoMemoryReplSet.create({ replSet: { count: 1 }, binary: { version: "7.0.14" } });

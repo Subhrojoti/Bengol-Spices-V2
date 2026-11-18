@@ -19,7 +19,7 @@ export interface ItemReturnInput {
 export const returnApi = {
   getReturnOptions: (orderId: string, signal?: AbortSignal): Promise<ReturnableItem[]> => api.get(`/returns/${encodeURIComponent(orderId)}/options`, { signal }).then(r => r.data.items),
   initiateItemsReturn: (orderId: string, input: ItemReturnInput): Promise<{ returnId: string }> => api.post(`/returns/${encodeURIComponent(orderId)}/initiate`, input).then(r => r.data),
-  getMyReturns: (): Promise<ReturnRequest[]> => api.get("/returns/my-returns").then((r) => unwrapList<ReturnRequest>(r.data)),
+  getMyReturns: (signal?: AbortSignal): Promise<ReturnRequest[]> => api.get("/returns/my-returns", { signal }).then((r) => unwrapList<ReturnRequest>(r.data)),
 
   // Backend route: POST /returns/:orderId/initiate  { reason }
   // Responds with { success, message, returnId } (no full return object).

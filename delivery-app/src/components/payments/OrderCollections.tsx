@@ -9,6 +9,8 @@ import { toast } from "@/utils/toast";
 import { readOfflineCollection, saveOfflineCollection, clearOfflineCollection, type OfflineCollection } from "@/utils/offlineCollection";
 import { collectionAmount } from "@/utils/deliveryView";
 import { DeliveryQrCollection } from "./DeliveryQrCollection";
+import { useIsFocused } from "expo-router";
+import { collectionData } from "@/utils/responseData";
 
 interface History {
   dueAmount: number; totalAmount: number; recordedAmount: number; verifiedAmount: number; pendingVerificationAmount: number;
@@ -16,9 +18,10 @@ interface History {
 }
 const money = (value: number) => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 export function OrderCollections({ orderId }: { orderId: string }) {
+  const focused = useIsFocused();
   const profile = useProfile(), client = useQueryClient();
   const url = `/delivery-partner/orders/${encodeURIComponent(orderId)}/payments`;
-  const query = useQuery({ queryKey: ["collections", orderId], queryFn: () => api.get<History>(url).then(r => r.data) });
+  const query = useQuery({ queryKey: ["collections", orderId], enabled: focused, gcTime: 60 * 1000, queryFn: ({ signal }) => api.get<History>(url, { signal }).then(r => collectionData<History>(r.data)) });
   const [amountText, setAmountText] = useState(""), [method, setMethod] = useState<"CASH" | "UPI">("CASH"), [note, setNote] = useState("");
   const [attempt, setAttempt] = useState<OfflineCollection | null>(null), [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [shown, setShown] = useState(10), [revision, setRevision] = useState(0);

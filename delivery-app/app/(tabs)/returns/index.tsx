@@ -1,4 +1,4 @@
-import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
+import { useMemo } from "react";
 import { View, Text, FlatList, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Undo2, MapPin } from "lucide-react-native";
@@ -15,11 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const STATUS_ORDER: Record<string, number> = { PICKUP_ASSIGNED: 0, PICKED_UP: 1, RECEIVED_AT_WAREHOUSE: 2 };
 
 export default function ReturnsScreen() {
-  useRefetchOnFocus(["returns"]);
   const { data, isLoading, isError, refetch, error } = useAssignedReturns();
   const { pulling, onPull } = usePullToRefresh(refetch);
 
-  const sorted = [...(data ?? [])].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
+  const sorted = useMemo(() => [...(data ?? [])].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)), [data]);
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
@@ -31,6 +30,9 @@ export default function ReturnsScreen() {
         <ErrorState message={getErrorMessage(error, "Couldn't load return pickups.")} onRetry={refetch} />
       ) : (
         <FlatList
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
           data={sorted}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ padding: 20, paddingTop: 4, gap: 10 }}

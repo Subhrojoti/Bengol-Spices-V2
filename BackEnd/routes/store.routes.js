@@ -4,6 +4,7 @@ import {
   getMyStores,
   getAllStores,
   getStoreCatalog,
+  getMySalesCoverage,
 } from "../controllers/store.controller.js";
 import { protect } from "../middleware/auth.js";
 import { isAgent } from "../middleware/role.js";
@@ -18,6 +19,8 @@ import { getStoreReport, getStoreReportAgents, revealStoreDeliveryCode } from ".
 import { submitStoreChanges, listStoreChanges, reviewStoreChanges } from "../controllers/storeChanges.controller.js";
 
 const router = express.Router();
+
+router.get("/my-coverage", protect, isAgent, getMySalesCoverage);
 
 router.get("/reports", protect, checkPermission("canViewStoreReports"), getStoreReport);
 router.get("/reports/agents", protect, checkPermission("canViewStoreReports"), getStoreReportAgents);

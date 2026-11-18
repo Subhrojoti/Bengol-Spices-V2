@@ -39,7 +39,7 @@ export const pendingVerification = (agentId, at = new Date(), collector = null) 
       status: PENDING,
       at,
       by: collector || { id: agentId || null, role: "AGENT", name: null },
-      note: collector?.role === "DELIVERY_PARTNER" ? "Recorded by the delivery partner" : "Recorded by the agent",
+      note: ["ADMIN", "EMPLOYEE"].includes(collector?.role) ? "Recorded by the office" : collector?.role === "DELIVERY_PARTNER" ? "Recorded by the delivery partner" : "Recorded by the agent",
     },
   ],
 });

@@ -1,12 +1,12 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { Controller } from "react-hook-form";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "expo-router";
+import { useIsFocused, useRouter } from "expo-router";
 import { ChevronLeft, MapPin, Store as StoreIcon } from "lucide-react-native";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCreateStore } from "@/hooks/useStores";
 import { storeApi } from "@/api/store.api";
 import { useLocationCapture } from "@/hooks/useLocationCapture";
@@ -18,6 +18,8 @@ import { Button, IconButton } from "@/components/ui/Button";
 import { getErrorMessage } from "@/api/client";
 import { toast } from "@/utils/toast";
 import { colors } from "@/theme/colors";
+import { ChoiceField } from "@/components/forms/ChoiceField";
+import { addressDefaults, coverageChoices, coverageState } from "@/utils/coverageChoices";
 
 /* A screen of its own over the tabs, like an order or the profile, opened
    from Home's "Add Store" and from the Stores tab. It used to sit inside the
@@ -30,6 +32,10 @@ export default function CreateStoreScreen() {
   const close = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)/stores"));
   const createStore = useCreateStore();
   const queryClient = useQueryClient();
+  const focused = useIsFocused();
+  const coverage = useQuery({ queryKey: ["sales-coverage", "mine"], queryFn: ({ signal }) => storeApi.getMyCoverage(signal), enabled: focused, retry: false });
+  const areas = useMemo(() => coverage.isError ? [] : coverageChoices(coverage.data ?? []), [coverage.data, coverage.isError]);
+  const defaultedAddress = useRef(false);
   const { captureLocation, capturing } = useLocationCapture();
   const [submitting, setSubmitting] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -38,10 +44,30 @@ export default function CreateStoreScreen() {
   const [imageError, setImageError] = useState<string | undefined>();
   const [locationError, setLocationError] = useState<string | undefined>();
 
-  const { control, handleSubmit, setValue, watch } = useForm<CreateStoreForm>({
+  const { control, handleSubmit, setValue, getValues, watch } = useForm<CreateStoreForm>({
     resolver: zodResolver(createStoreSchema),
     defaultValues: { storeName: "", ownerName: "", phone: "", state: "", city: "", street: "", pincode: "", gstNumber: "" },
   });
+  const state = watch("state");
+  const area = areas.find(choice => choice.state === coverageState(state || ""));
+  useEffect(() => {
+    if (!coverage.isSuccess || defaultedAddress.current) return;
+    defaultedAddress.current = true;
+    if (areas.length !== 1 || getValues("state").trim()) return;
+    setValue("state", areas[0].state);
+    const defaults = addressDefaults(areas[0]);
+    // Do not replace anything the agent typed while choices were loading.
+    if (!getValues("city").trim()) setValue("city", defaults.city);
+    if (!getValues("pincode").trim()) setValue("pincode", defaults.pincode);
+  }, [coverage.isSuccess, areas, getValues, setValue]);
+
+  const selectState = (next: string) => {
+    if (coverageState(next) === coverageState(getValues("state"))) { setValue("state", next, { shouldValidate: true }); return; }
+    const defaults = addressDefaults(areas.find(choice => choice.state === next));
+    setValue("state", next, { shouldDirty: true, shouldValidate: true });
+    setValue("city", defaults.city, { shouldDirty: true, shouldValidate: true });
+    setValue("pincode", defaults.pincode, { shouldDirty: true, shouldValidate: true });
+  };
 
   const handleCaptureLocation = async () => {
     if (!photoTakenAt.current) { setLocationError("Take the store photo first, then capture its location."); return; }
@@ -162,10 +188,13 @@ export default function CreateStoreScreen() {
             )}
           />
 
-          <FormInput control={control} name="state" label="State" required placeholder="e.g. WEST BENGAL" autoCapitalize="characters" />
-          <FormInput control={control} name="city" label="City" required placeholder="e.g. Kolkata" />
+          {coverage.isPending && <Text className="mb-3 font-sans text-xs text-ink-500">Loading your assigned address choices…</Text>}
+          {coverage.isError && <View className="mb-4 gap-2"><Text className="font-sans text-xs text-ink-500">Assigned choices couldn't load. You can enter the address manually.</Text><Button label="Retry address choices" size="sm" variant="outline" onPress={() => coverage.refetch()} loading={coverage.isFetching} /></View>}
+          {coverage.isSuccess && !areas.length && <Text className="mb-3 font-sans text-xs text-ink-500">No assigned pincodes found. Ask Admin to check your sales coverage before registration.</Text>}
+          {areas.length ? <Controller control={control} name="state" render={({ field, fieldState }) => <ChoiceField label="State" value={field.value} options={areas.map(choice => choice.state)} onChange={selectState} onBlur={field.onBlur} error={fieldState.error?.message} disabled={submitting} />} /> : <FormInput control={control} name="state" label="State" required placeholder="e.g. WEST BENGAL" autoCapitalize="characters" />}
+          {area?.cities.length ? <Controller control={control} name="city" render={({ field, fieldState }) => <ChoiceField label="City" value={field.value} options={area.cities} onChange={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} allowCustom disabled={submitting} />} /> : <FormInput control={control} name="city" label="City" required placeholder="e.g. Kolkata" />}
           <FormInput control={control} name="street" label="Street" required placeholder="e.g. Kancha Road" />
-          <FormInput control={control} name="pincode" label="Pincode" required placeholder="6-digit pincode" keyboardType="number-pad" maxLength={6} />
+          {area?.pincodes.length ? <Controller control={control} name="pincode" render={({ field, fieldState }) => <ChoiceField label="Pincode" value={field.value} options={area.pincodes} onChange={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} disabled={submitting} />} /> : <FormInput control={control} name="pincode" label="Pincode" required placeholder="6-digit pincode" keyboardType="number-pad" maxLength={6} />}
           <FormInput control={control} name="gstNumber" label="GST Number (optional)" placeholder="15-character GSTIN" autoCapitalize="characters" maxLength={15} />
 
           <ImagePickerField label="Store Photo" uri={imageUri} onChange={photoCaptured} error={imageError} mode="camera" />

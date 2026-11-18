@@ -2,11 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationApi } from "@/api/notification.api";
 import { getErrorMessage } from "@/api/client";
 import { toast } from "@/utils/toast";
+import { useIsFocused } from "expo-router";
 
 export function useNotifications() {
+  const focused = useIsFocused();
   return useQuery({
     queryKey: ["notifications"],
-    queryFn: notificationApi.getMyNotifications,
+    queryFn: ({ signal }) => notificationApi.getMyNotifications(signal),
+    enabled: focused,
     refetchInterval: 60 * 1000,
   });
 }

@@ -995,6 +995,10 @@ export const getCashPayments = async (params, options) => {
   const response = await get("/admin/cash-payments", { ...options, params });
   return response.data;
 };
+export const getStoreDues = async (params, options) => (await get("/admin/store-dues", { ...options, params })).data;
+export const getStoreDueOrders = async (consumerId, params, options) => (await get(`/admin/store-dues/stores/${encodeURIComponent(consumerId)}/orders`, { ...options, params })).data;
+export const getOfficeOrderPayments = async (orderId, params, options) => (await get(`/admin/store-dues/orders/${encodeURIComponent(orderId)}/payments`, { ...options, params })).data;
+export const recordOfficeCollection = async (orderId, input) => (await axiosInstance.post(`/admin/store-dues/orders/${encodeURIComponent(orderId)}/payments`, input, { timeout: 60000 })).data;
 
 export const approveCashPayment = async (paymentId, note) => {
   const response = await axiosInstance.post(

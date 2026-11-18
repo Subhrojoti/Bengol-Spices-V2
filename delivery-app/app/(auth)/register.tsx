@@ -8,6 +8,8 @@ import { ChevronLeft, UserPlus } from "lucide-react-native";
 import { authApi } from "@/api/auth.api";
 import { registerSchema, type RegisterForm } from "@/utils/validators";
 import { FormInput } from "@/components/forms/FormInput";
+import { ChoiceField } from "@/components/forms/ChoiceField";
+import { INDIA_STATES } from "@/utils/indiaStates";
 import { RadioGroup } from "@/components/forms/RadioGroup";
 import { DocumentPickerField, type PickedDocument } from "@/components/forms/DocumentPickerField";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -118,7 +120,7 @@ export default function RegisterScreen() {
           <DocumentPickerField label="ID Document" hint="PDF or image" value={document} onChange={setDocument} error={docError} />
 
           <Text className="mb-2 mt-2 font-sans-bold text-sm text-ink">Address</Text>
-          <FormInput control={control} name="state" label="State" required placeholder="e.g. WEST BENGAL" autoCapitalize="characters" />
+          <Controller control={control} name="state" render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => <ChoiceField label="State" value={value} options={INDIA_STATES} allowCustom onChange={onChange} onBlur={onBlur} error={error?.message} disabled={submitting} />} />
           <FormInput control={control} name="city" label="City" required placeholder="e.g. Kolkata" />
           <FormInput control={control} name="street" label="Street" required placeholder="e.g. Kancha Road" />
           <FormInput control={control} name="pincode" label="Pincode" required placeholder="6-digit pincode" keyboardType="number-pad" maxLength={6} />

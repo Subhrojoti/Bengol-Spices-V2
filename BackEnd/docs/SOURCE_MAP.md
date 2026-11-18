@@ -5,9 +5,9 @@ See [backend context](../../BACKEND_CONTEXT.md) and [implementation report](PROD
 
 ## Offline validation
 
-- Parsed **153** first-party JS/MJS files, including test and documentation scripts.
-- Checked **652** relative imports: all files and static named/default exports resolve.
-- Extracted **186** registered method/path entries, including health.
+- Parsed **154** first-party JS/MJS files, including test and documentation scripts.
+- Checked **661** relative imports: all files and static named/default exports resolve.
+- Extracted **191** registered method/path entries, including health.
 - This script imports no application code and connects to no services.
 - Runtime tests/build results and remaining live checks are recorded in the implementation report.
 - Regenerate with `node BackEnd/scripts/review-source.mjs` after backend edits; frontend development dependencies must be installed.
@@ -156,7 +156,7 @@ Package/built-in imports: `mongoose`, `node:crypto`.
 
 ### controllers/employee.controller.js
 
-[controllers/employee.controller.js](../controllers/employee.controller.js), 418 lines. SHA-256: `a34fef68b56976f3b51b165ee681b0e67bc7da16e01acee22c1a2537e48c4b24`.
+[controllers/employee.controller.js](../controllers/employee.controller.js), 418 lines. SHA-256: `3460b77b80fd1afbec8ca1673f29861427d7326981e7c431b975321c2feeede7`.
 
 Exports: [createEmployee](../controllers/employee.controller.js#L22), [getAllEmployees](../controllers/employee.controller.js#L211), [updateEmployeePermissions](../controllers/employee.controller.js#L232), [getEmployeeProfile](../controllers/employee.controller.js#L343), [deleteEmployee](../controllers/employee.controller.js#L371).
 
@@ -284,9 +284,9 @@ Local imports: [services/salesTarget.service.js](../services/salesTarget.service
 
 ### controllers/store.controller.js
 
-[controllers/store.controller.js](../controllers/store.controller.js), 385 lines. SHA-256: `ef8a6392245cfab30426b743aca31671e9a61a909d7381ea7ba9118eb23a0771`.
+[controllers/store.controller.js](../controllers/store.controller.js), 401 lines. SHA-256: `4d8bff66ff45a1f09c9a498c6f77573714430c3b127ab029a86a7b623d782f0a`.
 
-Exports: [getStoreCatalog](../controllers/store.controller.js#L35), [createStore](../controllers/store.controller.js#L104), [getMyStores](../controllers/store.controller.js#L324), [getAllStores](../controllers/store.controller.js#L362).
+Exports: [getMySalesCoverage](../controllers/store.controller.js#L25), [getStoreCatalog](../controllers/store.controller.js#L51), [createStore](../controllers/store.controller.js#L120), [getMyStores](../controllers/store.controller.js#L340), [getAllStores](../controllers/store.controller.js#L378).
 
 Local imports: [models/store.js](../models/store.js), [config/cloudinary.js](../config/cloudinary.js), [models/AgentTargetProgress.js](../models/AgentTargetProgress.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [models/Counter.js](../models/Counter.js), [models/Product.js](../models/Product.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/target.service.js](../services/target.service.js), [utils/publicError.js](../utils/publicError.js), [utils/salesLocation.js](../utils/salesLocation.js), [utils/orderMinimums.js](../utils/orderMinimums.js), [utils/storeDetails.js](../utils/storeDetails.js), [services/storePhone.service.js](../services/storePhone.service.js), [utils/pricing.js](../utils/pricing.js).
 
@@ -301,6 +301,14 @@ Exports: [submitStoreChanges](../controllers/storeChanges.controller.js#L70), [l
 Local imports: [models/store.js](../models/store.js), [models/StoreChangeRequest.js](../models/StoreChangeRequest.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/deliveryTrail.service.js](../services/deliveryTrail.service.js), [utils/storeDetails.js](../utils/storeDetails.js), [utils/salesLocation.js](../utils/salesLocation.js), [models/AgentSalesLocation.js](../models/AgentSalesLocation.js), [config/cloudinary.js](../config/cloudinary.js), [services/storeOperation.service.js](../services/storeOperation.service.js), [services/storePhone.service.js](../services/storePhone.service.js).
 
 Package/built-in imports: `mongoose`.
+
+### controllers/storeDues.controller.js
+
+[controllers/storeDues.controller.js](../controllers/storeDues.controller.js), 75 lines. SHA-256: `bd2432e83d85d7471577b551336e49efb70e994d059460a1bb4e63ead5cbdf7c`.
+
+Exports: [getStoreDues](../controllers/storeDues.controller.js#L22), [getStoreDueOrders](../controllers/storeDues.controller.js#L47), [getOfficeOrderPayments](../controllers/storeDues.controller.js#L56), [recordOfficeCollection](../controllers/storeDues.controller.js#L63).
+
+Local imports: [models/store.js](../models/store.js), [models/Order.js](../models/Order.js), [models/Payment.js](../models/Payment.js), [services/payment.service.js](../services/payment.service.js), [services/storeOperation.service.js](../services/storeOperation.service.js), [services/cashVerification.service.js](../services/cashVerification.service.js), [utils/paymentTotals.js](../utils/paymentTotals.js).
 
 ### controllers/storeReports.controller.js
 
@@ -552,7 +560,7 @@ Package/built-in imports: `mongoose`.
 
 ### models/Payment.js
 
-[models/Payment.js](../models/Payment.js), 111 lines. SHA-256: `047f69cacb5ff2ffa5dfe62ecb4ece0bafb36a789f943efb1cba38195b6e6ee3`.
+[models/Payment.js](../models/Payment.js), 111 lines. SHA-256: `1bb015b616773a1cb9b86fcaffa305f2380e755bdd9e05750943153757b81abb`.
 
 Exports: [default](../models/Payment.js#L110).
 
@@ -618,11 +626,11 @@ Package/built-in imports: `mongoose`.
 
 ### routes/admin.routes.js
 
-[routes/admin.routes.js](../routes/admin.routes.js), 207 lines. SHA-256: `cd548d48ab0d7117a893159fbd0792d1e959466ad1b1edd41faa42c1b83b88a0`.
+[routes/admin.routes.js](../routes/admin.routes.js), 212 lines. SHA-256: `48e5cfad4b8ba01258d56485c9dac951c998fde352df694c322a936b410e87f3`.
 
-Exports: [default](../routes/admin.routes.js#L206).
+Exports: [default](../routes/admin.routes.js#L211).
 
-Local imports: [controllers/admin.controller.js](../controllers/admin.controller.js), [controllers/employee.controller.js](../controllers/employee.controller.js), [controllers/analytics.controller.js](../controllers/analytics.controller.js), [controllers/cashVerification.controller.js](../controllers/cashVerification.controller.js), [controllers/delivery.controller.js](../controllers/delivery.controller.js), [middleware/auth.js](../middleware/auth.js), [middleware/role.js](../middleware/role.js), [middleware/permission.js](../middleware/permission.js), [controllers/orderWorkspace.controller.js](../controllers/orderWorkspace.controller.js), [controllers/dispatchMapping.controller.js](../controllers/dispatchMapping.controller.js), [controllers/deliveryPerformance.controller.js](../controllers/deliveryPerformance.controller.js), [controllers/partnerCollections.controller.js](../controllers/partnerCollections.controller.js), [controllers/bills.controller.js](../controllers/bills.controller.js), [controllers/adminManagement.controller.js](../controllers/adminManagement.controller.js), [controllers/adminManagement.controller.js](../controllers/adminManagement.controller.js).
+Local imports: [controllers/admin.controller.js](../controllers/admin.controller.js), [controllers/employee.controller.js](../controllers/employee.controller.js), [controllers/analytics.controller.js](../controllers/analytics.controller.js), [controllers/cashVerification.controller.js](../controllers/cashVerification.controller.js), [controllers/delivery.controller.js](../controllers/delivery.controller.js), [middleware/auth.js](../middleware/auth.js), [middleware/role.js](../middleware/role.js), [middleware/permission.js](../middleware/permission.js), [controllers/orderWorkspace.controller.js](../controllers/orderWorkspace.controller.js), [controllers/dispatchMapping.controller.js](../controllers/dispatchMapping.controller.js), [controllers/deliveryPerformance.controller.js](../controllers/deliveryPerformance.controller.js), [controllers/partnerCollections.controller.js](../controllers/partnerCollections.controller.js), [controllers/bills.controller.js](../controllers/bills.controller.js), [controllers/storeDues.controller.js](../controllers/storeDues.controller.js), [controllers/adminManagement.controller.js](../controllers/adminManagement.controller.js), [controllers/adminManagement.controller.js](../controllers/adminManagement.controller.js).
 
 Package/built-in imports: `express`.
 
@@ -748,9 +756,9 @@ Package/built-in imports: `express`.
 
 ### routes/store.routes.js
 
-[routes/store.routes.js](../routes/store.routes.js), 78 lines. SHA-256: `278079fccacb1efe42f618f653a264516cf620cf71997414b332fe48c13e0d88`.
+[routes/store.routes.js](../routes/store.routes.js), 81 lines. SHA-256: `28f4eddad26b413cf5fd7338e59045f5c68ad97526d3b79bb1934d3d2ce1bd70`.
 
-Exports: [default](../routes/store.routes.js#L77).
+Exports: [default](../routes/store.routes.js#L80).
 
 Local imports: [controllers/store.controller.js](../controllers/store.controller.js), [middleware/auth.js](../middleware/auth.js), [middleware/role.js](../middleware/role.js), [middleware/upload.js](../middleware/upload.js), [services/storeOperation.service.js](../services/storeOperation.service.js), [controllers/agent.controller.js](../controllers/agent.controller.js), [middleware/permission.js](../middleware/permission.js), [controllers/storeReports.controller.js](../controllers/storeReports.controller.js), [controllers/storeChanges.controller.js](../controllers/storeChanges.controller.js).
 
@@ -864,9 +872,9 @@ Package/built-in imports: `mongoose`.
 
 ### services/cashVerification.service.js
 
-[services/cashVerification.service.js](../services/cashVerification.service.js), 638 lines. SHA-256: `71bd40359217619d1ccd52fd8d1a488ecae4d37fc82d29d53c9abb326a67d862`.
+[services/cashVerification.service.js](../services/cashVerification.service.js), 640 lines. SHA-256: `e1eb30a992dad897ba8c0a6e6df780d4cc8fb05ecfdfdaeb189961473cc59702`.
 
-Exports: [LATE_AFTER_DAYS](../services/cashVerification.service.js#L50), [MAX_BULK](../services/cashVerification.service.js#L55), [verificationSummary](../services/cashVerification.service.js#L151), [listCashPayments](../services/cashVerification.service.js#L208), [getCashPayment](../services/cashVerification.service.js#L260), [approveCashPayment](../services/cashVerification.service.js#L480), [rejectCashPayment](../services/cashVerification.service.js#L481), [approveCashPayments](../services/cashVerification.service.js#L489), [withCashVerification](../services/cashVerification.service.js#L527), [cashPaymentsOfAgent](../services/cashVerification.service.js#L581).
+Exports: [LATE_AFTER_DAYS](../services/cashVerification.service.js#L50), [MAX_BULK](../services/cashVerification.service.js#L55), [verificationSummary](../services/cashVerification.service.js#L151), [listCashPayments](../services/cashVerification.service.js#L208), [getCashPayment](../services/cashVerification.service.js#L260), [approveCashPayment](../services/cashVerification.service.js#L482), [rejectCashPayment](../services/cashVerification.service.js#L483), [approveCashPayments](../services/cashVerification.service.js#L491), [withCashVerification](../services/cashVerification.service.js#L529), [cashPaymentsOfAgent](../services/cashVerification.service.js#L583).
 
 Local imports: [models/Payment.js](../models/Payment.js), [models/Order.js](../models/Order.js), [models/Agent.js](../models/Agent.js), [services/notification.service.js](../services/notification.service.js), [services/target.service.js](../services/target.service.js), [services/salesTarget.service.js](../services/salesTarget.service.js), [services/liveEvents.js](../services/liveEvents.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [services/storeOperation.service.js](../services/storeOperation.service.js), [utils/salesTarget.js](../utils/salesTarget.js), [utils/paymentVerification.js](../utils/paymentVerification.js).
 
@@ -996,9 +1004,9 @@ Local imports: [models/Order.js](../models/Order.js), [models/store.js](../model
 
 ### services/payment.service.js
 
-[services/payment.service.js](../services/payment.service.js), 406 lines. SHA-256: `87bc4917b3cca40a1d1c7acff7748f08acb65dc1dd7d1bc50899afb53b9bce1c`.
+[services/payment.service.js](../services/payment.service.js), 420 lines. SHA-256: `50d10a3539dca0f0f15ec61d6c967274d376e358c80e131fd05a9fd1face60c5`.
 
-Exports: [roundRupees](../services/payment.service.js#L19), [announceCashToVerify](../services/payment.service.js#L22), [withLock](../services/payment.service.js#L72), [applyDuePayment](../services/payment.service.js#L106), [beginGatewayPayment](../services/payment.service.js#L221), [paymentsNeedingAttention](../services/payment.service.js#L261), [markGatewayPayment](../services/payment.service.js#L271), [refundGatewayPayment](../services/payment.service.js#L278), [settleFailedGatewayPayment](../services/payment.service.js#L332), [respondToClaimedGatewayPayment](../services/payment.service.js#L369).
+Exports: [roundRupees](../services/payment.service.js#L19), [announceCashToVerify](../services/payment.service.js#L22), [withLock](../services/payment.service.js#L72), [applyDuePayment](../services/payment.service.js#L106), [beginGatewayPayment](../services/payment.service.js#L235), [paymentsNeedingAttention](../services/payment.service.js#L275), [markGatewayPayment](../services/payment.service.js#L285), [refundGatewayPayment](../services/payment.service.js#L292), [settleFailedGatewayPayment](../services/payment.service.js#L346), [respondToClaimedGatewayPayment](../services/payment.service.js#L383).
 
 Local imports: [models/OperationLock.js](../models/OperationLock.js), [models/GatewayPayment.js](../models/GatewayPayment.js), [models/Order.js](../models/Order.js), [models/Payment.js](../models/Payment.js), [models/Invoice.js](../models/Invoice.js), [config/razorpay.js](../config/razorpay.js), [services/invoice.service.js](../services/invoice.service.js), [services/target.service.js](../services/target.service.js), [services/salesTarget.service.js](../services/salesTarget.service.js), [services/liveEvents.js](../services/liveEvents.js), [services/storeAccess.service.js](../services/storeAccess.service.js), [utils/paymentVerification.js](../utils/paymentVerification.js).
 
@@ -1120,7 +1128,7 @@ Package/built-in imports: `node:test`, `node:assert/strict`.
 
 ### tests/production-enhancements.test.js
 
-[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 1855 lines. SHA-256: `3183c3fbac9b743e48188b95f60556f0266e395da4c62c6dd99bc7a76b79cdd9`.
+[tests/production-enhancements.test.js](../tests/production-enhancements.test.js), 1957 lines. SHA-256: `58f8f544d9b5aa12d427809f6f8c114ac3406a979735bb3588c2083217f78006`.
 
 Exports: none.
 
@@ -1130,11 +1138,11 @@ Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `nod
 
 ### tests/security-regressions.test.js
 
-[tests/security-regressions.test.js](../tests/security-regressions.test.js), 238 lines. SHA-256: `745d9f666b59bc13a4aaa37ea3161b2ec0a9272f1fd3711805d6b15bdbff7e3a`.
+[tests/security-regressions.test.js](../tests/security-regressions.test.js), 248 lines. SHA-256: `77e49cfb05625c2085837f25e76c05520963a6638200e581b9ed107d9bd2b729`.
 
 Exports: none.
 
-Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Product.js](../models/Product.js), [routes/auth.routes.js](../routes/auth.routes.js), [routes/agent.routes.js](../routes/agent.routes.js), [routes/deliveryPartner.routes.js](../routes/deliveryPartner.routes.js), [routes/events.routes.js](../routes/events.routes.js), [middleware/auth.js](../middleware/auth.js), [middleware/upload.js](../middleware/upload.js), [services/liveEvents.js](../services/liveEvents.js), [controllers/order.controller.js](../controllers/order.controller.js), [config/cloudinary.js](../config/cloudinary.js), [utils/cloudinaryStorage.js](../utils/cloudinaryStorage.js), [middleware/loginLimiter.js](../middleware/loginLimiter.js), [controllers/store.controller.js](../controllers/store.controller.js), [controllers/product.controller.js](../controllers/product.controller.js).
+Local imports: [models/Agent.js](../models/Agent.js), [models/Employee.js](../models/Employee.js), [models/DeliveryPartner.js](../models/DeliveryPartner.js), [models/Product.js](../models/Product.js), [routes/auth.routes.js](../routes/auth.routes.js), [routes/agent.routes.js](../routes/agent.routes.js), [routes/deliveryPartner.routes.js](../routes/deliveryPartner.routes.js), [routes/events.routes.js](../routes/events.routes.js), [middleware/auth.js](../middleware/auth.js), [middleware/upload.js](../middleware/upload.js), [services/liveEvents.js](../services/liveEvents.js), [controllers/order.controller.js](../controllers/order.controller.js), [config/cloudinary.js](../config/cloudinary.js), [utils/cloudinaryStorage.js](../utils/cloudinaryStorage.js), [middleware/loginLimiter.js](../middleware/loginLimiter.js), [controllers/store.controller.js](../controllers/store.controller.js), [controllers/product.controller.js](../controllers/product.controller.js), [controllers/employee.controller.js](../controllers/employee.controller.js).
 
 Package/built-in imports: `node:test`, `node:assert/strict`, `node:crypto`, `node:stream`, `node:events`, `node:zlib`, `mongoose`, `express`, `jsonwebtoken`, `bcryptjs`, `mongodb-memory-server`.
 
@@ -1250,7 +1258,7 @@ Exports: [paymentTotals](../utils/paymentTotals.js#L1), [publicPayment](../utils
 
 ### utils/paymentVerification.js
 
-[utils/paymentVerification.js](../utils/paymentVerification.js), 88 lines. SHA-256: `00e8b65037c910f567200b2400f40300d92d07f3ee999a873f898a1ebd1249a2`.
+[utils/paymentVerification.js](../utils/paymentVerification.js), 88 lines. SHA-256: `0a0f51ab16607f2e9740240c5884fe7141fe77e21c7f1000ba8ffc4bfc0b774f`.
 
 Exports: [PENDING](../utils/paymentVerification.js#L23), [APPROVED](../utils/paymentVerification.js#L24), [REJECTED](../utils/paymentVerification.js#L25), [VERIFICATION_STATUSES](../utils/paymentVerification.js#L27), [needsVerification](../utils/paymentVerification.js#L32), [pendingVerification](../utils/paymentVerification.js#L35), [COUNTS_AS_COLLECTED](../utils/paymentVerification.js#L48), [COUNTED_ON](../utils/paymentVerification.js#L54), [countedAtFor](../utils/paymentVerification.js#L67), [monthStartOf](../utils/paymentVerification.js#L82).
 

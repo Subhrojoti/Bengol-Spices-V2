@@ -42,7 +42,7 @@ export const PERMISSION_GROUPS = [
       { key: "canSeePaymentInfo", label: "View Payment Info" },
       { key: "canResolvePaymentIssues", label: "Refund & Resolve Online Payment Issues" },
       { key: "canExtendDueDates", label: "Extend Payment Due Dates" },
-      { key: "canVerifyPayments", label: "Verify Cash Payments" },
+      { key: "canVerifyPayments", label: "Verify Payments & Record Office Receipts" },
       { key: "canSetTargets", label: "Manage Daily Targets" },
       { key: "canManageNotifications", label: "Manage Notifications" },
     ],

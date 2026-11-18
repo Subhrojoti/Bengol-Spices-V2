@@ -1,4 +1,5 @@
 import { View, Text, Image, FlatList, StyleSheet } from "react-native";
+import { sizedImage } from "@/utils/image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Trophy, Crown, Sparkles, ChevronUp } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -101,7 +102,7 @@ export default function LeaderboardScreen() {
 
 function Avatar({ uri, name, size }: { uri?: string | null; name: string; size: number }) {
   if (uri) {
-    return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+    return <Image source={{ uri: sizedImage(uri, size) }} resizeMethod="resize" style={{ width: size, height: size, borderRadius: size / 2 }} />;
   }
   return (
     <View className="items-center justify-center bg-saffron-600" style={{ width: size, height: size, borderRadius: size / 2 }}>

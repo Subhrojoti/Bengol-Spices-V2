@@ -118,7 +118,9 @@ export const applyDuePayment = async ({
   gatewayVerified = false,
 }) => {
   const actor = collector || { id: agentId, role: "AGENT" };
-  if (!["AGENT", "DELIVERY_PARTNER"].includes(actor.role) || !actor.id) return refuse(403, "Invalid payment collector");
+  const office = ["ADMIN", "EMPLOYEE"].includes(actor.role);
+  if (!["AGENT", "DELIVERY_PARTNER", "ADMIN", "EMPLOYEE"].includes(actor.role) || !actor.id) return refuse(403, "Invalid payment collector");
+  if (office && !["CASH", "UPI", "BANK_TRANSFER"].includes(method)) return refuse(400, "Office receipts support Cash, UPI or Bank transfer");
   if (!["number", "string"].includes(typeof amount)) return refuse(400, "Enter a valid positive amount");
   amount = roundRupees(amount);
   if (!Number.isFinite(amount) || amount <= 0) return refuse(400, "Enter a valid positive amount");
@@ -132,8 +134,10 @@ export const applyDuePayment = async ({
     try { result = await mongoose.connection.transaction(async session => {
       const order = await Order.findOne({ orderId }).session(session);
       if (!order) return refuse(404, "Order not found");
-      const authorised = actor.role === "AGENT" ? await managesStore(order.consumerId, actor.id)
-        : String(order.delivery?.partnerId) === String(actor.id) && ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(order.status);
+      // Office collectors are supplied only by the permission-checked office
+      // controller. Agent/partner controllers never accept a collector from JSON.
+      const authorised = office || (actor.role === "AGENT" ? await managesStore(order.consumerId, actor.id)
+        : String(order.delivery?.partnerId) === String(actor.id) && ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(order.status));
       if (!authorised) return refuse(403, "You are not allowed to collect payment for this order");
       let previous;
       if (clientRequestId) previous = await Payment.findOne({ "collectedBy.id": actor.id, "collectedBy.role": actor.role, clientRequestId }).session(session);
@@ -142,6 +146,7 @@ export const applyDuePayment = async ({
         if (previous.orderId !== orderId || (clientRequestId && previous.requestHash !== requestHash) || previous.amount !== amount || previous.method !== method) return refuse(409, "This payment request identifier was already used with different details");
         return { ok: true, order, payment: previous, replayed: true };
       }
+      if (office && await GatewayPayment.exists({ orderId, purpose: "ORDER_DUE", status: { $in: ["QR_OPEN", "PROCESSING", "FAILED", "REFUND_FAILED"] } }).session(session)) return refuse(409, "This order has an unresolved online payment or QR. Resolve it before recording another receipt.");
       if (order.status === "CANCELLED") return refuse(400, "This order was cancelled");
       if (order.dueAmount <= 0) return refuse(400, "No due amount remaining");
       if (amount > order.dueAmount + 0.005) return refuse(400, "Amount exceeds due amount");
@@ -168,7 +173,16 @@ export const applyDuePayment = async ({
     if (!result.ok || result.replayed) return result;
     const { order, payment } = result;
     const invoice = await Invoice.findOne({ orderId });
-    if (invoice) await regenerateInvoicePDF(invoice, order);
+    if (invoice) {
+      try { await regenerateInvoicePDF(invoice, order); }
+      catch (error) {
+        if (!office) throw error;
+        // The receipt/balances already committed. Do not report that money was
+        // not recorded just because an ancillary PDF refresh failed.
+        console.error("OFFICE RECEIPT PDF REFRESH FAILED:", error.message);
+        result.invoiceRefreshPending = true;
+      }
+    }
 
     /* Cash waiting to be verified earns the agent nothing yet: the
        collection target and the sales target are credited when the office

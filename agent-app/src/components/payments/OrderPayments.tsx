@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { useState } from "react";
 import { Text, View, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -10,8 +11,9 @@ interface PaymentHistory {
   payments: { id: string; amount: number; method: string; collectedAt: string; collectionKind: string | null; verification: string | null; collector: { id: string; role: string; name: string | null } }[];
 }
 export function OrderPayments({ orderId }: { orderId: string }) {
+  const focused = useIsFocused();
   const [shown, setShown] = useState(10);
-  const query = useQuery({ queryKey: ["orders", orderId, "payment-history"], queryFn: () => api.get<PaymentHistory>(`/agent/orders/mine/${encodeURIComponent(orderId)}/payments`).then(r => r.data) });
+  const query = useQuery({ queryKey: ["orders", orderId, "payment-history"], enabled: focused, queryFn: ({ signal }) => api.get<PaymentHistory>(`/agent/orders/mine/${encodeURIComponent(orderId)}/payments`, { signal }).then(r => r.data) });
   return <View className="rounded-2xl border border-sand bg-white p-4"><Text className="font-sans-bold text-base text-ink">Payment history</Text>{query.isPending ? <Text className="mt-2 font-sans text-xs text-ink-500">Loading collections…</Text> : query.isError ? <Pressable onPress={() => query.refetch()}><Text className="mt-2 font-sans text-sm text-chili-600">Could not load payment history. Tap to retry.</Text></Pressable> : <>
     <View className="my-3 gap-1">{[["Recorded", query.data.recordedAmount], ["Verified", query.data.verifiedAmount], ["Pending verification", query.data.pendingVerificationAmount], ["Not verified", query.data.rejectedAmount]].map(([label, amount]) => <View key={String(label)} className="flex-row justify-between"><Text className="font-sans text-xs text-ink-500">{label}</Text><Text className="font-sans-semibold text-xs text-ink">{formatCurrency(Number(amount))}</Text></View>)}</View>
     <Text className="mb-2 font-sans text-xs text-ink-500">Only verified eligible collections count toward collected sales and incentives.</Text>
