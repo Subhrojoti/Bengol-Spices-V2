@@ -5,6 +5,14 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Production Admin tuning and access review (23 November):** deployed
+`ac78bac` to the VPS. Dispatch reads now restrict identity and banking fields,
+Bills uses one aggregation for ordinary pages, and Store Dues pages payment
+history in MongoDB. Employee logout and stale-session protection, Store Details
+fixes, and archived-store restoration are live. The exact candidate passed 181
+browser tests and 125 backend tests. Chain pricing and the mobile work are still
+local. [Release checks and rollback](deploy/releases/2026-11-23-admin-tuning.md).
+
 **Production office dues / Admin security release (18 November):** application
 `1797cc3` pushed; backend and Admin website deployed and verified. Store dues and
 office receipt/approval are live. Patched Mongoose 9.11.4, stale Employee-session
