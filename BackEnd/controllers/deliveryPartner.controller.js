@@ -301,10 +301,16 @@ export const logoutDeliveryPartner = async (req, res) => {
 /* GET ALL ACTIVE DELIVERY PARTNERS (ADMIN) */
 export const getAllDeliveryPartners = async (req, res) => {
   try {
+    const canReview = req.user.role === "ADMIN" || req.user.permissions?.canManageDeliveryPartners === true;
+    const summary = !canReview || req.query.view === "summary";
     const partners = await DeliveryPartner.find()
-      .select("-password -passwordResetToken -passwordResetExpires")
-      .sort({ createdAt: -1 });
+      .select(summary
+        ? "name phone status isOnline address.city address.state createdAt"
+        : "name phone email status isOnline address documents bankDetails rejectionReason createdAt updatedAt")
+      .sort({ createdAt: -1, _id: -1 })
+      .lean();
 
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
       success: true,
       count: partners.length,

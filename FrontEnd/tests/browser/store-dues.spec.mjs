@@ -87,3 +87,24 @@ test("another operator's approval refreshes the selected receipt and removes the
   await expect(dialog.getByRole("button", { name: "Approve this receipt", exact: true })).toHaveCount(0);
   expect(fixture.payments).toHaveLength(1);
 });
+
+test("Store Dues returns to the last available page when its final row is settled elsewhere", async ({ context, page }) => {
+  let settled = false;
+  const store = { consumerId: "DUE-STORE", storeName: "Outstanding shop", pendingOrders: 1, dueAmount: 100 };
+  const fixture = await installFixtures(context, { overrides: {
+    "/admin/store-dues": (route, request) => {
+      const pageNumber = Number(new URLSearchParams(request.query).get("page"));
+      const stores = pageNumber === 1 ? [store] : settled ? [] : [{ ...store, consumerId: "LAST-STORE", storeName: "Last pending shop" }];
+      return route.fulfill({ json: { stores, total: settled ? 25 : 26, page: pageNumber, pages: settled ? 1 : 2, summary: { dueAmount: 100, pendingOrders: 1 } } });
+    },
+  } });
+  await page.goto("/admin/cash-verification");
+  await page.getByRole("tab", { name: "Store dues", exact: true }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByText("Last pending shop", { exact: true })).toBeVisible();
+  settled = true;
+  await page.getByRole("button", { name: "Refresh dues", exact: true }).click();
+  await expect(page.getByText("Outstanding shop", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Page 1 of 1/)).toBeVisible();
+  expect(fixture.unknown).toEqual([]);
+});

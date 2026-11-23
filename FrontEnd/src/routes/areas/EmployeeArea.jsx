@@ -1,12 +1,13 @@
 import { Route, Routes } from "react-router-dom";
+import { lazy } from "react";
 import EmployeeBase from "../../pages/Employee/EmployeeBase";
-import ProductDetails from "../../pages/Admin/Tabs/AllProducts/ProductDetails";
+import AdminSectionBoundary from "../../components/common/AdminSectionBoundary";
 import PermissionGuard from "../../components/common/PermissionGuard";
 import ErrorPage from "../../components/common/ErrorPage";
 import { employeeRoutes } from "../../config/employeeRoutes";
 
-/* Everything under /employee, loaded as one bundle on first use. Moved out
-   of routeConfig unchanged; see AdminArea for why. */
+const ProductDetails = lazy(() => import("../../pages/Admin/Tabs/AllProducts/ProductDetails"));
+
 export default function EmployeeArea() {
   const Default = employeeRoutes[0].component;
 
@@ -26,7 +27,7 @@ export default function EmployeeArea() {
               element={
                 route.permission ? (
                   <PermissionGuard permission={route.permission}>
-                    <Component />
+                    <AdminSectionBoundary><Component /></AdminSectionBoundary>
                   </PermissionGuard>
                 ) : (
                   <Component />
@@ -45,7 +46,7 @@ export default function EmployeeArea() {
           path="allproducts/:productId"
           element={
             <PermissionGuard permission="canManageProducts">
-              <ProductDetails />
+              <AdminSectionBoundary><ProductDetails /></AdminSectionBoundary>
             </PermissionGuard>
           }
         />

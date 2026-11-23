@@ -7,6 +7,7 @@ import DeliveryPartner from "../models/DeliveryPartner.js";
 import { sendPasswordResetMail } from "../utils/email.js";
 import { frontendBaseUrl } from "../utils/frontendUrl.js";
 import { agentMaySignIn } from "../utils/agentAccess.js";
+import { revokeSession } from "../utils/sessionRevocation.js";
 
 // Generate link for the Password
 
@@ -304,7 +305,9 @@ export const employeeLogin = async (req, res) => {
       employeeId: employeeId.trim().toUpperCase(),
     });
 
-    if (!employee) {
+    const dummyHash = "$2b$10$T73UknC5svP/XseMHtJ6CO4OhRvgUy9IhDJevHMjH3giH1L2uTIWG";
+    const isMatch = await bcrypt.compare(password, employee?.password || dummyHash);
+    if (!employee || !isMatch) {
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -325,15 +328,6 @@ export const employeeLogin = async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(password, employee.password);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-
     const token = jwt.sign(
       {
         id: employee._id,
@@ -343,7 +337,7 @@ export const employeeLogin = async (req, res) => {
         permissions: employee.permissions, // 🔥 important
       },
       process.env.JWT_SECRET,
-      { expiresIn: "30d" },
+      { expiresIn: "30d", jwtid: crypto.randomUUID() },
     );
 
     // 🔥 Mark online
@@ -367,17 +361,13 @@ export const employeeLogin = async (req, res) => {
 // EMPLOYEE LOGOUT
 export const employeeLogout = async (req, res) => {
   try {
-    const employee = await Employee.findById(req.user.id);
-
-    if (!employee) {
+    const result = await revokeSession(Employee, req.user, req.authToken, { isOnline: false });
+    if (!result.matchedCount) {
       return res.status(404).json({
         success: false,
         message: "Employee not found",
       });
     }
-
-    employee.isOnline = false;
-    await employee.save();
 
     return res.json({
       success: true,

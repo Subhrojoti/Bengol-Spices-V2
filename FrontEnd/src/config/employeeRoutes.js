@@ -1,14 +1,9 @@
+import { lazy } from "react";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import Groups3Icon from "@mui/icons-material/Groups3";
-import AdminDashboard from "../pages/Admin/Tabs/AdminDashboard/AdminDashboard";
-import Delivery from "../pages/Admin/Tabs/Delivery/Delivery";
-import OrderManagement from "../pages/Admin/Tabs/Orders/AdminOrdersWorkspace";
-import ReturnManagement from "../pages/Admin/Tabs/Returns/ReturnManagement";
-import ProductCreation from "../pages/Admin/Tabs/ProductCreation/ProductCreation";
-import AllProducts from "../pages/Admin/Tabs/AllProducts/AllProducts";
 import PersonIcon from "@mui/icons-material/Person";
 import AddLocationIcon from "@mui/icons-material/AddLocation";
 import PaymentIcon from "@mui/icons-material/Payment";
@@ -16,16 +11,23 @@ import AdsClickIcon from "@mui/icons-material/AdsClick";
 import QueryStatsIcon from "@mui/icons-material/QueryStats";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import EmpProfile from "../components/profile/EmpProfile";
-import Agent from "../pages/Admin/Tabs/Agent/Agent";
-import PaymentInfo from "../pages/Admin/Tabs/PaymentInfo/PaymentInfo";
-import Targets from "../pages/Admin/Tabs/Targets/Targets";
-import ProductSales from "../pages/Admin/Tabs/ProductSales/ProductSales";
-import CashVerification from "../pages/Admin/Tabs/CashVerification/CashVerification";
 import { AllInbox, LocalShipping, OutboxOutlined } from "@mui/icons-material";
-import CustomNotification from "../pages/Admin/Tabs/CustomNotification/CustomNotification";
 import NotificationsActive from "@mui/icons-material/NotificationsActive";
-import AssignLocation from "../pages/Admin/Tabs/AssignLocation/AssignLocation";
-import Bills from "../pages/Admin/Tabs/Bills/Bills";
+
+const AdminDashboard = lazy(() => import("../pages/Admin/Tabs/AdminDashboard/AdminDashboard"));
+const Delivery = lazy(() => import("../pages/Admin/Tabs/Delivery/Delivery"));
+const OrderManagement = lazy(() => import("../pages/Admin/Tabs/Orders/AdminOrdersWorkspace"));
+const ReturnManagement = lazy(() => import("../pages/Admin/Tabs/Returns/ReturnManagement"));
+const ProductCreation = lazy(() => import("../pages/Admin/Tabs/ProductCreation/ProductCreation"));
+const AllProducts = lazy(() => import("../pages/Admin/Tabs/AllProducts/AllProducts"));
+const Agent = lazy(() => import("../pages/Admin/Tabs/Agent/Agent"));
+const PaymentInfo = lazy(() => import("../pages/Admin/Tabs/PaymentInfo/PaymentInfo"));
+const Targets = lazy(() => import("../pages/Admin/Tabs/Targets/Targets"));
+const ProductSales = lazy(() => import("../pages/Admin/Tabs/ProductSales/ProductSales"));
+const CashVerification = lazy(() => import("../pages/Admin/Tabs/CashVerification/CashVerification"));
+const CustomNotification = lazy(() => import("../pages/Admin/Tabs/CustomNotification/CustomNotification"));
+const AssignLocation = lazy(() => import("../pages/Admin/Tabs/AssignLocation/AssignLocation"));
+const Bills = lazy(() => import("../pages/Admin/Tabs/Bills/Bills"));
 
 /**
  * `permission` guards the route. A string means "must hold this permission";

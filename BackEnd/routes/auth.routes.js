@@ -12,6 +12,7 @@ import {
 } from "../controllers/auth.controller.js";
 import { adminLogin, adminLogout, adminSessionInfo } from "../controllers/admin.auth.js";
 import { protect } from "../middleware/auth.js";
+import { isEmployee } from "../middleware/role.js";
 import { limitLoginAttempts } from "../middleware/loginLimiter.js";
 import { limitPasswordRequests } from "../middleware/rateLimit.js";
 
@@ -41,7 +42,7 @@ router.post(
 router.post("/logout", protect, logout);
 
 // 🔒 Logout Employee
-router.post("/employee/logout", protect, employeeLogout);
+router.post("/employee/logout", protect, isEmployee, employeeLogout);
 
 // 🔒 CHANGE PASSWORD (AGENT)
 router.post("/change-password", protect, changePassword);

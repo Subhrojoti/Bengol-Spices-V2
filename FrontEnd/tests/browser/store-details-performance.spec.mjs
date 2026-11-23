@@ -44,6 +44,38 @@ test("store paging returns to the report and thumbnails preserve original photo 
   await expect.poll(() => page.locator("main").evaluate(el => el.scrollTop)).toBeLessThan(200);
 });
 
+test("browser Back conceals a revealed store delivery code when the report changes", async ({ context, page }) => {
+  const report = "/admin/agent?tab=stores";
+  const first = stores[0];
+  const next = stores[1];
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await installFixtures(context, { overrides: {
+    "/agent/store/reports": async route => {
+      const search = new URL(route.request().url()).searchParams.get("q");
+      if (search) await gate;
+      return route.fulfill({ json: { stores: [search ? next : first], page: 1, pages: 1, total: 1, retainedTotal: 1 } });
+    },
+    [`/agent/store/${first.consumerId}/delivery-code`]: route => route.fulfill({ json: { deliveryCode: "582416" } }),
+  } });
+  try {
+    await page.goto(report);
+    await page.getByRole("button", { name: "Reveal delivery code", exact: true }).click();
+    await expect(page.getByText("Delivery code: 582416", { exact: true })).toBeVisible();
+    await page.evaluate(({ report, query }) => {
+      const state = history.state;
+      history.replaceState({ ...state, key: "previous-report" }, "", `${report}&storeQuery=${encodeURIComponent(query)}`);
+      history.pushState({ ...state, idx: state.idx + 1 }, "", report);
+      history.back();
+    }, { report, query: next.storeName });
+    await expect(page.getByPlaceholder("Search stores")).toHaveValue(next.storeName);
+    await expect(page.getByText("Delivery code: 582416", { exact: true })).toHaveCount(0);
+    await expect(page.locator('[aria-busy="true"][inert]')).toHaveCount(1);
+    release();
+    await expect(page.getByRole("link", { name: next.storeName, exact: true })).toBeVisible();
+  } finally { release(); }
+});
+
 test("Target tabs fit a narrow Admin viewport", async ({ context, page }) => {
   await installFixtures(context);
   await page.setViewportSize({ width: 390, height: 844 });

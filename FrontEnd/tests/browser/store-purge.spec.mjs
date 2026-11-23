@@ -64,6 +64,28 @@ test("server cleanup blockers stay visible and prevent confirmation even when ty
   expect(network.requests.filter(r => r.path === `${prefix}/purge`)).toHaveLength(0);
 });
 
+test("an archived store can be restored from its management row with typed confirmation", async ({ context, page }) => {
+  const archived = { ...store, status: "INACTIVE" };
+  let restored = false;
+  const network = await setup(context, {
+    "/admin/store-management": route => route.fulfill({ json: { stores: [{ ...archived, status: restored ? "ACTIVE" : "INACTIVE" }], total: 1, pages: 1 } }),
+    [`${prefix}/removal-preview`]: route => route.fulfill({ json: { store: archived, counts: { orders: 1 }, options: [{ key: "RESTORE", allowed: true }], confirmationToken: "restore-preview" } }),
+    [`${prefix}/remove`]: route => { restored = true; return route.fulfill({ json: { success: true, message: "Store restored" } }); },
+  });
+  await page.goto("/admin/agent");
+  await page.getByRole("button", { name: "Manage agents & stores", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Unarchive / manage" }).click();
+  await expect(dialog.getByRole("heading", { name: "Unarchive store" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Confirm unarchive" })).toBeDisabled();
+  await dialog.getByLabel("Confirm identifier").fill(store.consumerId);
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Confirm unarchive" }).click();
+  await expect(dialog.getByRole("button", { name: "Delete / archive", exact: true })).toBeVisible();
+  const sent = network.requests.find(entry => entry.path === `${prefix}/remove`);
+  expect(JSON.parse(sent.body)).toMatchObject({ option: "RESTORE", confirmIdentifier: store.consumerId, confirmationToken: "restore-preview" });
+});
+
 test("stale cleanup errors retain the review; opening a fresh preview resets typed confirmation and request ID", async ({ context, page }) => {
   let version = 0;
   const network = await setup(context, {

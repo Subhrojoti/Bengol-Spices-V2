@@ -17,35 +17,32 @@ const SIGN_OUT_DELAY_MS = 3000;
  * carries the new access.
  */
 const useAccessSync = ({ enabled, permissions, onSignOut }) => {
-  /* null until the caller has actually loaded the profile. Capturing a
-     baseline before then would compare "no permissions yet" against the real
-     set on the first tick and sign the employee straight back out. */
-  const baselineRef = useRef(null);
-  const firedRef = useRef(false);
-  const lastCheckRef = useRef(0);
-
-  const signOutRef = useRef(onSignOut);
-  signOutRef.current = onSignOut;
+  const baseline = permissionSignature(permissions);
+  const signOut = useRef(onSignOut);
+  useEffect(() => { signOut.current = onSignOut; }, [onSignOut]);
 
   useEffect(() => {
     if (!enabled) return undefined;
 
-    if (baselineRef.current === null) {
-      baselineRef.current = permissionSignature(permissions);
-    }
-
     let timer = null;
     let cancelled = false;
+    let checking = false;
+    let fired = false;
+    let lastCheck = 0;
+    const token = localStorage.getItem("employeeToken");
+    const isCurrent = () => !cancelled && token && token === localStorage.getItem("employeeToken");
 
     const check = async () => {
-      if (cancelled || firedRef.current) return;
+      if (!isCurrent() || fired || checking) return;
 
-      lastCheckRef.current = Date.now();
+      checking = true;
+      lastCheck = Date.now();
       const result = await fetchEmployeeAccessState();
+      checking = false;
 
-      if (cancelled || firedRef.current) return;
+      if (!isCurrent()) return;
 
-      const verdict = evaluateAccess({ result, baseline: baselineRef.current });
+      const verdict = evaluateAccess({ result, baseline });
 
       if (verdict.action !== "signout") return;
 
@@ -59,13 +56,13 @@ const useAccessSync = ({ enabled, permissions, onSignOut }) => {
         }
       }
 
-      firedRef.current = true;
+      fired = true;
       toast.info(verdict.message, { duration: SIGN_OUT_DELAY_MS });
-      timer = setTimeout(() => signOutRef.current?.(), SIGN_OUT_DELAY_MS);
+      timer = setTimeout(() => { if (isCurrent()) signOut.current(); }, SIGN_OUT_DELAY_MS);
     };
 
     const onFocus = () => {
-      if (Date.now() - lastCheckRef.current > FOCUS_THROTTLE_MS) check();
+      if (Date.now() - lastCheck > FOCUS_THROTTLE_MS) check();
     };
 
     const interval = setInterval(check, POLL_INTERVAL_MS);
@@ -77,7 +74,7 @@ const useAccessSync = ({ enabled, permissions, onSignOut }) => {
       clearTimeout(timer);
       window.removeEventListener("focus", onFocus);
     };
-  }, [enabled]);
+  }, [enabled, baseline]);
 };
 
 export default useAccessSync;

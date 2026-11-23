@@ -27,13 +27,15 @@ function Pages({ data, onPage }) {
 
 function Receipt({ order, onClose, onChanged }) {
   const titleId = useId(), running = useRef(false), alive = useRef(true), attempt = useRef(null), begin = useLatestRequest();
+  const storageKey = useRef(null);
   const [data, setData] = useState(null), [error, setError] = useState(""), [revision, setRevision] = useState(0), [page, setPage] = useState(1);
   const [amount, setAmount] = useState(""), [method, setMethod] = useState("CASH"), [note, setNote] = useState("");
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [ready, setReady] = useState(false), [receipt, setReceipt] = useState(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem(recoveryKey(order.orderId));
+      storageKey.current = recoveryKey(order.orderId);
+      const saved = sessionStorage.getItem(storageKey.current);
       if (saved) {
         const value = JSON.parse(saved);
         if (!value || value.orderId !== order.orderId || typeof value.clientRequestId !== "string" || !/^[A-Za-z0-9_-]{16,100}$/.test(value.clientRequestId) || !Number.isFinite(Number(value.amount)) || Number(value.amount) <= 0 || !["CASH", "UPI", "BANK_TRANSFER"].includes(value.method) || typeof value.note !== "string") throw new Error("Saved receipt needs office review. Check payment history before recording another.");
@@ -51,15 +53,26 @@ function Receipt({ order, onClose, onChanged }) {
   const validAmount = /^\d+(?:\.\d{1,2})?$/.test(amount.trim()) && Number(amount) > 0 && Number(amount) <= Number(data?.order.dueAmount) && (Number(amount) >= 1 || Math.abs(Number(amount) - Number(data?.order.dueAmount)) < 0.005);
   const submit = async () => {
     if (running.current || !ready || !data || (!uncertain && (!validAmount || note.trim().length < 3))) return;
+    const key = storageKey.current;
+    try {
+      if (key !== recoveryKey(order.orderId)) throw new Error("The account changed. Reopen payment history before recording a receipt.");
+    } catch (e) {
+      setError(message(e));
+      return;
+    }
     running.current = true; setBusy(true); setError("");
     const input = attempt.current || { orderId: order.orderId, clientRequestId: crypto.randomUUID(), amount: Number(amount), method, note: note.trim() };
+    const saved = JSON.stringify(input);
+    const clearSaved = () => {
+      if (sessionStorage.getItem(key) === saved) sessionStorage.removeItem(key);
+    };
     attempt.current = input;
     let sent = false;
     try {
-      sessionStorage.setItem(recoveryKey(order.orderId), JSON.stringify(input));
+      sessionStorage.setItem(key, saved);
       sent = true;
       const result = await recordOfficeCollection(order.orderId, input);
-      sessionStorage.removeItem(recoveryKey(order.orderId));
+      clearSaved();
       if (!alive.current) return;
       attempt.current = null; setReceipt(result.payment); setUncertain(false); setAmount(""); setNote("");
       toast.success(result.replayed ? "Existing receipt recovered" : "Receipt recorded; approval required");
@@ -68,7 +81,7 @@ function Receipt({ order, onClose, onChanged }) {
     } catch (e) {
       const definitive = sent && [400, 403, 404, 422].includes(e?.response?.status);
       let retained = true;
-      if (definitive) { try { sessionStorage.removeItem(recoveryKey(order.orderId)); attempt.current = null; retained = false; } catch { /* retain original reference */ } }
+      if (definitive) { try { clearSaved(); attempt.current = null; retained = false; } catch { /* retain original reference */ } }
       if (alive.current) { setUncertain(retained); setError(`${message(e)}${retained ? " Retry the saved receipt; do not record the same money again." : ""}`); }
     } finally { running.current = false; if (alive.current) setBusy(false); }
   };
@@ -111,7 +124,15 @@ export default function StoreDues() {
     const request = begin(), values = JSON.parse(key);
     const timer = setTimeout(() => {
       const read = values.consumerId ? getStoreDueOrders(values.consumerId, { page: values.page }, { signal: request.signal }) : getStoreDues({ q: values.q, balance: values.balance, page: values.page }, { signal: request.signal });
-      read.then(result => { if (request.current()) setState({ key, data: result, error: "" }); }).catch(e => { if (request.current()) setState({ key, data: null, error: message(e) }); });
+      read.then(result => {
+        if (!request.current()) return;
+        const lastPage = Math.max(1, result.pages);
+        if (values.page > lastPage) {
+          setPage(lastPage);
+          return;
+        }
+        setState({ key, data: result, error: "" });
+      }).catch(e => { if (request.current()) setState({ key, data: null, error: message(e) }); });
     }, values.q && !values.consumerId ? 250 : 0);
     return () => { clearTimeout(timer); begin(); };
   }, [key, begin]);

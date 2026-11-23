@@ -4,6 +4,7 @@ import Employee from "../models/Employee.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import { agentSessionMatches } from "../utils/agentAccess.js";
 import { authenticateAdminCookie } from "../utils/adminSession.js";
+import { sessionDigest } from "../utils/sessionRevocation.js";
 
 /* A token only proves who someone WAS when they logged in. For every role
    with an account record, the record is checked on each request, so:
@@ -64,7 +65,10 @@ export const authenticatedUser = async (token) => {
   if (decoded.role === "ADMIN") return user;
   if (typeof decoded.id !== "string" || !/^[a-f0-9]{24}$/i.test(decoded.id)) reject("Invalid token");
   const account = ACCOUNTS[decoded.role];
-  const record = await account.model.findById(decoded.id).select(account.fields).lean();
+  const accountQuery = decoded.role === "EMPLOYEE"
+    ? account.model.findOne({ _id: decoded.id, "revokedSessions.digest": { $ne: sessionDigest(token) } })
+    : account.model.findById(decoded.id);
+  const record = await accountQuery.select(account.fields).lean();
   if (!record) reject("Account not found. Please log in again.");
   if (record.status !== account.activeStatus) reject("Your account is no longer active.");
   if (decoded.role === "AGENT" && !agentSessionMatches(record, decoded)) {

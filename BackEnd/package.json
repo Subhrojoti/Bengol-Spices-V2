@@ -34,7 +34,7 @@
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.13",
     "mongodb-memory-server": "^11.3.0",
-    "nodemon": "^3.1.14",
+    "nodemon": "3.1.11",
     "pdfjs-dist": "^6.4.299"
   }
 }

@@ -87,9 +87,18 @@ export const previewRemoval = async (consumerId, session = null) => {
   const store = await q(Store.findOne({ consumerId }), session).lean();
   if (!store) refuse("Store not found", 404);
   const counts = await relatedCounts([store], session);
+  const managerId = managerOf(store);
+  const archived = store.status === "INACTIVE";
+  const canRestore = archived && managerId && agentMaySignIn(await q(
+    Agent.findOne({ agentId: managerId }).select("status accessStatus"), session,
+  ).lean());
   const unsettled = counts.openOrders + counts.unpaidOrders + counts.openReturns;
   const used = counts.orders + counts.payments + counts.returns + counts.invoices + counts.deliveryEvents + counts.gatewayPayments + counts.creationTargets + counts.storeChanges + counts.orderModifications;
   const options = [
+    ...(archived ? [{
+      key: "RESTORE", label: "Unarchive store", allowed: Boolean(canRestore),
+      removes: [], preserves: "Store history and every business record", reason: canRestore ? null : "The responsible agent must be approved and active.",
+    }] : []),
     { key: "ARCHIVE", label: "A: Remove store only (archive)", allowed: !unsettled, removes: [], preserves: "Store history and every business record", reason: unsettled ? "Settle open orders, outstanding dues and return pickups first" : null },
     { key: "ARCHIVE_OPERATIONAL", label: "B: Archive and remove store photo", allowed: !unsettled, removes: ["Unshared store photo and its reference"], preserves: "Store, address, GPS, all orders, payments, invoices, returns, delivery and audit history", reason: unsettled ? "Settle open orders, outstanding dues and return pickups first" : null },
     { key: "PERMANENT", label: "C: Full removal of an unused store", allowed: !used, removes: ["Store record", "Store photo reference"], preserves: "Administrative audit record", reason: used ? "Business records or store-creation target progress require retention; use archive" : null },
@@ -151,7 +160,7 @@ export const removeStore = async (consumerId, body, actor) => {
   const signed = readConfirmation(body.confirmationToken);
   if (signed.kind !== "REMOVE" || signed.consumerIds[0] !== consumerId) refuse("Wrong store confirmation");
   await MediaDeletionJob.init();
-  const result = await withStoreLocks([consumerId], () => runAdminOperation({ requestId: body.requestId, input: { consumerId, option: body.option, token: body.confirmationToken }, action: "REMOVE_STORE", actor,
+  const result = await withStoreLocks([consumerId], () => runAdminOperation({ requestId: body.requestId, input: { consumerId, option: body.option, token: body.confirmationToken }, action: body.option === "RESTORE" ? "RESTORE_STORE" : "REMOVE_STORE", actor,
     context: { consumerIds: [consumerId], details: { option: body.option } },
     work: async (session) => {
       const fresh = await previewRemoval(consumerId, session);
@@ -159,6 +168,17 @@ export const removeStore = async (consumerId, body, actor) => {
       if (signed.stamp !== fresh.payload.stamp || hash(signed.counts) !== hash(fresh.counts)) refuse("The store or related records changed. Preview again.", 409);
       const option = fresh.options.find((o) => o.key === body.option);
       if (!option?.allowed) refuse(option?.reason || "Choose a supported removal option", 409);
+      if (body.option === "RESTORE") {
+        // Write the manager's version to serialize against changes to their account.
+        const assigned = await Agent.updateOne({ agentId: fresh.store.currentAgentId, status: "APPROVED", accessStatus: { $in: [null, "ACTIVE"] } }, { $inc: { managementVersion: 1 } }, { session });
+        if (!assigned.matchedCount) refuse("The responsible agent must be approved and active.", 409);
+        await Store.updateOne({ consumerId, status: "INACTIVE" }, {
+          $set: { status: "ACTIVE" }, $unset: { archivedAt: "", archivedBy: "" }, $inc: { ownershipVersion: 1 },
+        }, { session });
+        return { consumerIds: [consumerId], sourceAgentId: fresh.store.currentAgentId,
+          details: { store: fresh.store, option: body.option },
+          result: { success: true, message: "Store restored to the responsible agent." } };
+      }
       const store = await Store.findOne({ consumerId }).session(session).select("image").lean();
       const asset = body.option !== "ARCHIVE" ? mediaAssetOf(store?.image?.url) : null;
       if (asset) await MediaDeletionJob.create([{ ...asset, batchId: body.requestId }], { session });
@@ -166,7 +186,7 @@ export const removeStore = async (consumerId, body, actor) => {
       else await Store.updateOne({ consumerId }, { $set: { status: "INACTIVE", archivedAt: new Date(), archivedBy: actor }, $inc: { ownershipVersion: 1 }, ...(body.option === "ARCHIVE_OPERATIONAL" && { $unset: { image: "" } }) }, { session });
       return { consumerIds: [consumerId], sourceAgentId: fresh.store.currentAgentId, details: { store: fresh.store, option: body.option, counts: fresh.counts, removedCategories: option.removes }, result: { success: true, message: body.option === "PERMANENT" ? "Unused store removed; audit retained." : "Store archived. Business history is preserved.", ...(body.option !== "ARCHIVE" && { cleanupBatchId: body.requestId, unrecognizedFiles: store?.image?.url && !asset ? 1 : 0 }) } };
     } }));
-  if (body.option === "ARCHIVE") return result;
+  if (body.option === "ARCHIVE" || body.option === "RESTORE") return result;
   let cleanup;
   try { cleanup = await processMediaCleanup(body.requestId); }
   catch { cleanup = await getMediaCleanup(body.requestId).catch(() => ({ batchId: body.requestId, statusUnavailable: true })); }

@@ -245,3 +245,35 @@ test("a product photo saved successfully is retained if a subsequent stock adjus
     assert(!removed.includes("new-front"));
   } finally { Product.updateOne = originalUpdate; cloudinary.uploader.destroy = originalDestroy; }
 });
+
+test("Employee logout invalidates one session and deactivation is disclosed only after credential verification", async () => {
+  const credentials = { employeeId: "EMP-SESSION-TEST", password: "OfficeTest1!" };
+  const employee = await Employee.create({
+    ...credentials,
+    name: "Office tester",
+    email: "office-session@test.invalid",
+    password: await bcrypt.hash(credentials.password, 10),
+    status: "INACTIVE",
+  });
+  const wrong = await call("/auth/employee/login", null, { ...credentials, password: "WrongPassword1!" });
+  const missing = await call("/auth/employee/login", null, { ...credentials, employeeId: "NONEXISTENT-TEST" });
+  assert.equal(wrong.status, 401);
+  assert.deepEqual(wrong, missing);
+  assert.equal((await call("/auth/employee/login", null, credentials)).status, 403);
+
+  await Employee.updateOne({ _id: employee.id }, { status: "ACTIVE" });
+  const first = await call("/auth/employee/login", null, credentials);
+  const second = await call("/auth/employee/login", null, credentials);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.notEqual(first.data.token, second.data.token);
+  const legacy = sign(employee, "EMPLOYEE");
+  assert.equal((await call("/secure", legacy)).status, 200);
+  assert.equal((await call("/auth/employee/logout", sign(employee, "ADMIN"), {})).status, 403);
+  assert.equal((await call("/auth/employee/logout", first.data.token, {})).status, 200);
+  assert.equal((await call("/secure", first.data.token)).status, 401);
+  assert.equal((await call("/secure", second.data.token)).status, 200);
+  assert.equal((await call("/auth/employee/logout", legacy, {})).status, 200);
+  assert.equal((await call("/secure", legacy)).status, 401);
+  assert.equal((await Employee.findById(employee.id)).revokedSessions, undefined);
+});

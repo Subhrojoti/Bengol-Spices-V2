@@ -47,11 +47,22 @@ const publicBill = row => ({
 });
 export const listBills = async query => {
   const pipeline = billsPipeline(query), wanted = integer(query, "page", 1, 1000000), pageSize = integer(query, "pageSize", 25, 50);
-  const [summary = { total: 0, billAmount: 0, dueAmount: 0 }] = await Invoice.aggregate([...pipeline, { $group: { _id: null, total: { $sum: 1 }, billAmount: { $sum: "$billAmount" }, dueAmount: { $sum: "$remaining" } } }]);
+  const fields = { $project: { invoiceNumber: 1, orderId: 1, "buyer.name": 1, invoiceDate: 1, createdAt: 1, dueDate: 1, billAmount: 1, recordedPaid: 1, remaining: 1, "order.consumerId": 1, "order.agentId": 1, "order.deliveryAddress.storeName": 1, "order.createdAt": 1, "order.dueDate": 1, "order.status": 1 } };
+  const pageStages = page => [
+    { $sort: { invoiceDate: -1, _id: -1 } }, { $skip: (page - 1) * pageSize }, { $limit: pageSize },
+    { $lookup: { from: "agents", localField: "order.agentId", foreignField: "agentId", as: "agent", pipeline: [{ $project: { name: 1 } }] } },
+    { $set: { agent: { $first: "$agent" } } },
+  ];
+  const [result] = await Invoice.aggregate([...pipeline, fields, { $facet: {
+    totals: [{ $group: { _id: null, total: { $sum: 1 }, billAmount: { $sum: "$billAmount" }, dueAmount: { $sum: "$remaining" } } }],
+    rows: pageStages(wanted),
+  } }]);
+  const [summary = { total: 0, billAmount: 0, dueAmount: 0 }] = result.totals;
   const pages = Math.max(1, Math.ceil(summary.total / pageSize)), page = Math.min(wanted, pages);
-  const rows = await Invoice.aggregate([...pipeline, { $sort: { invoiceDate: -1, _id: -1 } }, { $skip: (page - 1) * pageSize }, { $limit: pageSize },
-    { $lookup: { from: "agents", localField: "order.agentId", foreignField: "agentId", as: "agent", pipeline: [{ $project: { name: 1 } }] } }, { $set: { agent: { $first: "$agent" } } },
-    { $project: { _id: 1, invoiceNumber: 1, orderId: 1, buyer: 1, invoiceDate: 1, createdAt: 1, dueDate: 1, billAmount: 1, recordedPaid: 1, remaining: 1, agent: 1, "order.consumerId": 1, "order.agentId": 1, "order.deliveryAddress.storeName": 1, "order.createdAt": 1, "order.dueDate": 1, "order.status": 1 } }]);
+  // A saved URL may point to a page that disappeared after the filters or data changed.
+  const rows = page === wanted || !summary.total
+    ? result.rows
+    : await Invoice.aggregate([...pipeline, fields, ...pageStages(page)]);
   return { success: true, bills: rows.map(publicBill), total: summary.total, page, pages, pageSize,
     summary: { billAmount: Math.round(summary.billAmount * 100) / 100, dueAmount: Math.round(summary.dueAmount * 100) / 100 } };
 };

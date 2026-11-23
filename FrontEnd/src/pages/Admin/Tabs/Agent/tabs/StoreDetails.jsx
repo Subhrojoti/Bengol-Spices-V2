@@ -34,12 +34,16 @@ export default function StoreDetails({ canReveal = false, onBack, backLabel = "B
     const reportParams = new URLSearchParams(params); reportParams.set("tab", "stores");
     return `${base}/order-management?${new URLSearchParams({ consumerId, returnTo: `${location.pathname}?${reportParams}` })}`;
   };
-  const [data, setData] = useState(null), [error, setError] = useState(""), [loading, setLoading] = useState(true);
+  const [report, setReport] = useState({ data: null, error: "", requestKey: "" });
   const [revision, setRevision] = useState(0), [codes, setCodes] = useState({}), [revealing, setRevealing] = useState("");
   const begin = useLatestRequest(), beginReveal = useLatestRequest();
   const lastSearch = useRef(filters.q.trim());
   const section = useRef(null), scrollAfterPage = useRef(false);
   const query = reportQuery(filters);
+  const requestKey = `${revision}:${query}`;
+  const { data } = report;
+  const loading = report.requestKey !== requestKey;
+  const error = loading ? "" : report.error;
   useEffect(() => {
     const request = begin();
     let disposed = false;
@@ -47,14 +51,17 @@ export default function StoreDetails({ canReveal = false, onBack, backLabel = "B
     const search = JSON.parse(query).q;
     const delay = lastSearch.current === search ? 0 : 250;
     lastSearch.current = search;
+    setCodes({}); setRevealing("");
     const timer = setTimeout(async () => {
-      setLoading(true); setError(""); setCodes({}); setRevealing("");
-      try { const result = await getStoreReport(JSON.parse(query), { signal: request.signal }); if (!disposed && request.current()) setData(result); }
-      catch (e) { if (!disposed && request.current()) { setData(null); setError(e.response?.data?.message || "Could not load stores. Please retry."); } }
-      finally { if (!disposed && request.current()) setLoading(false); }
+      try {
+        const result = await getStoreReport(JSON.parse(query), { signal: request.signal });
+        if (!disposed && request.current()) setReport({ data: result, error: "", requestKey });
+      } catch (e) {
+        if (!disposed && request.current()) setReport({ data: null, error: e.response?.data?.message || "Could not load stores. Please retry.", requestKey });
+      }
     }, delay);
     return () => { disposed = true; clearTimeout(timer); beginReveal(); };
-  }, [query, revision, begin, beginReveal]);
+  }, [query, requestKey, begin, beginReveal]);
   useEffect(() => {
     if (loading || !data || !scrollAfterPage.current) return;
     scrollAfterPage.current = false;
@@ -63,11 +70,10 @@ export default function StoreDetails({ canReveal = false, onBack, backLabel = "B
     const tabs = panel.querySelector('[role="tablist"]')?.closest(".sticky");
     panel.scrollTo({ top: panel.scrollTop + section.current.getBoundingClientRect().top - panel.getBoundingClientRect().top - (tabs?.offsetHeight || 0) - 12, behavior: "instant" });
   }, [loading, data]);
-  const resetReveal = () => { beginReveal(); setCodes({}); setRevealing(""); };
-  const refresh = () => { resetReveal(); setLoading(true); setRevision(v => v + 1); };
-  const update = (patch) => { scrollAfterPage.current = Boolean(patch.page); if (reportQuery({ ...filters, ...patch, page: patch.page || 1 }) !== query) setLoading(true); resetReveal(); setParams(current => { const next = new URLSearchParams(current); for (const [key, value] of Object.entries({ ...patch, page: patch.page || 1 })) { if (!value || value === "ALL" || key === "page" && Number(value) === 1) next.delete(filterKeys[key]); else next.set(filterKeys[key], String(value)); } return next; }, { replace: true }); };
+  const refresh = () => setRevision(v => v + 1);
+  const update = (patch) => { scrollAfterPage.current = Boolean(patch.page); setParams(current => { const next = new URLSearchParams(current); for (const [key, value] of Object.entries({ ...patch, page: patch.page || 1 })) { if (!value || value === "ALL" || key === "page" && Number(value) === 1) next.delete(filterKeys[key]); else next.set(filterKeys[key], String(value)); } return next; }, { replace: true }); };
   const reveal = async (id) => {
-    if (revealing) return;
+    if (loading || revealing) return;
     const request = beginReveal();
     setRevealing(id);
     try { const result = await revealStoreDeliveryCode(id, { signal: request.signal }); if (request.current()) setCodes(current => ({ ...current, [id]: result.deliveryCode || "Unavailable" })); }
@@ -101,7 +107,7 @@ export default function StoreDetails({ canReveal = false, onBack, backLabel = "B
           ["GST", store.gstNumber || "Not provided"],
         ].map(([label, value]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{value}</dd></div>)}</dl>
         {canReadOrders && <Link className={`${button} mt-4 inline-block max-w-full break-words`} to={ordersLink(store.consumerId)}>View orders for {store.storeName}</Link>}
-        {canReveal && <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">{codes[store.consumerId] ? <><span className="font-mono text-slate-900">Delivery code: {codes[store.consumerId]}</span><button className={button} onClick={() => setCodes(current => ({ ...current, [store.consumerId]: undefined }))}>Hide</button></> : <button className={button} disabled={Boolean(revealing)} onClick={() => reveal(store.consumerId)}>{revealing === store.consumerId ? "Loading…" : "Reveal delivery code"}</button>}</div>}
+        {canReveal && <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">{!loading && codes[store.consumerId] ? <><span className="font-mono text-slate-900">Delivery code: {codes[store.consumerId]}</span><button className={button} onClick={() => setCodes(current => ({ ...current, [store.consumerId]: undefined }))}>Hide</button></> : <button className={button} disabled={loading || Boolean(revealing)} onClick={() => reveal(store.consumerId)}>{!loading && revealing === store.consumerId ? "Loading…" : "Reveal delivery code"}</button>}</div>}
       </article>)}</div>
       <div className="flex items-center justify-between gap-3"><button className={button} disabled={data.page <= 1} onClick={() => update({ page: data.page - 1 })}>Previous</button><span className="text-sm text-slate-500">Page {data.page} of {data.pages} · {data.total} stores</span><button className={button} disabled={data.page >= data.pages} onClick={() => update({ page: data.page + 1 })}>Next</button></div>
     </div>}

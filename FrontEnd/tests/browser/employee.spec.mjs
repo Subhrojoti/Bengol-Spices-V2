@@ -37,6 +37,47 @@ test("bare Employee landing and reload render the account with its permitted nav
   expect(network.unknown).toEqual([]);
 });
 
+test("Employee sign-out revokes the current session without clearing another panel's session", async ({ context, page }) => {
+  const path = "/auth/employee/logout";
+  const network = await setup(context, { overrides: { [path]: route => route.fulfill({ json: { success: true } }) } });
+  await page.goto("/employee/profile");
+  await expect(page.getByRole("heading", { name: "Your access", exact: true })).toBeVisible();
+  const token = await page.evaluate(() => {
+    localStorage.setItem("adminToken", "separate-admin");
+    return localStorage.getItem("employeeToken");
+  });
+  await page.locator("header").getByRole("button", { name: new RegExp(employee.name) }).click();
+  await page.getByRole("menuitem", { name: "Log out", exact: true }).click();
+  await expect(page).toHaveURL(/\/employee\/login$/);
+  await expect.poll(() => network.requests.find(request => request.path === path)?.authorization).toBe(`Bearer ${token}`);
+  expect(await page.evaluate(() => [localStorage.getItem("employeeToken"), localStorage.getItem("permissions"), localStorage.getItem("adminToken")])).toEqual([null, null, "separate-admin"]);
+  expect(network.unknown).toEqual([]);
+});
+
+test("a scheduled permission-change sign-out cannot revoke a replacement Employee login", async ({ context, page }) => {
+  const path = "/auth/employee/logout";
+  let changeAccess = false;
+  const network = await setup(context, { overrides: {
+    "/employee/profile": route => route.fulfill({ json: {
+      success: true,
+      employee: changeAccess ? { ...employee, permissions: { canGetAllOrders: true } } : employee,
+    } }),
+    [path]: route => route.fulfill({ json: { success: true } }),
+  } });
+  await page.clock.install();
+  await page.goto("/employee/dashboard");
+  await expect(page.getByText("Verified Collections", { exact: true })).toBeVisible();
+  changeAccess = true;
+  await page.clock.runFor(45000);
+  await expect(page.getByText(/Your access permissions were updated/)).toBeVisible();
+  const replacement = tokenFor("EMPLOYEE", { id: "replacement-employee" });
+  await page.evaluate(token => localStorage.setItem("employeeToken", token), replacement);
+  await page.clock.runFor(3100);
+  await expect(page).toHaveURL(/\/employee\/dashboard$/);
+  expect(await page.evaluate(() => localStorage.getItem("employeeToken"))).toBe(replacement);
+  expect(network.requests.some(request => request.path === path)).toBe(false);
+});
+
 test("Employee permission restrictions remain enforced after the header renders", async ({ context, page }) => {
   await setup(context, { overrides: { "/employee/profile": (route) => route.fulfill({ json: { success: true, employee: { ...employee, permissions: { canGetAllOrders: true } } } }) } });
   await page.goto("/employee");

@@ -4,10 +4,11 @@ import { useNavigate } from "react-router-dom";
 import PanelLayout from "../../components/layout/PanelLayout";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import { employeeRoutes } from "../../config/employeeRoutes";
-import { getEmployeeProfile } from "../../api/services";
+import { getEmployeeProfile, logoutEmployeeSession } from "../../api/services";
 import { canAccessRoute } from "../../utils/permissionUtils";
 import useAccessSync from "../../hooks/useAccessSync";
 import useLiveOrders from "../../hooks/useLiveOrders";
+import { clearEmployeeSession } from "../../utils/employeeSession";
 
 const EMPLOYEE_ACCENT = {
   main: "#7c3aed",
@@ -33,8 +34,11 @@ const EmployeeBase = () => {
   /* Fetched once here and handed to the sidebar. The sidebar used to fetch
      the same profile a second time on every page load. */
   const loadProfile = useCallback(async () => {
+    const token = localStorage.getItem("employeeToken");
+    const isCurrent = () => token && token === localStorage.getItem("employeeToken");
     try {
       const res = await getEmployeeProfile();
+      if (!isCurrent()) return;
 
       const permissions = res?.employee?.permissions || {};
       localStorage.setItem("permissions", JSON.stringify(permissions));
@@ -42,10 +46,11 @@ const EmployeeBase = () => {
       if (res?.employee) setProfile(res.employee);
       setFailed(false);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error("Failed to load employee profile", error);
       setFailed(true);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, []);
 
@@ -53,12 +58,12 @@ const EmployeeBase = () => {
     loadProfile();
   }, [loadProfile]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("employeeToken");
-    localStorage.removeItem("permissions");
-    localStorage.removeItem("role");
+  const handleLogout = useCallback(() => {
+    const token = localStorage.getItem("employeeToken");
+    clearEmployeeSession();
     navigate("/employee/login", { replace: true });
-  };
+    if (token) void logoutEmployeeSession(token).catch(() => { /* Local sign-out still works offline. */ });
+  }, [navigate]);
 
   /* Sign the employee out as soon as the admin changes their access, so the
      next login reflects it. */

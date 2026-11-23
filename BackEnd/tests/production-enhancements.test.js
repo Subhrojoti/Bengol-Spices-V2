@@ -228,6 +228,80 @@ test("office dues group non-cancelled orders once, include archived/clear stores
   for (const query of ["?page=0", "?page[]=1", "?balance=wrong", "?q[x]=y"]) assert.equal((await call(`/admin/store-dues${query}`, admin())).status, 400);
 });
 
+test("archived stores can be restored only with an active responsible agent and keep their order history", async () => {
+  const a = await person("RESTORE-A");
+  const store = await shop("RESTORE-S", a, { status: "INACTIVE", archivedAt: new Date(), image: { url: "https://test.invalid/store.jpg" } });
+  await rawOrder("RESTORE-O", store, a, { status: "CANCELLED" });
+  const path = "/admin/store-management/RESTORE-S";
+  assert.equal((await call(path + "/removal-preview", token(a))).status, 403);
+  const preview = await call(path + "/removal-preview", admin());
+  assert.equal(preview.data.options.find(item => item.key === "RESTORE")?.allowed, true);
+  const command = { option: "RESTORE", confirmIdentifier: store.consumerId, requestId: id(), confirmationToken: preview.data.confirmationToken };
+  await Agent.updateOne({ _id: a._id }, { $set: { accessStatus: "BLOCKED" } });
+  assert.equal((await call(path + "/remove", admin(), "POST", command)).status, 409);
+  assert.equal((await Store.findById(store._id)).status, "INACTIVE");
+  await Agent.updateOne({ _id: a._id }, { $set: { accessStatus: "ACTIVE" } });
+  const fresh = await call(path + "/removal-preview", admin());
+  const valid = { ...command, requestId: id(), confirmationToken: fresh.data.confirmationToken };
+  assert.equal((await call(path + "/remove", admin(), "POST", valid)).status, 200);
+  assert.equal((await call(path + "/remove", admin(), "POST", valid)).data.alreadyProcessed, true);
+  const restored = await Store.findById(store._id).lean();
+  assert.equal(restored.status, "ACTIVE");
+  assert.equal(restored.archivedAt, undefined);
+  assert.equal(restored.image.url, store.image.url);
+  assert.equal(await Order.countDocuments({ consumerId: store.consumerId }), 1);
+  assert(await AdminAudit.exists({ action: "RESTORE_STORE", outcome: "COMPLETED", requestId: valid.requestId }));
+});
+
+test("office history pages only the rows while retaining totals across every receipt", async () => {
+  const a = await person("HISTORY-A"), s = await shop("HISTORY-S", a);
+  await rawOrder("HISTORY-O", s, a, { totalAmount: 100, paidAmount: 27.06, dueAmount: 72.94 });
+  const paymentDate = new Date("2026-11-20T04:00:00Z");
+  const input = { orderId: "HISTORY-O", consumerId: s.consumerId, agentId: a.agentId, method: "CASH", createdAt: paymentDate };
+  const rows = await Payment.collection.insertMany([
+    ...Array.from({ length: 20 }, () => ({ ...input, amount: 0.1 })),
+    { ...input, amount: 21.05, verification: { status: "APPROVED" } },
+    { ...input, amount: 2.01, verification: { status: "PENDING" } },
+    { ...input, amount: 3.00, verification: { status: "REJECTED" } },
+  ]);
+  const url = "/admin/store-dues/orders/HISTORY-O/payments";
+  const first = await call(url, admin()), second = await call(`${url}?page=2`, admin());
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.deepEqual([...first.data.payments, ...second.data.payments].map(row => row.id), Object.values(rows.insertedIds).reverse().map(String));
+  for (const response of [first, second]) {
+    const { total, pages, ledgerAmount, reconciliationDifference, verifiedAmount, pendingVerificationAmount, rejectedAmount } = response.data;
+    assert.deepEqual({ total, pages, ledgerAmount, reconciliationDifference, verifiedAmount, pendingVerificationAmount, rejectedAmount },
+      { total: 23, pages: 2, ledgerAmount: 28.06, reconciliationDifference: -1, verifiedAmount: 23.05, pendingVerificationAmount: 2.01, rejectedAmount: 3 });
+  }
+  assert.equal(first.data.payments.length, 20);
+});
+
+test("delivery dispatch receives contact details without identity documents or banking data", async () => {
+  const account = await DeliveryPartner.collection.insertOne({
+    name: "Dispatch fixture", phone: "9000000081", status: "ACTIVE",
+    address: { city: "KOLKATA", state: "WEST BENGAL", street: "Private street" },
+    documents: { idType: "AADHAAR", idNumber: "fixture-id", documentUrl: "https://example.invalid/private-document" },
+    bankDetails: { accountNumber: "fixture-bank" }, password: "fixture-hash",
+  });
+  const staff = await Employee.create({ employeeId: "DISPATCH-STAFF", name: "Dispatch staff", email: "dispatch@test.invalid", password: "hash", permissions: { canAssignDelivery: true } });
+  const auth = jwt.sign({ id: String(staff._id), role: "EMPLOYEE" }, process.env.JWT_SECRET);
+  const url = "/delivery-partner/all";
+  for (const [path, token] of [[url, auth], [`${url}?view=summary`, admin()]]) {
+    const response = await call(path, token);
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.data.data[0], {
+      _id: String(account.insertedId), name: "Dispatch fixture", phone: "9000000081", status: "ACTIVE",
+      address: { city: "KOLKATA", state: "WEST BENGAL" },
+    });
+  }
+  await Employee.updateOne({ _id: staff._id }, { $set: { "permissions.canManageDeliveryPartners": true } });
+  const review = (await call(url, auth)).data.data[0];
+  assert.equal(review.documents.idNumber, "fixture-id");
+  assert.equal(review.bankDetails.accountNumber, "fixture-bank");
+  assert.equal(review.password, undefined);
+});
+
 test("office collections require live verification permission and ignore spoofed collector, sales owner and approval", async () => {
   const a = await person("OFFICE-A"), s = await shop("OFFICE-S", a), p = await partner("OFFICE-P");
   await rawOrder("OFFICE-O", s, a, { paidAmount: 0, dueAmount: 100 });
@@ -484,6 +558,7 @@ test("Bills permission, stable filtering, saved names and current balances remai
   assert.deepEqual((await call(`/admin/bills?${query}`, auth)).data.bills, first.data.bills);
   const second = await call(`/admin/bills?${query}&page=2`, auth);
   assert.equal(second.data.bills.length, 3); assert(!second.data.bills.some(row => first.data.bills.some(previous => previous.id === row.id)));
+  assert.deepEqual((await call(`/admin/bills?${query}&page=99`, auth)).data, second.data);
   const due = await call(`/admin/bills?${query}&balance=DUE&q=%5BStore%5D`, auth);
   assert.equal(due.data.total, 27); assert(due.data.bills.every(row => row.storeName === "Original [Store]" && row.dueAmount === 40 && row.paidAmount === 60));
   assert.equal((await call(`/admin/bills?${query}&from=2026-11-02&to=2026-11-01`, auth)).status, 400);

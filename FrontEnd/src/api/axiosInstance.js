@@ -1,6 +1,7 @@
 import axios from "axios";
 import { storedAdminToken, adminRequestSession, storedAdminCookieSession, clearAdminSession } from "../utils/adminSession";
 import { invalidateAdminReads } from "../utils/adminReads";
+import { clearEmployeeSession } from "../utils/employeeSession";
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
@@ -9,14 +10,6 @@ const axiosInstance = axios.create({
 /* 🔹 GET TOKEN BASED ON CURRENT ROUTE */
 const getTokenByPath = () => {
   const path = window.location.pathname;
-
-  if (path.startsWith("/admin")) {
-    return localStorage.getItem("adminToken");
-  }
-
-  if (path.startsWith("/employee")) {
-    return localStorage.getItem("employeeToken");
-  }
 
   if (path.startsWith("/delivery")) {
     return localStorage.getItem("deliveryToken");
@@ -28,11 +21,14 @@ const getTokenByPath = () => {
 /* 🔹 REQUEST INTERCEPTOR */
 axiosInstance.interceptors.request.use(
   (config) => {
-    const admin = /^\/admin(?:\/|$)/.test(window.location.pathname);
-    const adminRequest = admin || Object.hasOwn(config, "_adminSessionToken");
+    const path = window.location.pathname;
+    const explicitEmployee = Object.hasOwn(config, "_employeeSessionToken");
+    const adminRequest = Object.hasOwn(config, "_adminSessionToken") || (!explicitEmployee && isAdminPanel(path));
+    const employeeRequest = !adminRequest && (explicitEmployee || isEmployeePanel(path));
     const session = adminRequest ? (Object.hasOwn(config, "_adminSessionToken") ? config : adminRequestSession()) : null;
-    const token = adminRequest ? session._adminSessionToken : getTokenByPath();
+    let token;
     if (adminRequest) {
+      token = session._adminSessionToken;
       config._adminSessionToken = token;
       config._adminCookieId = session._adminCookieId || "";
       if (config._adminCookieId) {
@@ -42,6 +38,12 @@ axiosInstance.interceptors.request.use(
       }
       if ((config.method || "get").toLowerCase() !== "get") invalidateAdminReads();
       else if (!config.timeout) config.timeout = 30000;
+    } else if (employeeRequest) {
+      token = explicitEmployee ? config._employeeSessionToken : localStorage.getItem("employeeToken");
+      config._employeeSessionToken = token;
+      if (!config.timeout && (config.method || "get").toLowerCase() === "get") config.timeout = 30000;
+    } else {
+      token = getTokenByPath();
     }
 
     if (token) {
@@ -59,19 +61,8 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-/* The office's two panels, by the address the page is on. Anything else
-   (the agent and delivery panels, the public site) is not one of them. */
-const officePanel = () => {
-  const path = window.location.pathname;
-
-  if (path.startsWith("/admin")) {
-    return { login: "/admin/login", keys: ["adminToken", "role"] };
-  }
-  if (path.startsWith("/employee")) {
-    return { login: "/employee/login", keys: ["employeeToken", "permissions", "role"] };
-  }
-  return null;
-};
+const isAdminPanel = path => /^\/admin(?:\/|$)/.test(path);
+const isEmployeePanel = path => /^\/employee(?:\/|$)/.test(path);
 
 // Read by the sign-in pages, to say why the person is looking at one
 export const SIGNED_OUT_NOTICE = "signedOutNotice";
@@ -91,7 +82,7 @@ axiosInstance.interceptors.response.use(
       const cookieId = error.config._adminCookieId;
       const matching = cookieId ? cookieId === storedAdminCookieSession()?.id : token && token === storedAdminToken() && !storedAdminCookieSession();
       if (status === 401 && matching &&
-          /^\/admin(?:\/|$)/.test(window.location.pathname) && window.location.pathname !== "/admin/login" && !leavingForSignIn) {
+          isAdminPanel(window.location.pathname) && window.location.pathname !== "/admin/login" && !leavingForSignIn) {
         leavingForSignIn = true;
         clearAdminSession();
         invalidateAdminReads();
@@ -122,24 +113,19 @@ axiosInstance.interceptors.response.use(
        Now a failed request is simply handed back to the screen that made
        it, and an ended session removes that panel's own sign-in and goes
        to its sign-in page, which says what happened. */
-    const panel = officePanel();
-
-    if (panel) {
-      const hadSession = Boolean(error.config?.headers?.Authorization);
-      // A delayed response belongs to the session used to send it, not a
-      // replacement login or a different panel opened while it was in flight.
-      const matchingSession = panel.login === "/employee/login" &&
-        error.config?.headers?.Authorization === `Bearer ${localStorage.getItem("employeeToken")}`;
-
+    if (error.config && Object.hasOwn(error.config, "_employeeSessionToken")) {
+      const path = window.location.pathname;
+      const token = error.config._employeeSessionToken;
       if (
         status === 401 &&
-        hadSession &&
-        matchingSession &&
+        token && token === localStorage.getItem("employeeToken") &&
+        isEmployeePanel(path) && path !== "/employee/login" &&
+        error.config.url !== "/auth/employee/logout" &&
         !leavingForSignIn &&
-        window.location.pathname !== panel.login
+        !error.config.signal?.aborted
       ) {
         leavingForSignIn = true;
-        panel.keys.forEach((key) => localStorage.removeItem(key));
+        clearEmployeeSession();
 
         // The server says why in words fit to show ("Session expired...", "Your
         // account is no longer active."), except for a sign-in it could not read
@@ -155,9 +141,13 @@ axiosInstance.interceptors.response.use(
           /* storage unavailable: the sign-in page simply says nothing */
         }
 
-        window.location.replace(panel.login);
+        window.location.replace("/employee/login");
       }
 
+      return Promise.reject(error);
+    }
+
+    if (isAdminPanel(window.location.pathname) || isEmployeePanel(window.location.pathname)) {
       return Promise.reject(error);
     }
 

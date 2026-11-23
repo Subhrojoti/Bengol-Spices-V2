@@ -371,7 +371,7 @@ export const cancelOrder = async (orderId, reason) => {
 // All Delivery Partners
 
 export const getAllDeliveryPartners = async (options) => {
-  const response = await get("/delivery-partner/all", options);
+  const response = await get("/delivery-partner/all", { ...options, params: { view: "summary" } });
   return response.data;
 };
 
@@ -496,6 +496,11 @@ export const getEmployeeProfile = async () => {
   const response = await get("/employee/profile");
   return response.data;
 };
+
+export const logoutEmployeeSession = (token) => axiosInstance.post("/auth/employee/logout", {}, {
+  _employeeSessionToken: token,
+  timeout: 10000,
+});
 
 // Get active orders
 

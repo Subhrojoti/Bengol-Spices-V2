@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { revokedSessionField } from "../utils/sessionRevocation.js";
 
 const employeeSchema = new mongoose.Schema(
   {
@@ -31,6 +32,7 @@ const employeeSchema = new mongoose.Schema(
     },
     // Logins issued before this moment are no longer accepted
     passwordChangedAt: Date,
+    revokedSessions: revokedSessionField,
     profilePic: {
       url: String,
       publicId: String,

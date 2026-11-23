@@ -56,8 +56,22 @@ export const getStoreDueOrders = handle("STORE DUE ORDERS ERROR", async (req, re
 export const getOfficeOrderPayments = handle("OFFICE ORDER PAYMENTS ERROR", async (req, res) => {
   const page = pageOf(req.query.page), order = await Order.findOne({ orderId: req.params.orderId }).select("orderId consumerId agentId status totalAmount paidAmount dueAmount deliveryAddress.storeName").lean();
   if (!order) return fail(res, 404, "Order not found");
-  const payments = await Payment.find({ orderId: order.orderId }).sort({ createdAt: -1, _id: -1 }).lean();
-  res.json({ success: true, order, ...paymentTotals(payments, order.paidAmount), payments: payments.slice((page - 1) * 20, page * 20).map(publicPayment), total: payments.length, page, pages: Math.max(1, Math.ceil(payments.length / 20)) });
+  const pageSize = 20;
+  const [{ totals, payments }] = await Payment.aggregate([
+    { $match: { orderId: order.orderId } },
+    { $project: { amount: 1, method: 1, createdAt: 1, collectedBy: 1, collectionKind: 1, verification: 1, note: 1 } },
+    { $facet: {
+      totals: [{ $group: {
+        _id: { $cond: [{ $in: ["$verification.status", ["PENDING", "REJECTED"]] }, "$verification.status", null] },
+        amount: { $sum: { $convert: { input: "$amount", to: "double", onNull: 0 } } },
+        count: { $sum: 1 },
+      } }],
+      payments: [{ $sort: { createdAt: -1, _id: -1 } }, { $skip: (page - 1) * pageSize }, { $limit: pageSize }],
+    } },
+  ]);
+  const buckets = totals.map(bucket => ({ amount: bucket.amount, verification: { status: bucket._id } }));
+  const total = totals.reduce((count, bucket) => count + bucket.count, 0);
+  res.json({ success: true, order, ...paymentTotals(buckets, order.paidAmount), payments: payments.map(publicPayment), total, page, pages: Math.max(1, Math.ceil(total / pageSize)) });
 });
 
 export const recordOfficeCollection = handle("OFFICE COLLECTION ERROR", async (req, res) => {

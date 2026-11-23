@@ -57,7 +57,7 @@ export const getManagedStores = handle(async (req) => {
 export const getManagementAudit = handle(async (req) => {
   const filter = req.query.agentId ? { $or: [{ sourceAgentId: String(req.query.agentId) }, { destinationAgentId: String(req.query.agentId) }] } : {};
   if (req.user.role !== "ADMIN") filter.action = { $in: [
-    ...(req.user.permissions?.canManageAgents === true ? ["AGENT_ACCESS", "TRANSFER_STORES", "REMOVE_STORE", "PURGE_TEST_AGENT", "PURGE_TEST_STORE"] : []),
+    ...(req.user.permissions?.canManageAgents === true ? ["AGENT_ACCESS", "TRANSFER_STORES", "REMOVE_STORE", "RESTORE_STORE", "PURGE_TEST_AGENT", "PURGE_TEST_STORE"] : []),
     ...(req.user.permissions?.canManageDeliveryPartners === true ? ["PURGE_TEST_DELIVERY_PARTNER"] : []),
   ] };
   return { success: true, data: await AdminAudit.find(filter).sort({ createdAt: -1 }).limit(100).lean() };
