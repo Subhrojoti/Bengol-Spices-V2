@@ -56,6 +56,16 @@ export interface LeaderboardEntry {
   storesCreated?: number;
 }
 
+export type LeaderboardMetric = "INCENTIVE" | "SALES";
+export interface LeaderboardReport {
+  data: LeaderboardEntry[];
+  metric: LeaderboardMetric;
+  totalAgents?: number;
+  myStanding?: LeaderboardEntry | null;
+  nextAbove?: LeaderboardEntry | null;
+  period?: { from: string; to: string };
+}
+
 // ---------- Stores ----------
 
 // HORECA: hotels, restaurants and caterers

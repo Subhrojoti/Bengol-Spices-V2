@@ -74,8 +74,8 @@ export default function OverviewScreen() {
   const growth = totalSales > 0 ? parseGrowth(data?.growth?.salesGrowth) : null;
   const bestMonth =
     data?.monthly.reduce<{ month: string; sales: number } | null>((best, m) => (m.sales > (best?.sales ?? 0) ? m : best), null) ?? null;
-  const myRank = board && agent ? board.findIndex((e) => e.agentId === agent.agentId) + 1 : 0;
-  const myEntry = board && myRank > 0 ? board[myRank - 1] : undefined;
+  const myEntry = board?.myStanding ?? board?.data.find(e => e.agentId === agent?.agentId);
+  const myRank = myEntry?.rank ?? 0;
 
   return (
     <Screen onRefresh={onPull} refreshing={pulling}>
@@ -197,8 +197,8 @@ export default function OverviewScreen() {
             />
           </View>
 
-          {board && board.length > 0 ? (
-            <StandingCard rank={myRank} entry={myEntry} total={board.length} onPress={() => router.push("/leaderboard")} />
+          {board && board.data.length > 0 ? (
+            <StandingCard rank={myRank} entry={myEntry} total={board.totalAgents} onPress={() => router.push("/leaderboard")} />
           ) : null}
 
           <SectionHeader
@@ -250,9 +250,9 @@ function QuickAction({ icon: Icon, label, onPress }: { icon: LucideIcon; label: 
   );
 }
 
-function StandingCard({ rank, entry, total, onPress }: { rank: number; entry?: LeaderboardEntry; total: number; onPress: () => void }) {
+function StandingCard({ rank, entry, total, onPress }: { rank: number; entry?: LeaderboardEntry; total?: number; onPress: () => void }) {
   const ranked = !!entry && rank > 0;
-  const title = ranked ? (rank === 1 ? "You're leading the board" : `You're ranked #${rank} of ${total}`) : "Not on the board yet";
+  const title = ranked ? (rank === 1 ? "You're leading the board" : `You're ranked #${rank}${total !== undefined ? ` of ${total}` : ""}`) : "Your standing is unavailable";
   const subtitle =
     entry && ranked
       ? `${formatCurrency(entry.earnedAmount)} earned · ${entry.ordersDelivered} orders delivered`

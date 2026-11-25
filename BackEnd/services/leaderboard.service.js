@@ -2,201 +2,82 @@ import Agent from "../models/Agent.js";
 import Order from "../models/Order.js";
 import Return from "../models/Return.js";
 import AgentTargetProgress from "../models/AgentTargetProgress.js";
+import AgentIncentiveLedger from "../models/AgentIncentiveLedger.js";
 import Store from "../models/store.js";
+import { collectionsByAgent } from "./sales.service.js";
+import { isDateKey } from "../utils/salesTarget.js";
 
-export const getLeaderboard = async ({ from, to, limit = 10 }) => {
-  const start = new Date(from);
-  const end = new Date(to);
+export const LEADERBOARD_METRICS = ["INCENTIVE", "SALES"];
+const DAY = 86400000;
+const invalid = message => { throw Object.assign(new Error(message), { status: 400 }); };
 
-  // 🔥 FIX: extend "to" to the end of that day (matches
-  // dashboard.service.js's handling). Without this, a date-only "to" (e.g.
-  // "2026-07-18") parses as midnight UTC, silently excluding almost the
-  // entire final day's orders/returns/target-progress/stores.
-  end.setHours(23, 59, 59, 999);
+// Date-only filters mean Indian calendar days. Timestamps are exact instants;
+// never expand them using the server's timezone.
+export function leaderboardRange(from, to, now = new Date()) {
+  const parse = (value, end) => {
+    if (value instanceof Date && Number.isFinite(value.getTime())) return value;
+    if (typeof value !== "string") invalid("from and to must be valid dates");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      if (!isDateKey(value)) invalid("from and to must be valid dates");
+      const date = new Date(value + "T00:00:00+05:30");
+      return new Date(date.getTime() + (end ? DAY : 0));
+    }
+    if (!/^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !isDateKey(value.slice(0, 10))) invalid("Use a calendar date or timestamp with a timezone");
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) invalid("from and to must be valid dates");
+    return date;
+  };
+  const end = to === undefined ? now : parse(to, true);
+  const start = from === undefined ? new Date(end.getTime() - 30 * DAY) : parse(from, false);
+  if (start >= end || end - start > 3660 * DAY) invalid("Choose a valid leaderboard date range of up to 10 years.");
+  return { start, end };
+}
 
-  // =========================
-  // 🟢 ORDERS
-  // =========================
-  const orders = await Order.aggregate([
-    {
-      $match: {
-        createdAt: { $gte: start, $lte: end },
-      },
-    },
-    {
-      $group: {
-        _id: "$agentId",
-        ordersDelivered: {
-          $sum: {
-            $cond: [{ $eq: ["$status", "DELIVERED"] }, 1, 0],
-          },
-        },
-        // A cancelled order is not a sale; counting it lifted agents' ranks
-        sales: {
-          $sum: {
-            $cond: [{ $ne: ["$status", "CANCELLED"] }, "$totalAmount", 0],
-          },
-        },
-        collected: {
-          $sum: {
-            $cond: [{ $ne: ["$status", "CANCELLED"] }, "$paidAmount", 0],
-          },
-        },
-      },
-    },
+const money = value => Math.round((Number(value) || 0) * 100) / 100;
+export function rankLeaderboard(rows, metric = "INCENTIVE", limit = 10) {
+  if (!LEADERBOARD_METRICS.includes(metric)) invalid("Choose INCENTIVE or SALES ranking");
+  const field = metric === "SALES" ? "sales" : "earnedAmount";
+  return [...rows].sort((a, b) => money(b[field]) - money(a[field]) ||
+    (a.agentId < b.agentId ? -1 : a.agentId > b.agentId ? 1 : 0))
+    .slice(0, limit).map((row, index) => ({ ...row, rank: index + 1, medal: ["\u{1F947}", "\u{1F948}", "\u{1F949}"][index] || null }));
+}
+
+export const getLeaderboard = async ({ from, to, limit = 10, metric = "INCENTIVE" }) => {
+  if (!LEADERBOARD_METRICS.includes(metric)) invalid("Choose INCENTIVE or SALES ranking");
+  const { start, end } = leaderboardRange(from, to);
+  const period = { $gte: start, $lt: end };
+  const [agents, orders, earnings, progress, stores, returns, collections] = await Promise.all([
+    Agent.find({ status: "APPROVED", accessStatus: { $in: [null, "ACTIVE"] } })
+      .select("agentId name documents.photo addressDetails.state").lean(),
+    Order.aggregate([
+      { $match: { createdAt: period, status: { $ne: "CANCELLED" } } },
+      { $group: { _id: "$agentId", sales: { $sum: "$totalAmount" }, ordersDelivered: { $sum: { $cond: [{ $eq: ["$status", "DELIVERED"] }, 1, 0] } } } },
+    ]),
+    // One source of earned money: includes target commissions, monthly sales
+    // incentives and manual credits. Payouts never reduce earned ranking.
+    AgentIncentiveLedger.aggregate([
+      { $match: { createdAt: period, type: "EARNING", status: { $in: [null, "COMPLETED"] } } },
+      { $group: { _id: "$agentId", earnedAmount: { $sum: "$amount" } } },
+    ]),
+    AgentTargetProgress.aggregate([
+      { $match: { isCompleted: true, $or: [{ completedAt: period }, { completedAt: null, createdAt: period }] } },
+      { $group: { _id: "$agentId", completedTargets: { $sum: 1 } } },
+    ]),
+    Store.aggregate([{ $match: { createdAt: period } }, { $group: { _id: "$registeredBy", storesCreated: { $sum: 1 } } }]),
+    Return.aggregate([{ $match: { createdAt: period, status: { $ne: "CANCELLED" } } }, { $group: { _id: "$agentId", returns: { $sum: 1 } } }]),
+    collectionsByAgent({ from: start, to: end }),
   ]);
-
-  // =========================
-  // 🔴 RETURNS
-  // =========================
-  const returns = await Return.aggregate([
-    {
-      $match: {
-        createdAt: { $gte: start, $lte: end },
-      },
-    },
-    {
-      $group: {
-        _id: "$agentId",
-        returns: { $sum: 1 },
-      },
-    },
-  ]);
-
-  // =========================
-  // 🟡 TARGET (NEW SYSTEM)
-  // =========================
-  const progress = await AgentTargetProgress.aggregate([
-    {
-      $match: {
-        // 🔥 FIX: the "date" string field was removed from
-        // AgentTargetProgress (it broke targets that span midnight).
-        // Use the real createdAt timestamp instead, consistent with
-        // every other section of this leaderboard.
-        createdAt: { $gte: start, $lte: end },
-      },
-    },
-    {
-      $group: {
-        _id: "$agentId",
-        earnedAmount: { $sum: "$earnedAmount" }, // ✅ NEW FIELD
-        completedTargets: {
-          $sum: {
-            $cond: ["$isCompleted", 1, 0], // ✅ NEW FIELD
-          },
-        },
-      },
-    },
-  ]);
-
-  // =========================
-  // 🟣 STORES
-  // =========================
-  const stores = await Store.aggregate([
-    {
-      $match: {
-        createdAt: { $gte: start, $lte: end },
-      },
-    },
-    {
-      $group: {
-        _id: "$registeredBy",
-        storesCreated: { $sum: 1 },
-      },
-    },
-  ]);
-
-  // =========================
-  // 🧠 MERGE
-  // =========================
-  // 🔥 FIX: previously, only the ORDERS loop initialized every metric to 0.
-  // The RETURNS/TARGET/STORES loops created a bare { agentId } for any
-  // agent not already in the map — leaving fields like earnedAmount
-  // undefined. That was invisible in the final response (a "|| 0" fallback
-  // catches it there), but the SORT below runs before that fallback, so
-  // `undefined - number` produced NaN — letting an agent with no real
-  // earnings rank above one who genuinely earned money.
-  const defaultEntry = (agentId) => ({
-    agentId,
-    ordersDelivered: 0,
-    sales: 0,
-    collected: 0,
-    returns: 0,
-    earnedAmount: 0,
-    completedTargets: 0,
-    storesCreated: 0,
-  });
-
-  const map = Object.create(null);
-
-  orders.forEach((o) => {
-    map[o._id] = {
-      ...defaultEntry(o._id),
-      ordersDelivered: o.ordersDelivered,
-      sales: o.sales,
-      collected: o.collected,
-    };
-  });
-
-  returns.forEach((r) => {
-    if (!map[r._id]) map[r._id] = defaultEntry(r._id);
-    map[r._id].returns = r.returns;
-  });
-
-  progress.forEach((p) => {
-    if (!map[p._id]) map[p._id] = defaultEntry(p._id);
-    map[p._id].earnedAmount = p.earnedAmount;
-    map[p._id].completedTargets = p.completedTargets;
-  });
-
-  stores.forEach((s) => {
-    if (!map[s._id]) map[s._id] = defaultEntry(s._id);
-    map[s._id].storesCreated = s.storesCreated;
-  });
-
-  // =========================
-  // 👤 AGENT DETAILS
-  // =========================
-  const ranked = Object.values(map)
-    .sort((a, b) => {
-      const earningsDifference = (b.earnedAmount || 0) - (a.earnedAmount || 0);
-      if (earningsDifference) return earningsDifference;
-      // MongoDB $group has no guaranteed order. Break earnings ties by the
-      // immutable agent ID before limiting so refreshes keep the same ranks.
-      const aId = String(a.agentId);
-      const bId = String(b.agentId);
-      return aId < bId ? -1 : aId > bId ? 1 : 0;
-    })
-    .slice(0, limit);
-
-  const agents = await Agent.find({ agentId: { $in: ranked.map(entry => entry.agentId) } })
-    .select("agentId name documents.photo addressDetails.state");
-  const agentMap = new Map(agents.map(agent => [agent.agentId, agent]));
-
-  const leaderboard = ranked.map((agent, index) => {
-    const agentInfo = agentMap.get(agent.agentId) || {};
-
-    return {
-      rank: index + 1,
-      medal:
-        index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : null,
-
-      agentId: agent.agentId,
-      name: agentInfo.name || "Unknown",
-      profileImage: agentInfo?.documents?.photo || null,
-      state: agentInfo?.addressDetails?.state || "N/A",
-
-      // 📊 METRICS
-      earnedAmount: agent.earnedAmount || 0, // 🔥 MAIN KPI
-      completedTargets: agent.completedTargets || 0,
-
-      ordersDelivered: agent.ordersDelivered || 0,
-      sales: agent.sales || 0,
-      collected: agent.collected || 0,
-      returns: agent.returns || 0,
-      storesCreated: agent.storesCreated || 0,
-    };
-  });
-
-  return leaderboard;
+  const byId = rows => new Map(rows.map(row => [row._id, row]));
+  const orderMap = byId(orders), earningMap = byId(earnings), progressMap = byId(progress), storeMap = byId(stores), returnMap = byId(returns);
+  return rankLeaderboard(agents.filter(agent => typeof agent.agentId === "string" && agent.agentId).map(agent => ({
+    agentId: agent.agentId, name: agent.name || agent.agentId,
+    profileImage: agent.documents?.photo || null, state: agent.addressDetails?.state || "N/A",
+    earnedAmount: money(earningMap.get(agent.agentId)?.earnedAmount),
+    sales: money(orderMap.get(agent.agentId)?.sales),
+    collected: money((collections.get(agent.agentId)?.total || 0) + (collections.get(agent.agentId)?.earlier?.total || 0)),
+    ordersDelivered: orderMap.get(agent.agentId)?.ordersDelivered || 0,
+    completedTargets: progressMap.get(agent.agentId)?.completedTargets || 0,
+    storesCreated: storeMap.get(agent.agentId)?.storesCreated || 0,
+    returns: returnMap.get(agent.agentId)?.returns || 0,
+  })), metric, limit);
 };

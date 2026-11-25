@@ -5,6 +5,29 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Leaderboard correction (25 November 2026, local only):** Agent mobile now
+switches between incentive earned and product sales over the existing rolling
+30-day period. Earned amounts come from completed `EARNING` ledger entries
+(including monthly incentives), at credit time; payouts and pending earnings
+are excluded. Product sales use non-cancelled order value by placement time,
+including unpaid orders. This is booked value, not verified collections or
+net revenue after refunds. Informational collections use the existing verified
+collection rules. Active approved agents are ranked by the selected amount,
+rounded to paise, then Agent ID for stable ties. The API keeps its `data` array
+and adds metric, period, total eligible agents, personal standing and the agent
+immediately above, so positions below the top ten remain visible. Mobile reads
+share one 30-second period snapshot across both metrics; personalized results
+are assembled per authenticated request and use `Cache-Control: no-store`.
+Date-only API filters use Indian calendar boundaries; timestamps stay exact.
+See `BackEnd/tests/leaderboard.test.js` and
+`agent-app/tests/leaderboard.test.cjs`. Backend deployment and an Agent mobile
+release are required; no production data or incentive-earning rules changed.
+Validation: 140 backend tests, 58 Agent tests, Agent TypeScript check and Android
+production bundle export passed. Component tests exercise both ranking modes,
+personal ranks below tenth place and loading/error states. No real-device or
+live-database verification was performed for this change. One existing product
+preview test mock was updated for its already-added pricing/quantity helpers.
+
 **Production Admin/backend release (25 November 2026):** application `8ae7193`
 pushed and deployed. Paginated/searchable delivery mappings, blocked-agent
 mapping enforcement, bounded catalogue images, zero-discount display correction

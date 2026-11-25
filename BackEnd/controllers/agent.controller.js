@@ -3,7 +3,7 @@ import { sendAdminNotification } from "../utils/email.js";
 import cloudinary from "../config/cloudinary.js";
 import AgentSalesLocation from "../models/AgentSalesLocation.js";
 import { getAgentDashboard } from "../services/dashboard.service.js";
-import { getLeaderboard } from "../services/leaderboard.service.js";
+import { getLeaderboard, leaderboardRange, rankLeaderboard, LEADERBOARD_METRICS } from "../services/leaderboard.service.js";
 import Counter from "../models/Counter.js";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import Product from "../models/Product.js";
@@ -611,72 +611,40 @@ export const agentDashboard = async (req, res) => {
   }
 };
 
-// The mobile home screen and leaderboard share the same rolling top ten.
-// Keep one result per process and share in-flight refreshes across agents.
+// Cache the shared period snapshot, never a particular agent's personal rank.
 const LEADERBOARD_TTL_MS = 30_000;
 let mobileLeaderboard;
-
 function getMobileLeaderboard(now) {
   if (mobileLeaderboard && now.getTime() < mobileLeaderboard.expiresAt) return mobileLeaderboard.result;
-  const entry = {
-    expiresAt: Infinity,
-    result: getLeaderboard({
-      from: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
-      to: now,
-      limit: 10,
-    }),
-  };
+  const range = leaderboardRange(undefined, undefined, now);
+  const entry = { expiresAt: Infinity, result: getLeaderboard({ from: range.start, to: range.end, limit: Infinity })
+    .then(rows => ({ rows, from: range.start.toISOString(), to: range.end.toISOString() })) };
   mobileLeaderboard = entry;
-  void entry.result.then(
-    () => { entry.expiresAt = Date.now() + LEADERBOARD_TTL_MS; },
-    () => { if (mobileLeaderboard === entry) mobileLeaderboard = undefined; },
-  );
+  void entry.result.then(() => { entry.expiresAt = Date.now() + LEADERBOARD_TTL_MS; }, () => { if (mobileLeaderboard === entry) mobileLeaderboard = undefined; });
   return entry.result;
 }
 
-// Agent Leaderboard
-
 export const leaderboard = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   try {
-    const { from, to, limit } = req.query;
-    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
-    const useMobileCache = req.query.view === "mobile" && !from && !to && safeLimit === 10;
-
-    // ✅ Default: the 30 days before the end date (this used today's month
-    // with the end date's day, so a given "to" gave a wrong or empty range)
-    const endDate = to ? new Date(to) : new Date();
-    const startDate = from
-      ? new Date(from)
-      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    if (Number.isNaN(endDate.getTime()) || Number.isNaN(startDate.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: "from and to must be valid dates",
-      });
+    const { from, to, limit, metric = "INCENTIVE" } = req.query;
+    if (!LEADERBOARD_METRICS.includes(metric) || (limit !== undefined && (typeof limit !== "string" || !/^[1-9]\d*$/.test(limit) || !Number.isSafeInteger(Number(limit))))) {
+      return res.status(400).json({ success: false, message: "Choose a valid ranking and positive whole-number limit" });
     }
-
-    if (startDate > endDate || endDate.getUTCFullYear() - startDate.getUTCFullYear() > 10) {
-      return res.status(400).json({ success: false, message: "Choose a valid leaderboard date range of up to 10 years." });
-    }
-
-    const data = useMobileCache ? await getMobileLeaderboard(endDate) : await getLeaderboard({
-      from: startDate,
-      to: endDate,
-      // Query strings arrive as text; the database rejects a text limit
-      limit: safeLimit,
-    });
-
-    res.json({
-      success: true,
-      data,
-    });
+    const safeLimit = Math.min(Number(limit) || 10, 100);
+    const range = leaderboardRange(from, to);
+    const snapshot = req.query.view === "mobile" && from === undefined && to === undefined
+      ? await getMobileLeaderboard(range.end)
+      : { rows: await getLeaderboard({ from: range.start, to: range.end, limit: Infinity }), from: range.start.toISOString(), to: range.end.toISOString() };
+    const ranked = rankLeaderboard(snapshot.rows, metric, Infinity);
+    const mine = ranked.findIndex(row => row.agentId === req.user?.agentId);
+    res.json({ success: true, data: ranked.slice(0, safeLimit), metric,
+      totalAgents: ranked.length, myStanding: mine >= 0 ? ranked[mine] : null,
+      nextAbove: mine > 0 ? ranked[mine - 1] : null,
+      period: { from: snapshot.from, to: snapshot.to }, cacheSeconds: LEADERBOARD_TTL_MS / 1000 });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      message: "Leaderboard error",
-    });
+    if (!err.status) console.error(err);
+    res.status(err.status || 500).json({ success: false, message: err.status ? err.message : "Leaderboard error" });
   }
 };
 

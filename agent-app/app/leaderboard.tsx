@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View, Text, Image, FlatList, StyleSheet } from "react-native";
 import { sizedImage } from "@/utils/image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,8 +13,11 @@ import { useLeaderboard, useProfile } from "@/hooks/useAgent";
 import { formatCurrency } from "@/utils/currency";
 import { colors, gradients } from "@/theme/colors";
 import { getErrorMessage } from "@/api/client";
-import type { LeaderboardEntry } from "@/types/api";
+import type { LeaderboardEntry, LeaderboardMetric } from "@/types/api";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+const metricValue = (entry: LeaderboardEntry, metric: LeaderboardMetric) => metric === "SALES" ? entry.sales : entry.earnedAmount;
 
 type PodiumRank = 1 | 2 | 3;
 
@@ -44,27 +48,35 @@ function ordinal(n: number): string {
 }
 
 export default function LeaderboardScreen() {
-  const { data, isLoading, isError, refetch, error } = useLeaderboard();
+  const [metric, setMetric] = useState<LeaderboardMetric>("INCENTIVE");
+  const { data, isLoading, isError, refetch, error } = useLeaderboard(metric);
   const { pulling, onPull } = usePullToRefresh(refetch);
   const { data: agent } = useProfile();
 
-  const entries = data ?? [];
+  const entries = data?.data ?? [];
   const rest = entries.slice(3);
-  const maxEarned = entries[0]?.earnedAmount ?? 0;
+  const maxEarned = entries[0] ? metricValue(entries[0], metric) : 0;
   const myIndex = agent ? entries.findIndex((e) => e.agentId === agent.agentId) : -1;
-  const me = myIndex >= 0 ? entries[myIndex] : undefined;
-  const nextAbove = myIndex > 0 ? entries[myIndex - 1] : undefined;
+  const me = data?.myStanding ?? (myIndex >= 0 ? entries[myIndex] : undefined);
+  const nextAbove = data?.nextAbove ?? (myIndex > 0 ? entries[myIndex - 1] : undefined);
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
       <AppHeader title="Leaderboard" showBack />
+      <View className="px-5 pb-3">
+        <SegmentedControl value={metric} onChange={setMetric} segments={[{ value: "INCENTIVE", label: "Incentive earned" }, { value: "SALES", label: "Product sales" }]} />
+        <Text className="mt-2 font-sans text-xs text-ink-500">
+          {metric === "SALES" ? "Non-cancelled order value, including unpaid orders, placed in the last 30 days." : "Incentives credited to the wallet in the last 30 days. Payouts do not reduce earnings."}
+        </Text>
+        <Text className="mt-1 font-sans text-xs text-ink-500">Equal totals are ordered by Agent ID. Pull down to refresh; recent activity may take a short time to appear.</Text>
+      </View>
 
       {isLoading ? (
         <LoadingState message="Loading leaderboard…" />
       ) : isError ? (
         <ErrorState message={getErrorMessage(error, "Couldn't load the leaderboard.")} onRetry={refetch} />
       ) : entries.length === 0 ? (
-        <EmptyState icon={<Trophy size={24} color={colors.ink[500]} />} title="No rankings yet" subtitle="Rankings appear once agents start earning incentives." />
+        <EmptyState icon={<Trophy size={24} color={colors.ink[500]} />} title="No rankings yet" subtitle="No eligible agents are available for this period." />
       ) : (
         <FlatList
           data={rest}
@@ -83,17 +95,17 @@ export default function LeaderboardScreen() {
                   </View>
                   <Text className="mt-1 font-display-bold text-xl text-white">Hall of Fame</Text>
                 </View>
-                <Podium entries={entries} myAgentId={agent?.agentId} />
+                <Podium entries={entries} myAgentId={agent?.agentId} metric={metric} />
               </HeroCard>
 
-              <StandingCard me={me} rank={myIndex + 1} total={entries.length} nextAbove={nextAbove} />
+              <StandingCard me={me} rank={me?.rank ?? myIndex + 1} total={data?.totalAgents} nextAbove={nextAbove ?? undefined} metric={metric} />
 
               {rest.length > 0 ? (
-                <SectionHeader title="All Rankings" subtitle="Ranked by incentives earned" right={<Pill label={`${entries.length} agents`} />} />
+                <SectionHeader title="Top rankings" subtitle={metric === "SALES" ? "Ranked by product sales" : "Ranked by incentives earned"} right={<Pill label={`Top ${entries.length}`} />} />
               ) : null}
             </View>
           }
-          renderItem={({ item, index }) => <RankRow entry={item} rank={index + 4} isMe={item.agentId === agent?.agentId} maxEarned={maxEarned} />}
+          renderItem={({ item, index }) => <RankRow entry={item} rank={index + 4} isMe={item.agentId === agent?.agentId} maxEarned={maxEarned} metric={metric} />}
         />
       )}
     </SafeAreaView>
@@ -113,7 +125,7 @@ function Avatar({ uri, name, size }: { uri?: string | null; name: string; size: 
   );
 }
 
-function Podium({ entries, myAgentId }: { entries: LeaderboardEntry[]; myAgentId?: string }) {
+function Podium({ entries, myAgentId, metric }: { entries: LeaderboardEntry[]; myAgentId?: string; metric: LeaderboardMetric }) {
   // Visual order is 2nd · 1st · 3rd so the winner stands in the middle.
   const slots: { entry?: LeaderboardEntry; rank: PodiumRank }[] = [
     { entry: entries[1], rank: 2 },
@@ -124,7 +136,7 @@ function Podium({ entries, myAgentId }: { entries: LeaderboardEntry[]; myAgentId
     <View className="mt-5 flex-row items-end justify-center gap-2">
       {slots.map(({ entry, rank }) =>
         entry ? (
-          <PodiumColumn key={entry.agentId} entry={entry} rank={rank} isMe={entry.agentId === myAgentId} />
+          <PodiumColumn key={entry.agentId} entry={entry} rank={rank} isMe={entry.agentId === myAgentId} metric={metric} />
         ) : (
           <View key={`slot-${rank}`} className="flex-1" />
         ),
@@ -133,7 +145,7 @@ function Podium({ entries, myAgentId }: { entries: LeaderboardEntry[]; myAgentId
   );
 }
 
-function PodiumColumn({ entry, rank, isMe }: { entry: LeaderboardEntry; rank: PodiumRank; isMe: boolean }) {
+function PodiumColumn({ entry, rank, isMe, metric }: { entry: LeaderboardEntry; rank: PodiumRank; isMe: boolean; metric: LeaderboardMetric }) {
   const first = rank === 1;
   const avatarSize = first ? 72 : 56;
   return (
@@ -157,7 +169,7 @@ function PodiumColumn({ entry, rank, isMe }: { entry: LeaderboardEntry; rank: Po
         {isMe ? " (You)" : ""}
       </Text>
       <Text className="font-display-bold text-base text-saffron-100" numberOfLines={1} adjustsFontSizeToFit>
-        {formatCurrency(entry.earnedAmount)}
+        {formatCurrency(metricValue(entry, metric))}
       </Text>
 
       <View className="mt-3 w-full items-center rounded-t-2xl pt-2" style={[{ height: PODIUM_HEIGHT[rank] }, first ? styles.podiumFirst : styles.podiumOther]}>
@@ -170,7 +182,7 @@ function PodiumColumn({ entry, rank, isMe }: { entry: LeaderboardEntry; rank: Po
   );
 }
 
-function StandingCard({ me, rank, total, nextAbove }: { me?: LeaderboardEntry; rank: number; total: number; nextAbove?: LeaderboardEntry }) {
+function StandingCard({ me, rank, total, nextAbove, metric }: { me?: LeaderboardEntry; rank: number; total?: number; nextAbove?: LeaderboardEntry; metric: LeaderboardMetric }) {
   if (!me) {
     return (
       <Card className="mt-4 flex-row items-center gap-3">
@@ -178,14 +190,14 @@ function StandingCard({ me, rank, total, nextAbove }: { me?: LeaderboardEntry; r
           <Trophy size={20} color={colors.ink[500]} />
         </View>
         <View className="flex-1">
-          <Text className="font-sans-bold text-sm text-ink">You're not on the board yet</Text>
-          <Text className="mt-0.5 font-sans text-xs text-ink-500">Complete targets to earn incentives and claim your spot.</Text>
+          <Text className="font-sans-bold text-sm text-ink">Your standing is unavailable</Text>
+          <Text className="mt-0.5 font-sans text-xs text-ink-500">Refresh to check your standing. Only active approved agents are ranked.</Text>
         </View>
       </Card>
     );
   }
 
-  const gap = nextAbove ? Math.max(0, nextAbove.earnedAmount - me.earnedAmount) : 0;
+  const gap = nextAbove ? Math.max(0, metricValue(nextAbove, metric) - metricValue(me, metric)) : 0;
 
   return (
     <View className="mt-4 overflow-hidden rounded-2xl border border-saffron-400/60 bg-saffron-50" style={styles.cardShadow}>
@@ -202,10 +214,10 @@ function StandingCard({ me, rank, total, nextAbove }: { me?: LeaderboardEntry; r
         <View className="flex-1">
           <Eyebrow>Your standing</Eyebrow>
           <Text className="mt-0.5 font-display-bold text-lg text-ink">
-            {ordinal(rank)} of {total}
+            {ordinal(rank)}{total !== undefined ? ` of ${total}` : ""}
           </Text>
           <Text className="font-sans text-xs text-ink-500" numberOfLines={1}>
-            {formatCurrency(me.earnedAmount)} earned · {me.ordersDelivered} orders · {me.completedTargets} targets
+            {formatCurrency(metricValue(me, metric))} {metric === "SALES" ? "sales" : "earned"} · {me.ordersDelivered} orders · {me.completedTargets} targets
           </Text>
         </View>
 
@@ -232,9 +244,9 @@ function StandingCard({ me, rank, total, nextAbove }: { me?: LeaderboardEntry; r
   );
 }
 
-function RankRow({ entry, rank, isMe, maxEarned }: { entry: LeaderboardEntry; rank: number; isMe: boolean; maxEarned: number }) {
+function RankRow({ entry, rank, isMe, maxEarned, metric }: { entry: LeaderboardEntry; rank: number; isMe: boolean; maxEarned: number; metric: LeaderboardMetric }) {
   // Relative bar against the leader, floored so tiny earners still show a sliver.
-  const share = maxEarned > 0 ? Math.max(4, Math.round((entry.earnedAmount / maxEarned) * 100)) : 0;
+  const share = maxEarned > 0 ? Math.max(4, Math.round((metricValue(entry, metric) / maxEarned) * 100)) : 0;
 
   return (
     <View className={`overflow-hidden rounded-2xl border bg-white ${isMe ? "border-saffron-400" : "border-sand"}`} style={styles.cardShadow}>
@@ -259,7 +271,7 @@ function RankRow({ entry, rank, isMe, maxEarned }: { entry: LeaderboardEntry; ra
           </Text>
         </View>
         <View className="items-end">
-          <Text className="font-display-bold text-sm text-saffron-700">{formatCurrency(entry.earnedAmount)}</Text>
+          <Text className="font-display-bold text-sm text-saffron-700">{formatCurrency(metricValue(entry, metric))}</Text>
           <Text className="font-sans text-[10px] text-ink-500">
             {entry.ordersDelivered} orders · {entry.completedTargets} targets
           </Text>

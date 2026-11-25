@@ -1,6 +1,7 @@
 import { useIsFocused } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { agentApi } from "@/api/agent.api";
+import type { LeaderboardMetric } from "@/types/api";
 
 export function useProfile() {
   return useQuery({
@@ -19,11 +20,11 @@ export function useDashboard() {
   });
 }
 
-export function useLeaderboard() {
+export function useLeaderboard(metric: LeaderboardMetric = "INCENTIVE") {
   const focused = useIsFocused();
   return useQuery({
-    queryKey: ["leaderboard"],
-    queryFn: ({ signal }) => agentApi.getLeaderboard(undefined, undefined, 10, signal),
+    queryKey: ["leaderboard", metric],
+    queryFn: ({ signal }) => agentApi.getLeaderboard(undefined, undefined, 10, signal, metric),
     enabled: focused,
   });
 }

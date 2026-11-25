@@ -1,7 +1,7 @@
 import { api } from "./client";
 import { unwrapList, unwrapObject } from "./unwrap";
 import { dashboardData } from "@/utils/dashboardData";
-import type { Agent, AgentDashboardData, LeaderboardEntry } from "@/types/api";
+import type { Agent, AgentDashboardData, LeaderboardReport, LeaderboardMetric } from "@/types/api";
 
 export const agentApi = {
   getProfile: (): Promise<Agent> =>
@@ -21,6 +21,9 @@ export const agentApi = {
       return dashboardData(data);
     }),
 
-  getLeaderboard: (from?: string, to?: string, limit = 10, signal?: AbortSignal): Promise<LeaderboardEntry[]> =>
-    api.get("/agent/leaderboard", { params: { from, to, limit }, signal }).then((r) => unwrapList<LeaderboardEntry>(r.data)),
+  getLeaderboard: (from?: string, to?: string, limit = 10, signal?: AbortSignal, metric: LeaderboardMetric = "INCENTIVE"): Promise<LeaderboardReport> =>
+    api.get("/agent/leaderboard", { params: { from, to, limit, metric, view: "mobile" }, signal }).then((r) => {
+      if (metric === "SALES" && r.data?.metric !== metric) throw new Error("Sales ranking needs the latest server update. Please contact the office.");
+      return { ...r.data, data: unwrapList(r.data), metric };
+    }),
 };
