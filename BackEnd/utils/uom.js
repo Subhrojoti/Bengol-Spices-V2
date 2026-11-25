@@ -10,7 +10,7 @@
    order line, so it must stay one of these exact words.
    ===================================================================== */
 
-export const UNITS = ["kg", "gm", "ltr", "packet"];
+export const UNITS = ["kg", "gm", "ltr", "packet", "chain"];
 
 /** "Packet " → "packet"; anything that is not text → "". */
 export const normalizeUnit = (value) =>
@@ -25,5 +25,6 @@ export const isKnownUnit = (value) => UNITS.includes(value);
 export const quantityWithUnit = (quantity, unit) => {
   if (!unit) return `${quantity} units`;
   if (unit === "packet") return `${quantity} ${Number(quantity) === 1 ? "packet" : "packets"}`;
+  if (unit === "chain") return `${quantity} ${Number(quantity) === 1 ? "chain" : "chains"}`;
   return `${quantity} ${unit}`;
 };

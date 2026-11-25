@@ -9,7 +9,7 @@ import { guardPartnerAssignment } from "../services/deliveryPartnerActivity.serv
 import { createNotification } from "../services/notification.service.js";
 import { withLock } from "../services/payment.service.js";
 import mongoose from "mongoose";
-import { managesStore, historyConsumerIds } from "../services/storeAccess.service.js";
+import { managesStore, historyConsumerIds, mayReadStoreHistory } from "../services/storeAccess.service.js";
 
 // The agent app's own box takes 500 characters; nothing took any limit here
 const REASON_MAX = 1000;
@@ -206,10 +206,16 @@ export const assignReturnPickup = async (req, res) => {
 export const getAssignedReturns = async (req, res) => {
   try {
     const partnerId = req.user.id;
+    const { returnId } = req.query;
+    if (returnId !== undefined && (typeof returnId !== "string" || !returnId || returnId.length > 100)) {
+      return res.status(400).json({ success: false, message: "Invalid return identifier" });
+    }
+    res.setHeader("Cache-Control", "no-store");
 
     // 1️⃣ Fetch assigned returns
     const returns = await Return.find({
       "pickup.partnerId": partnerId,
+      ...(returnId && { returnId }),
       status: {
         $in: ["PICKUP_ASSIGNED", "PICKED_UP", "RECEIVED_AT_WAREHOUSE"],
       },
@@ -397,6 +403,21 @@ export const updateReturnStatus = async (req, res) => {
 export const getMyReturns = async (req, res) => {
   try {
     const agentId = req.user.agentId;
+    const { orderId } = req.query;
+
+    if (orderId !== undefined) {
+      if (typeof orderId !== "string" || !orderId || orderId.length > 128) {
+        return res.status(400).json({ success: false, message: "Invalid order ID" });
+      }
+      const order = await Order.findOne({ orderId }).select("consumerId").lean();
+      const latest = order && await mayReadStoreHistory(order.consumerId, agentId)
+        ? await Return.findOne({ orderId, consumerId: order.consumerId })
+          .sort({ createdAt: -1 })
+          .select("returnId orderId reason status createdAt items.lineIndex items.name items.quantity items.uom")
+          .lean()
+        : null;
+      return res.json({ success: true, count: latest ? 1 : 0, data: latest ? [latest] : [] });
+    }
 
     const returns = await Return.find({ consumerId: { $in: await historyConsumerIds(agentId) } }).sort({ createdAt: -1 });
 

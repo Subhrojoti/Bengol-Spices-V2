@@ -22,7 +22,7 @@ export const saveDispatchMapping = async (req, res) => {
   try {
     const actor = await actorOf(req.user);
     const result = await mongoose.connection.transaction(async session => {
-      const agent = await Agent.findOne({ agentId: req.body.agentId, status: "APPROVED", accessStatus: { $ne: "DELETED" } }).session(session);
+      const agent = await Agent.findOne({ agentId: req.body.agentId, status: "APPROVED", accessStatus: { $in: [null, "ACTIVE"] } }).session(session);
       const partner = await DeliveryPartner.findOne({ _id: req.body.partnerId, status: "ACTIVE" }).session(session);
       if (!agent || !partner) return null;
       await guardPartnerAssignment(partner._id, session);

@@ -6,6 +6,7 @@ import Return from "../models/Return.js";
 import AgentTargetProgress from "../models/AgentTargetProgress.js";
 import Store from "../models/store.js";
 import { getLeaderboard } from "../services/leaderboard.service.js";
+import { leaderboard } from "../controllers/agent.controller.js";
 
 // Exercise the real merging, ranking and limiting with varying MongoDB group
 // output order. No database connection or production services are started.
@@ -47,4 +48,31 @@ test("earnings remain the primary ranking rule with stable ties before the limit
   assert.deepEqual(await getLeaderboard({ ...period, limit: 2 }), first);
   assert.deepEqual(first.map(row => row.agentId), ["BS2026-003", "BS2026-004"]);
   assert.deepEqual(first.map(row => row.earnedAmount), [100.01, 100]);
+});
+
+test("concurrent mobile leaderboard reads share one calculation and failure can recover", async t => {
+  fixture(t, {});
+  let calculations = 0;
+  let fail = true;
+  Order.aggregate.mock.mockImplementation(async () => {
+    calculations++;
+    if (fail) throw new Error("Synthetic database failure");
+    return [{ _id: "RANKED", sales: 5 }];
+  });
+  t.mock.method(console, "error", () => {});
+  const read = async (query = { view: "mobile" }) => {
+    let result;
+    const res = { json(data) { result = data; }, status() { return this; } };
+    await leaderboard({ query }, res);
+    return result;
+  };
+  assert.equal((await read()).success, false);
+  fail = false;
+  const responses = await Promise.all(Array.from({ length: 30 }, () => read()));
+  assert.equal(calculations, 2);
+  assert(responses.every(response => response.success && response.data[0].agentId === "RANKED"));
+  assert.deepEqual(await read(), responses[0]);
+  assert.equal(calculations, 2);
+  await read(period);
+  assert.equal(calculations, 3);
 });

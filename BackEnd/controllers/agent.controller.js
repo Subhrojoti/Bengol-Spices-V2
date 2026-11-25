@@ -407,6 +407,14 @@ export const getAgentProfile = async (req, res) => {
   try {
     const agentMongoId = req.user.id;
 
+    res.setHeader("Cache-Control", "no-store");
+    if (req.query.view === "mobile") {
+      const agent = await Agent.findById(agentMongoId)
+        .select("agentId name email phone address status role documents.photo")
+        .lean();
+      if (!agent) return res.status(404).json({ success: false, message: "Agent not found" });
+      return res.json({ success: true, agent });
+    }
     const agent = await Agent.findById(agentMongoId).select(
       "-password -passwordResetToken -passwordResetExpires",
     );
@@ -574,6 +582,12 @@ export const agentDashboard = async (req, res) => {
       });
     }
 
+    const months = (endDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12
+      + endDate.getUTCMonth() - startDate.getUTCMonth();
+    if (startDate > endDate || months >= 120) {
+      return res.status(400).json({ success: false, message: "Choose a dashboard date range shorter than 10 years." });
+    }
+
     const data = await getAgentDashboard({
       agentId,
       from: startDate,
@@ -597,11 +611,36 @@ export const agentDashboard = async (req, res) => {
   }
 };
 
+// The mobile home screen and leaderboard share the same rolling top ten.
+// Keep one result per process and share in-flight refreshes across agents.
+const LEADERBOARD_TTL_MS = 30_000;
+let mobileLeaderboard;
+
+function getMobileLeaderboard(now) {
+  if (mobileLeaderboard && now.getTime() < mobileLeaderboard.expiresAt) return mobileLeaderboard.result;
+  const entry = {
+    expiresAt: Infinity,
+    result: getLeaderboard({
+      from: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      to: now,
+      limit: 10,
+    }),
+  };
+  mobileLeaderboard = entry;
+  void entry.result.then(
+    () => { entry.expiresAt = Date.now() + LEADERBOARD_TTL_MS; },
+    () => { if (mobileLeaderboard === entry) mobileLeaderboard = undefined; },
+  );
+  return entry.result;
+}
+
 // Agent Leaderboard
 
 export const leaderboard = async (req, res) => {
   try {
     const { from, to, limit } = req.query;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+    const useMobileCache = req.query.view === "mobile" && !from && !to && safeLimit === 10;
 
     // ✅ Default: the 30 days before the end date (this used today's month
     // with the end date's day, so a given "to" gave a wrong or empty range)
@@ -617,11 +656,15 @@ export const leaderboard = async (req, res) => {
       });
     }
 
-    const data = await getLeaderboard({
+    if (startDate > endDate || endDate.getUTCFullYear() - startDate.getUTCFullYear() > 10) {
+      return res.status(400).json({ success: false, message: "Choose a valid leaderboard date range of up to 10 years." });
+    }
+
+    const data = useMobileCache ? await getMobileLeaderboard(endDate) : await getLeaderboard({
       from: startDate,
       to: endDate,
       // Query strings arrive as text; the database rejects a text limit
-      limit: Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100),
+      limit: safeLimit,
     });
 
     res.json({

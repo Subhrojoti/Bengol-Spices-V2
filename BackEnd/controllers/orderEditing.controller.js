@@ -32,6 +32,7 @@ export const getOrderEditDetails = handle(async (req, res) => {
   for (const line of order.products) reserved.set(String(line.productId), (reserved.get(String(line.productId)) || 0) + line.quantity);
   const products = (await Product.find({ status: "ACTIVE" }).sort({ name: 1 }).lean()).map(product => ({
     productId: String(product._id), name: product.name, uom: product.uom,
+    packetsPerChain: product.packetsPerChain, pricingUnit: product.pricingUnit,
     unitPrice: effectivePrice(product, store.storeType, overrides.get(String(product._id))).price,
     minOrderQty: effectiveMinimum(product, store.storeType), availableStock: product.stock + (reserved.get(String(product._id)) || 0),
   })).filter(product => product.unitPrice !== null);
@@ -81,10 +82,11 @@ export const editPlacedOrder = handle(async (req, res) => {
       const product = await Product.findById(id).session(session);
       if (!product || product.status !== "ACTIVE") refuse("A product is no longer available. Refresh the catalogue.");
       const minimum = effectiveMinimum(product, store.storeType);
+      if (product.uom === "chain" && !Number.isSafeInteger(quantity)) refuse(`${product.name}: order a whole number of chains.`, 400);
       if (quantity < minimum) refuse(`${product.name}: minimum order is ${minimum} ${product.uom}.`, 400);
       const { price } = effectivePrice(product, store.storeType, overrides.get(id));
       if (price === null || !Number.isFinite(price)) refuse(`${product.name} has no available price. Ask the office.`);
-      revised.push({ productId: product._id, name: product.name, quantity, unitPrice: price, uom: product.uom, totalPrice: round(price * quantity), gstPercentage: product.gstPercentage || 0, image: product.images?.front?.url });
+      revised.push({ productId: product._id, sku: product.sku, packetsPerChain: product.packetsPerChain, name: product.name, quantity, unitPrice: price, uom: product.uom, totalPrice: round(price * quantity), gstPercentage: product.gstPercentage || 0, image: product.images?.front?.url });
     }
     const total = round(revised.reduce((sum, line) => sum + line.totalPrice, 0));
     if (!Number.isFinite(total) || Math.abs(total - expectedTotal) > 0.005) refuse("Product prices changed. Refresh and review the new total before saving.");

@@ -5,6 +5,7 @@ import { UNITS, isKnownUnit, normalizeUnit } from "../utils/uom.js";
 import { sanitizeDescription } from "../utils/sanitizeHtml.js";
 import { publicMessage } from "../utils/publicError.js";
 import { CATEGORY_MINIMUM_FIELDS, parseCategoryMinimums } from "../utils/orderMinimums.js";
+import { readChainProduct } from "../utils/chainPricing.js";
 
 /* What the catalogue shows.
 
@@ -15,7 +16,7 @@ import { CATEGORY_MINIMUM_FIELDS, parseCategoryMinimums } from "../utils/orderMi
    request, so they receive everything exactly as before; a caller with no
    login gets the range and the listed prices, without the trade tiers. */
 const PUBLIC_FIELDS =
-  "name title description category uom price discountPrice images gstPercentage minOrderQty";
+  "name title description category uom packetsPerChain pricingUnit price discountPrice images gstPercentage minOrderQty";
 const TRADE_FIELDS = "retailerPrice wholesalerPrice distributorPrice horecaPrice";
 
 const catalogueFields = (req) =>
@@ -152,6 +153,7 @@ export const createProduct = async (req, res) => {
       wholesalerPrice: toOptionalPrice(wholesalerPrice),
       distributorPrice: toOptionalPrice(distributorPrice),
       horecaPrice: toOptionalPrice(horecaPrice),
+      ...readChainProduct(req.body),
 
       images: {
         front: {
@@ -252,6 +254,8 @@ export const updateProduct = async (req, res) => {
       throw new Error("Product not found");
     }
 
+    const chainFields = readChainProduct(req.body, product);
+
     // FRONT IMAGE UPDATE
     if (req.files?.frontImage) {
       newFrontId = req.files.frontImage[0].filename;
@@ -330,7 +334,7 @@ export const updateProduct = async (req, res) => {
       product.certificates = req.body.certificates.split(",");
     }
 
-    Object.assign(product, categoryMinimums(req, product));
+    Object.assign(product, chainFields, categoryMinimums(req, product));
     await product.save();
     imagesCommitted = true;
 

@@ -5,6 +5,27 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Admin review (25 November 2026, release preparation):** paginated/searchable
+delivery mappings, blocked-agent mapping enforcement, bounded catalogue images,
+zero-discount display correction and Chain packet specifications. Backend
+136/136 and frontend 19/19 unit checks passed; full browser verification and
+deployment evidence will be recorded in the release note. This candidate also
+contains the pending compatible backend/Chain work described below. Mobile
+source/builds remain separate. [Review and measured performance](BackEnd/docs/ADMIN_REVIEW_2026-11-25.md).
+
+**Agent category comparison (25 November 2026, local):** Agent mobile product
+details now compare Retailer, Wholesaler, Distributor and HoReCa prices and
+minimum order quantities. The managed-store catalogue adds
+`minimumOrderQuantities`, calculated using each category's effective minimum
+before replacing the legacy `minOrderQty` with the selected store minimum.
+Location prices and the existing price fallback apply to the comparison;
+checkout continues using only the store's assigned category. Older APIs show
+unavailable comparison minimums rather than guessing. Chain setup already
+exists under Admin Product Creation → Classification → Chain → Packets per
+chain; this request does not duplicate it. Backend rollout and a new Agent
+build are required for the comparison. Focused validation is recorded in
+the store/Chain workflow notes linked below.
+
 **Production Admin tuning and access review (23 November):** deployed
 `ac78bac` to the VPS. Dispatch reads now restrict identity and banking fields,
 Bills uses one aggregation for ordinary pages, and Store Dues pages payment
@@ -12,6 +33,48 @@ history in MongoDB. Employee logout and stale-session protection, Store Details
 fixes, and archived-store restoration are live. The exact candidate passed 181
 browser tests and 125 backend tests. Chain pricing and the mobile work are still
 local. [Release checks and rollback](deploy/releases/2026-11-23-admin-tuning.md).
+
+**Admin and Employee Panel follow-up (23 November, local):** Employee sessions
+now revoke their bearer token at logout, and delayed replies cannot clear a
+replacement session or another panel's sign-in. Store Details conceals prior
+delivery codes as reports change, and Store Dues recovers when a settlement
+empties the current page. Employee sections load on demand.
+[Review, measurements and rollout notes](BackEnd/docs/ADMIN_PRODUCTION_FOLLOW_UP_2026-11-23.md).
+
+**Agent App production follow-up (23 November, local):** Agent sessions now
+revoke individually on logout. Cash and zero-advance checkouts persist across
+restarts and replay only the same order. Agent due QRs are recoverable and
+reserve the outstanding balance across collectors until gateway reconciliation.
+Payment confirmation requires captured INR funds. Product-ID validation at
+checkout is batched and ambiguous registration replies use a scoped search.
+Read the [Agent production follow-up](agent-app/docs/AGENT_PRODUCTION_FOLLOW_UP_2026-11-23.md).
+The production API and installed mobile apps still need a release.
+
+**Delivery App production review (23 November, local):** per-device logout
+revocation, minimized mobile profiles, and single-order/pickup lookups on
+the existing routes. An unresolved Delivery QR now blocks new offline
+receipts, and abandoned codes are released only after gateway reconciliation.
+The app checks recovered codes before displaying them and stops QR polling in
+the background. TypeScript, Android Hermes export and regression results are
+recorded in the [Delivery production review](delivery-app/docs/DELIVERY_PRODUCTION_REVIEW_2026-11-23.md).
+The production API and installed apps still need a release.
+
+**Store restoration, Chain products and delivery planning (23 November, local):**
+Admin exposes the existing cancelled test-store cleanup directly and can restore
+archived stores through the existing management permissions. Chain products
+store inventory and order values per chain with a packet count and selectable
+quote basis. Delivery mobile adds multi-agent pending-order filters, remaining
+quantities by variant and a whole-order return action with office review.
+[Workflow and rollout notes](BackEnd/docs/STORE_CHAIN_DELIVERY_WORKFLOWS_2026-11-23.md).
+
+**Agent mobile production-readiness review (22 November, local):** added
+compatible compact views for order lists, profile and unread notifications, a
+lookup for the latest return on one order, and a shared 30-second mobile
+leaderboard result. Hardened Agent password writes and fixed mobile session and
+payment lifecycle issues. The Agent review documents synthetic measurements,
+dependency advisories and remaining rollout limits.
+[Agent review and verification](agent-app/docs/AGENT_PRODUCTION_REVIEW_2026-11-22.md).
+The backend changes and new Agent build have yet to be released.
 
 **Production office dues / Admin security release (18 November):** application
 `1797cc3` pushed; backend and Admin website deployed and verified. Store dues and

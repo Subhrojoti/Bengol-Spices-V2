@@ -4,17 +4,39 @@ import Payment from "../models/Payment.js";
 import GatewayPayment from "../models/GatewayPayment.js";
 import { razorpayInstance } from "../config/razorpay.js";
 import { applyDuePayment, beginGatewayPayment, markGatewayPayment, respondToClaimedGatewayPayment, settleFailedGatewayPayment, withLock } from "../services/payment.service.js";
+import { closeUnpaidDueQr, findUnresolvedDueQr, unresolvedDueQr } from "../services/dueQr.service.js";
 
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
 const qrId = value => typeof value === "string" && /^qr_[A-Za-z0-9]{6,60}$/.test(value);
-const ownedQr = async req => {
+const ownedRecord = async req => {
   if (!qrId(req.params.qrCodeId)) fail(404, "QR code not found");
-  const qr = await razorpayInstance.qrCode.fetch(req.params.qrCodeId);
-  if (qr.notes?.purpose !== "delivery_due_payment" || qr.notes?.collectorId !== String(req.user.id) || qr.notes?.collectorRole !== "DELIVERY_PARTNER" || qr.notes?.orderId !== req.params.orderId) fail(404, "QR code not found");
+  const record = await GatewayPayment.findOne({
+    key: `qr:${req.params.qrCodeId}`,
+    orderId: req.params.orderId,
+    purpose: "ORDER_DUE",
+    "collectedBy.id": String(req.user.id),
+    "collectedBy.role": "DELIVERY_PARTNER",
+  }).lean();
+  if (!record) fail(404, "QR code not found");
+  return record;
+};
+const fetchOwnedQr = async record => {
+  const qr = await razorpayInstance.qrCode.fetch(record.qrCodeId);
+  if (qr.notes?.purpose !== "delivery_due_payment" || qr.notes?.collectorId !== record.collectedBy.id || qr.notes?.collectorRole !== "DELIVERY_PARTNER" || qr.notes?.orderId !== record.orderId) fail(404, "QR code not found");
+  if (!Number.isSafeInteger(qr.payments_amount_received) || qr.payments_amount_received < 0) fail(503, "Could not confirm the QR payment status. Retry this QR before collecting again.");
   return qr;
 };
+const alreadySettled = record => ["APPLIED", "REFUNDED", "RESOLVED"].includes(record.status);
+const unresolved = ["QR_OPEN", "PROCESSING", "FAILED", "REFUND_FAILED"];
+const deliveryQrFilter = orderId => ({ orderId, purpose: "ORDER_DUE", "collectedBy.role": "DELIVERY_PARTNER", status: { $in: unresolved } });
 const paid = qr => qr.status === "closed" && Number.isSafeInteger(qr.payment_amount) && qr.payment_amount >= 100 && qr.payments_amount_received >= qr.payment_amount;
 const publicQr = record => ({ qrCodeId: record.qrCodeId, imageUrl: record.qrImageUrl, amount: record.amount, closeBy: record.qrCloseBy });
+
+async function refreshExpiredQr(record) {
+  if (record?.status !== "QR_OPEN" || !Number.isFinite(record.qrCloseBy) || record.qrCloseBy * 1000 > Date.now()) return false;
+  try { return await closeUnpaidDueQr(record, await fetchOwnedQr(record)); }
+  catch { return false; } // Keep the reservation when Razorpay is unavailable.
+}
 const handle = work => async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try { await work(req, res); }
@@ -32,9 +54,9 @@ export const createDeliveryQr = handle(async (req, res) => {
   const amount = Math.round(Number(raw) * 100) / 100;
   if (!Number.isFinite(order.dueAmount) || !Number.isFinite(amount) || amount < 1 || amount > order.dueAmount + 0.005) fail(400, "QR payments must be at least ₹1 and cannot exceed the outstanding balance");
   const locked = await withLock(`delivery-qr:${order.orderId}`, async () => {
-  const pending = await GatewayPayment.findOne({ orderId: order.orderId, status: { $in: ["QR_OPEN", "PROCESSING", "FAILED", "REFUND_FAILED"] }, "collectedBy.role": "DELIVERY_PARTNER" }).sort({ createdAt: -1 }).lean();
+  const pending = await findUnresolvedDueQr(order.orderId);
   if (pending) {
-    if (pending.collectedBy.id !== String(req.user.id)) fail(409, "A previous partner has an unresolved QR for this order. Ask the office to close or resolve it first.");
+    if (pending.collectedBy?.role !== "DELIVERY_PARTNER" || pending.collectedBy.id !== String(req.user.id)) fail(409, "Another collector has an unresolved QR for this order. Ask the office to close or resolve it first.");
     return { ...publicQr(pending), reused: true };
   }
   const qr = await razorpayInstance.qrCode.create({ type: "upi_qr", usage: "single_use", fixed_amount: true,
@@ -51,24 +73,40 @@ export const createDeliveryQr = handle(async (req, res) => {
   res.json({ success: true, ...locked.value });
 });
 export const recoverDeliveryQr = handle(async (req, res) => {
-  const record = await GatewayPayment.findOne({ orderId: req.params.orderId, "collectedBy.id": String(req.user.id), "collectedBy.role": "DELIVERY_PARTNER", status: { $in: ["QR_OPEN", "PROCESSING", "FAILED", "REFUND_FAILED"] } }).sort({ createdAt: -1 }).lean();
-  res.json({ success: true, qr: record ? publicQr(record) : null });
+  const filter = deliveryQrFilter(req.params.orderId);
+  const record = await GatewayPayment.findOne({ ...filter, "collectedBy.id": String(req.user.id) }).sort({ createdAt: -1 }).lean();
+  if (record) return res.json({ success: true, qr: await refreshExpiredQr(record) ? null : publicQr(record) });
+
+  // Only the current assignee may reconcile an abandoned QR. The previous
+  // partner's QR image and payment data are never returned to this device.
+  const expired = await GatewayPayment.findOne({ ...unresolvedDueQr(req.params.orderId), status: "QR_OPEN", qrCloseBy: { $lte: Math.floor(Date.now() / 1000) } }).sort({ createdAt: -1 }).lean();
+  if (expired && await Order.exists({ orderId: req.params.orderId, "delivery.partnerId": req.user.id,
+    status: { $in: ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"] } })) await findUnresolvedDueQr(req.params.orderId);
+  res.json({ success: true, qr: null });
 });
 export const deliveryQrStatus = handle(async (req, res) => {
-  const qr = await ownedQr(req);
-  if (qr.status === "closed" && !Number(qr.payments_amount_received)) await GatewayPayment.updateOne({ key: `qr:${qr.id}`, status: "QR_OPEN" }, { $set: { status: "QR_CLOSED" } });
-  res.json({ success: true, paid: paid(qr), hasFunds: Number(qr.payments_amount_received || 0) > 0, closed: qr.status === "closed", amountReceived: Number(qr.payments_amount_received || 0) / 100 });
+  const record = await ownedRecord(req);
+  if (alreadySettled(record)) return res.json({ success: true, paid: record.status === "APPLIED", hasFunds: true, closed: true, amountReceived: record.amount });
+  const qr = await fetchOwnedQr(record);
+  const hasFunds = qr.payments_amount_received > 0;
+  const closed = hasFunds ? qr.status === "closed" : await closeUnpaidDueQr(record, qr);
+  res.json({ success: true, paid: paid(qr), hasFunds, closed, awaitingSettlement: qr.status === "closed" && !closed, amountReceived: qr.payments_amount_received / 100 });
 });
 export const closeDeliveryQr = handle(async (req, res) => {
-  let qr = await ownedQr(req);
-  if (qr.status !== "closed") { await razorpayInstance.qrCode.close(qr.id); qr = await ownedQr(req); }
-  if (qr.status === "closed" && !Number(qr.payments_amount_received)) await GatewayPayment.updateOne({ key: `qr:${qr.id}`, status: "QR_OPEN" }, { $set: { status: "QR_CLOSED" } });
+  const record = await ownedRecord(req);
+  if (alreadySettled(record)) return res.json({ success: true, paid: true, closed: true });
+  let qr = await fetchOwnedQr(record);
+  if (qr.status !== "closed") { await razorpayInstance.qrCode.close(qr.id); qr = await fetchOwnedQr(record); }
   // Retain the saved attempt if any money arrived while closing: verification
   // must finish before another method/QR is offered.
-  res.json({ success: true, closed: qr.status === "closed", paid: paid(qr) || Number(qr.payments_amount_received || 0) > 0 });
+  const hasFunds = qr.payments_amount_received > 0;
+  res.json({ success: true, closed: hasFunds ? qr.status === "closed" : await closeUnpaidDueQr(record, qr), paid: hasFunds });
 });
 export const verifyDeliveryQr = handle(async (req, res) => {
-  const qr = await ownedQr(req);
+  const record = await ownedRecord(req);
+  if (record.status === "RESOLVED") return res.status(409).json({ success: false, terminal: true, message: "The office settled this QR. Refresh the outstanding balance before collecting again." });
+  if (alreadySettled(record)) return respondToClaimedGatewayPayment(res, record);
+  const qr = await fetchOwnedQr(record);
   if (!paid(qr) || qr.type !== "upi_qr" || qr.usage !== "single_use" || qr.fixed_amount !== true) fail(400, "This UPI QR has not been paid yet");
   const result = await razorpayInstance.qrCode.fetchAllPayments(qr.id);
   const payments = (result.items || []).filter(p => p.status === "captured"), amount = Number(qr.payment_amount) / 100;

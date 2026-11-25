@@ -9,6 +9,10 @@ import { frontendBaseUrl } from "../utils/frontendUrl.js";
 import { agentMaySignIn } from "../utils/agentAccess.js";
 import { revokeSession } from "../utils/sessionRevocation.js";
 
+const signAgentSession = (agent) => jwt.sign({
+  id: agent._id, agentId: agent.agentId, role: agent.role, sessionVersion: agent.sessionVersion || 0,
+}, process.env.JWT_SECRET, { expiresIn: "30d", jwtid: crypto.randomUUID() });
+
 // Generate link for the Password
 
 export const setPassword = async (req, res) => {
@@ -33,6 +37,9 @@ export const setPassword = async (req, res) => {
         message:
           "Password must be at least 6 characters long and contain letters and numbers",
       });
+    }
+    if (bcrypt.truncates(password)) {
+      return res.status(400).json({ success: false, message: "Password must be at most 72 bytes." });
     }
 
     /* Only the hash of the token is stored. Matching the raw token as well
@@ -91,12 +98,14 @@ export const agentLogin = async (req, res) => {
     // Agent IDs are issued in capitals (BS2026-001); forgive the case typed
     const agent = await Agent.findOne({
       agentId: agentId.trim().toUpperCase(),
-    });
+    }).select("password agentId role sessionVersion accessStatus status").lean();
 
-    if (!agent) {
-      return res.status(404).json({
+    const dummyHash = "$2b$10$T73UknC5svP/XseMHtJ6CO4OhRvgUy9IhDJevHMjH3giH1L2uTIWG";
+    const isMatch = await bcrypt.compare(password, agent?.password || dummyHash);
+    if (!agent?.password || !isMatch) {
+      return res.status(401).json({
         success: false,
-        message: "Agent not found",
+        message: "Invalid credentials. If you haven't set a password, use your approval email or Forgot password.",
       });
     }
 
@@ -107,35 +116,7 @@ export const agentLogin = async (req, res) => {
       });
     }
 
-    // Approved but the set-password link was never used: bcrypt would throw
-    // on the missing hash and the agent would only see a server error
-    if (!agent.password) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Your password has not been set yet. Use the link in your approval email, or Forgot password.",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, agent.password);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-
-    const token = jwt.sign(
-      {
-        id: agent._id, // MongoDB _id (internal use)
-        agentId: agent.agentId, // BS2026-001 (business use)
-        sessionVersion: agent.sessionVersion || 0,
-        role: agent.role, // AGENT / ADMIN
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" },
-    );
+    const token = signAgentSession(agent);
 
     res.json({
       success: true,
@@ -189,6 +170,9 @@ export const changePassword = async (req, res) => {
         message:
           "Password must be at least 6 characters long and contain letters and numbers",
       });
+    }
+    if (bcrypt.truncates(newPassword)) {
+      return res.status(400).json({ success: false, message: "Password must be at most 72 bytes." });
     }
 
     // req.user.id comes from JWT (protect middleware)
@@ -249,11 +233,7 @@ export const changePassword = async (req, res) => {
     );
     if (!changed) return res.status(409).json({ success: false, message: "Your account changed. Please sign in again before changing your password." });
 
-    const token = jwt.sign(
-      { id: changed._id, agentId: changed.agentId, role: changed.role, sessionVersion: changed.sessionVersion },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" },
-    );
+    const token = signAgentSession(changed);
 
     return res.json({
       success: true,
@@ -272,6 +252,7 @@ export const changePassword = async (req, res) => {
 // LOGOUT (Agent / Admin)
 export const logout = async (req, res) => {
   try {
+    if (req.user.role === "AGENT") await revokeSession(Agent, req.user, req.authToken);
     return res.json({
       success: true,
       message: "Logged out successfully",
@@ -489,6 +470,9 @@ const applyPasswordReset = async (Model, req, res) => {
       message:
         "Password must be at least 6 characters long and contain letters and numbers",
     });
+  }
+  if (bcrypt.truncates(password)) {
+    return res.status(400).json({ success: false, message: "Password must be at most 72 bytes." });
   }
 
   const user = await Model.findOne({

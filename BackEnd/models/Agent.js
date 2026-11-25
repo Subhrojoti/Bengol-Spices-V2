@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { revokedSessionField } from "../utils/sessionRevocation.js";
 
 const agentSchema = new mongoose.Schema(
   {
@@ -84,6 +85,7 @@ const agentSchema = new mongoose.Schema(
       default: "ACTIVE",
     },
     sessionVersion: { type: Number, default: 0 },
+    revokedSessions: revokedSessionField,
     managementVersion: { type: Number, default: 0 },
     accessChangedAt: Date,
     accessReason: String,

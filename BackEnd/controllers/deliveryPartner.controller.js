@@ -1,13 +1,16 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import DeliveryPartner from "../models/DeliveryPartner.js";
 import cloudinary from "../config/cloudinary.js";
 import Order from "../models/Order.js";
 import Return from "../models/Return.js";
 import Agent from "../models/Agent.js";
+import Product from "../models/Product.js";
+import { remainingOrderItems } from "../services/returnItems.service.js";
 import mongoose from "mongoose";
 import { PERSON_FIELD_LIMITS, checkTextFields } from "../utils/formFields.js";
 import { publicMessage } from "../utils/publicError.js";
+import { signDeliverySession } from "../utils/deliverySession.js";
+import { revokeSession } from "../utils/sessionRevocation.js";
 import {
   COULD_NOT_DELIVER_REASONS,
   getDeliverySettings,
@@ -101,6 +104,7 @@ export const registerDeliveryPartner = async (req, res) => {
       );
     }
 
+    if (bcrypt.truncates(password)) throw new Error("Password must be 72 bytes or fewer");
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const partnerData = {
@@ -192,11 +196,13 @@ export const loginDeliveryPartner = async (req, res) => {
       });
     }
 
-    const partner = await DeliveryPartner.findOne({ phone: phone.trim() });
-
-    // ❌ Not found
-    if (!partner) {
-      return res.status(404).json({
+    const partner = await DeliveryPartner.findOne({ phone: phone.trim() })
+      .select("password status name role sessionVersion").lean();
+    // Keep approval status private until the submitted credentials are checked.
+    const dummyHash = "$2b$10$T73UknC5svP/XseMHtJ6CO4OhRvgUy9IhDJevHMjH3giH1L2uTIWG";
+    const isMatch = await bcrypt.compare(password, partner?.password || dummyHash);
+    if (!partner?.password || !isMatch) {
+      return res.status(401).json({
         success: false,
         message: "Phone No. or Password does not match",
       });
@@ -225,16 +231,6 @@ export const loginDeliveryPartner = async (req, res) => {
       });
     }
 
-    // 🔐 PASSWORD CHECK
-    const isMatch = await bcrypt.compare(password, partner.password);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Phone No. or Password does not match",
-      });
-    }
-
     // ✅ UPDATE ONLINE STATUS
     await DeliveryPartner.updateOne(
       { _id: partner._id },
@@ -242,16 +238,7 @@ export const loginDeliveryPartner = async (req, res) => {
     );
 
     // 🔑 TOKEN
-    const token = jwt.sign(
-      {
-        id: partner._id,
-        role: partner.role,
-        name: partner.name,
-        sessionVersion: partner.sessionVersion || 0,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" },
-    );
+    const token = signDeliverySession(partner);
 
     return res.json({
       success: true,
@@ -273,17 +260,14 @@ export const logoutDeliveryPartner = async (req, res) => {
   // returning a clean JSON response. Also now returns 404 if the partner
   // record is somehow missing, matching employeeLogout's pattern.
   try {
-    const partner = await DeliveryPartner.findById(req.user.id);
+    const result = await revokeSession(DeliveryPartner, req.user, req.authToken, { isOnline: false });
 
-    if (!partner) {
+    if (!result.matchedCount) {
       return res.status(404).json({
         success: false,
         message: "Delivery partner not found",
       });
     }
-
-    partner.isOnline = false;
-    await partner.save();
 
     return res.json({
       success: true,
@@ -354,13 +338,20 @@ export const getMyAssignedOrders = async (req, res) => {
   try {
     const partnerId = req.user.id;
 
+    const withPlanning = req.query.view === "mobile-planning";
+    const orderId = withPlanning ? req.query.orderId : undefined;
+    if (orderId !== undefined && (typeof orderId !== "string" || !orderId || orderId.length > 100)) {
+      return res.status(400).json({ success: false, message: "Invalid order identifier" });
+    }
+    if (withPlanning) res.setHeader("Cache-Control", "no-store");
     const orders = await Order.find({
       "delivery.partnerId": partnerId,
+      ...(orderId && { orderId }),
       status: {
         $in: ["ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"],
       },
     })
-      .select(PARTNER_ORDER_FIELDS)
+      .select(withPlanning ? PARTNER_ORDER_FIELDS + " agentId products.productId products.sku products.packetsPerChain" : PARTNER_ORDER_FIELDS)
       // Without deliveryCode: the store owner reads it out at handover, and
       // showing it here let a partner confirm without visiting the store
       .populate("store", "storeName ownerName phone address location image.url")
@@ -368,6 +359,33 @@ export const getMyAssignedOrders = async (req, res) => {
       .lean();
 
     const settings = await getDeliverySettings();
+    if (withPlanning && orders.length) {
+      const orderIds = orders.map(order => order.orderId);
+      const agentIds = [...new Set(orders.map(order => order.agentId).filter(Boolean))];
+      const productsWithoutSku = [...new Set(orders.flatMap(order => (order.products || [])
+        .filter(line => !line.sku && mongoose.isValidObjectId(line.productId)).map(line => String(line.productId))))];
+      const [agents, returns, variants] = await Promise.all([
+        Agent.find({ agentId: { $in: agentIds } }).select("agentId name").lean(),
+        Return.find({ orderId: { $in: orderIds }, status: { $ne: "CANCELLED" } }).select("orderId items.lineIndex items.quantity").lean(),
+        productsWithoutSku.length ? Product.find({ _id: { $in: productsWithoutSku } }).select("sku").lean() : [],
+      ]);
+      const names = new Map(agents.map(agent => [agent.agentId, agent.name]));
+      const skus = new Map(variants.map(variant => [String(variant._id), variant.sku]));
+      const returnsByOrder = new Map();
+      for (const row of returns) {
+        if (!returnsByOrder.has(row.orderId)) returnsByOrder.set(row.orderId, []);
+        returnsByOrder.get(row.orderId).push(row);
+      }
+      for (const order of orders) {
+        order.agentName = names.get(order.agentId);
+        if (!order.products?.length) continue;
+        const remaining = remainingOrderItems(order, returnsByOrder.get(order.orderId) || []);
+        order.products.forEach((item, index) => {
+          item.sku ||= skus.get(String(item.productId));
+          item.remainingDeliveryQuantity = remaining[index].remainingQuantity;
+        });
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -567,9 +585,12 @@ export const getProfile = async (req, res) => {
   try {
     const partnerId = req.user.id;
 
-    const partner = await DeliveryPartner.findById(partnerId).select(
+    const mobile = req.query.view === "mobile";
+    res.setHeader("Cache-Control", "no-store");
+    const partner = await DeliveryPartner.findById(partnerId).select(mobile
+      ? "name phone email status address documents.idType documents.idNumber" :
       "-password -passwordResetToken -passwordResetExpires",
-    );
+    ).lean();
 
     if (!partner) {
       return res.status(404).json({
@@ -578,8 +599,15 @@ export const getProfile = async (req, res) => {
       });
     }
 
-    // Convert to plain object
-    const data = partner.toObject();
+    if (mobile) {
+      partner.documents = partner.documents ? {
+        idType: partner.documents.idType,
+        idLast4: typeof partner.documents.idNumber === "string" ? partner.documents.idNumber.slice(-4) : "",
+      } : null;
+      return res.json({ success: true, data: partner });
+    }
+
+    const data = partner;
 
     // 👉 If bankDetails doesn't exist, remove it OR set null
     if (!data.bankDetails || Object.keys(data.bankDetails).length === 0) {
@@ -603,10 +631,11 @@ export const getProfile = async (req, res) => {
    `forPartner` is the partner reading their own history: the same list
    without the money (order values, refunds). The office's view of a
    partner's history keeps everything. */
-async function fetchPartnerHistory(partnerId, { forPartner = false } = {}) {
+async function fetchPartnerHistory(partnerId, { forPartner = false, orderId, returnId } = {}) {
   const orders = Order.find({
     "delivery.partnerId": partnerId,
     status: "DELIVERED",
+    ...(orderId && { orderId }),
   })
     .populate("store", "storeName ownerName phone address location image.url")
     .sort({ updatedAt: -1 });
@@ -614,6 +643,7 @@ async function fetchPartnerHistory(partnerId, { forPartner = false } = {}) {
   const returns = Return.find({
     "pickup.partnerId": partnerId,
     status: { $in: ["COMPLETED", "REFUND_PROCESSED"] },
+    ...(returnId && { returnId }),
   }).sort({ updatedAt: -1 });
 
   if (forPartner) {
@@ -621,7 +651,7 @@ async function fetchPartnerHistory(partnerId, { forPartner = false } = {}) {
     returns.select("-refund -items.unitPrice -items.totalPrice -items.productId").lean();
   }
 
-  const [deliveredOrders, completedReturns] = await Promise.all([orders, returns]);
+  const [deliveredOrders, completedReturns] = await Promise.all([returnId ? [] : orders, orderId ? [] : returns]);
 
   return { deliveredOrders, completedReturns };
 }
@@ -629,7 +659,13 @@ async function fetchPartnerHistory(partnerId, { forPartner = false } = {}) {
 /* GET MY DELIVERY & RETURN HISTORY (DELIVERY PARTNER) */
 export const getMyDeliveryHistory = async (req, res) => {
   try {
-    const data = await fetchPartnerHistory(req.user.id, { forPartner: true });
+    const { orderId, returnId } = req.query;
+    if ((orderId !== undefined && returnId !== undefined) || [orderId, returnId].some(id =>
+      id !== undefined && (typeof id !== "string" || !id || id.length > 100))) {
+      return res.status(400).json({ success: false, message: "Invalid history identifier" });
+    }
+    res.setHeader("Cache-Control", "no-store");
+    const data = await fetchPartnerHistory(req.user.id, { forPartner: true, orderId, returnId });
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("GET DELIVERY HISTORY ERROR:", error);
@@ -699,6 +735,9 @@ export const changeDeliveryPartnerPassword = async (req, res) => {
           "Password must be at least 6 characters long and contain letters and numbers",
       });
     }
+    if (bcrypt.truncates(newPassword)) {
+      return res.status(400).json({ success: false, message: "Password must be 72 bytes or fewer" });
+    }
 
     const partner = await DeliveryPartner.findById(req.user.id);
 
@@ -740,11 +779,7 @@ export const changeDeliveryPartnerPassword = async (req, res) => {
     );
     if (!changed) return res.status(409).json({ success: false, message: "Your account changed. Please sign in again before changing your password." });
 
-    const token = jwt.sign(
-      { id: changed._id, role: changed.role, name: changed.name, sessionVersion: changed.sessionVersion },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" },
-    );
+    const token = signDeliverySession(changed);
 
     return res.json({
       success: true,

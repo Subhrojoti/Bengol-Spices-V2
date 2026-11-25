@@ -175,7 +175,7 @@ export default function ProductDetails() {
 
   const stock = n(product.stock);
   const discounted =
-    product.discountPrice && n(product.discountPrice) < n(product.price);
+    product.discountPrice != null && n(product.discountPrice) < n(product.price);
   const saving = discounted ? n(product.price) - n(product.discountPrice) : 0;
   const savingPct = saving
     ? Math.round((saving / n(product.price)) * 100)
@@ -408,6 +408,7 @@ export default function ProductDetails() {
               <Spec label="Category" value={product.category} />
               <Spec label="SKU" value={product.sku} mono />
               <Spec label="Unit of measure" value={product.uom} />
+              {product.uom === "chain" && <Spec label="Packets per chain" value={product.packetsPerChain} />}
               <Spec
                 label="Added on"
                 value={

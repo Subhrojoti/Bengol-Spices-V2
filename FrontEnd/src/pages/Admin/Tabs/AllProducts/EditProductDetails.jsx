@@ -32,6 +32,7 @@ import {
 import EntityAvatar from "../../../../components/common/EntityAvatar";
 import { updateProduct } from "../../../../api/services";
 import { UOM_OPTIONS } from "../../../../utils/uom";
+import { CHAIN_PRICE_FIELDS, chainErrors, chainRate } from "../../../../utils/chainPricing";
 import { sanitizeHtml } from "../../../../utils/sanitizeHtml";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -166,6 +167,8 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
       category: product?.category || "",
       sku: product?.sku || "",
       uom: product?.uom || "",
+      packetsPerChain: product?.packetsPerChain ?? "",
+      pricingUnit: product?.uom === "chain" ? product.pricingUnit || "chain" : "",
       price: product?.price ?? "",
       discountPrice: product?.discountPrice ?? "",
       gstPercentage: product?.gstPercentage ?? "",
@@ -176,6 +179,9 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
       wholesalerPrice: product?.wholesalerPrice ?? "",
       distributorPrice: product?.distributorPrice ?? "",
       horecaPrice: product?.horecaPrice ?? "",
+      ...(product?.uom === "chain" && Object.fromEntries(CHAIN_PRICE_FIELDS.map(field => [
+        field, chainRate(product[field], product.packetsPerChain, product.pricingUnit),
+      ]))),
     }),
     [product],
   );
@@ -198,6 +204,19 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
 
   const set = (key) => (e) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  const setPricingUnit = e => {
+    const pricingUnit = e.target.value;
+    setForm(prev => ({
+      ...prev, pricingUnit,
+      ...Object.fromEntries(CHAIN_PRICE_FIELDS.map(field => {
+        const saved = chainRate(product[field], prev.packetsPerChain, prev.pricingUnit);
+        const price = String(prev[field]) === String(saved) ? product[field]
+          : prev[field] === "" ? "" : Number(prev[field]) * (prev.pricingUnit === "packet" ? prev.packetsPerChain : 1);
+        return [field, chainRate(price, prev.packetsPerChain, pricingUnit)];
+      })),
+    }));
+  };
 
   const errors = useMemo(() => {
     const found = {};
@@ -231,7 +250,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
       found.minOrderQty = "Minimum order quantity must be at least 1";
     }
 
-    return { ...found, ...categoryMinimumErrors(form) };
+    return { ...found, ...categoryMinimumErrors(form), ...chainErrors(form) };
   }, [form]);
 
   const show = (key) => (touched ? errors[key] : undefined);
@@ -284,13 +303,16 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
        applies the difference to the current stock. */
     Object.entries(form).forEach(([key, value]) => {
       const next = String(value ?? "").trim();
-      if (next === String(initial[key] ?? "").trim()) return;
+      const original = form.uom === "chain" && CHAIN_PRICE_FIELDS.includes(key)
+        ? chainRate(product[key], form.packetsPerChain, form.pricingUnit) : initial[key];
+      if (next === String(original ?? "").trim()) return;
 
       data.append(key, next);
       if (key === "stock") {
         data.append("previousStock", String(initial.stock ?? "").trim());
       }
     });
+    if (form.uom === "chain") data.set("pricingUnit", form.pricingUnit);
 
     data.append("certificates", certificates.join(","));
 
@@ -461,11 +483,13 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
                 error={show("uom")}
                 hint={form.uom === "packet" ? "prices are per packet" : undefined}>
                 <select
+                  aria-label="Unit of measure"
                   value={form.uom}
                   onChange={set("uom")}
+                  disabled={initial.uom === "chain"}
                   className={inputClass(show("uom"))}>
                   <option value="">Select</option>
-                  {UOM_OPTIONS.map((u) => (
+                  {UOM_OPTIONS.filter(u => u.value !== "chain" || initial.uom === "chain").map((u) => (
                     <option key={u.value} value={u.value}>
                       {u.label}
                     </option>
@@ -477,6 +501,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
                   )}
                 </select>
               </Field>
+              {form.uom === "chain" && <p className="self-center text-sm text-slate-500">{form.packetsPerChain} packets per chain. Create a new SKU to change the pack size.</p>}
             </div>
           </Section>
 
@@ -484,12 +509,19 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
             title="Pricing & Inventory"
             subtitle="Base price, tax and what is in stock."
             icon={<Box size={17} />}>
+            {form.uom === "chain" && <div className="mb-4 max-w-sm">
+              <Field label="Enter prices per" error={show("pricingUnit")} hint="Stock and minimum quantities are in whole chains.">
+                <select aria-label="Enter prices per" value={form.pricingUnit} onChange={setPricingUnit} className={inputClass(show("pricingUnit"))}>
+                  <option value="chain">Chain</option><option value="packet">Packet</option>
+                </select>
+              </Field>
+            </div>}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Price" required error={show("price")}>
                 <input aria-label="Price"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step={form.uom === "chain" ? "any" : "0.01"}
                   value={form.price}
                   onChange={set("price")}
                   className={inputClass(show("price"))}
@@ -500,7 +532,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
                 <input aria-label="Discount Price"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step={form.uom === "chain" ? "any" : "0.01"}
                   value={form.discountPrice}
                   onChange={set("discountPrice")}
                   className={inputClass(show("discountPrice"))}
@@ -606,7 +638,7 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step={form.uom === "chain" ? "any" : "0.01"}
                     value={form[key]}
                     onChange={set(key)}
                     placeholder="—"

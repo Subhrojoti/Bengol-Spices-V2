@@ -127,7 +127,7 @@ export const getLeaderboard = async ({ from, to, limit = 10 }) => {
     storesCreated: 0,
   });
 
-  const map = {};
+  const map = Object.create(null);
 
   orders.forEach((o) => {
     map[o._id] = {
@@ -157,21 +157,7 @@ export const getLeaderboard = async ({ from, to, limit = 10 }) => {
   // =========================
   // 👤 AGENT DETAILS
   // =========================
-  const agentIds = Object.keys(map);
-
-  const agents = await Agent.find({
-    agentId: { $in: agentIds },
-  }).select("agentId name documents.photo addressDetails.state");
-
-  const agentMap = {};
-  agents.forEach((a) => {
-    agentMap[a.agentId] = a;
-  });
-
-  // =========================
-  // 🏆 FINAL LEADERBOARD
-  // =========================
-  const leaderboard = Object.values(map)
+  const ranked = Object.values(map)
     .sort((a, b) => {
       const earningsDifference = (b.earnedAmount || 0) - (a.earnedAmount || 0);
       if (earningsDifference) return earningsDifference;
@@ -181,31 +167,36 @@ export const getLeaderboard = async ({ from, to, limit = 10 }) => {
       const bId = String(b.agentId);
       return aId < bId ? -1 : aId > bId ? 1 : 0;
     })
-    .slice(0, limit)
-    .map((agent, index) => {
-      const agentInfo = agentMap[agent.agentId] || {};
+    .slice(0, limit);
 
-      return {
-        rank: index + 1,
-        medal:
-          index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : null,
+  const agents = await Agent.find({ agentId: { $in: ranked.map(entry => entry.agentId) } })
+    .select("agentId name documents.photo addressDetails.state");
+  const agentMap = new Map(agents.map(agent => [agent.agentId, agent]));
 
-        agentId: agent.agentId,
-        name: agentInfo.name || "Unknown",
-        profileImage: agentInfo?.documents?.photo || null,
-        state: agentInfo?.addressDetails?.state || "N/A",
+  const leaderboard = ranked.map((agent, index) => {
+    const agentInfo = agentMap.get(agent.agentId) || {};
 
-        // 📊 METRICS
-        earnedAmount: agent.earnedAmount || 0, // 🔥 MAIN KPI
-        completedTargets: agent.completedTargets || 0,
+    return {
+      rank: index + 1,
+      medal:
+        index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : null,
 
-        ordersDelivered: agent.ordersDelivered || 0,
-        sales: agent.sales || 0,
-        collected: agent.collected || 0,
-        returns: agent.returns || 0,
-        storesCreated: agent.storesCreated || 0,
-      };
-    });
+      agentId: agent.agentId,
+      name: agentInfo.name || "Unknown",
+      profileImage: agentInfo?.documents?.photo || null,
+      state: agentInfo?.addressDetails?.state || "N/A",
+
+      // 📊 METRICS
+      earnedAmount: agent.earnedAmount || 0, // 🔥 MAIN KPI
+      completedTargets: agent.completedTargets || 0,
+
+      ordersDelivered: agent.ordersDelivered || 0,
+      sales: agent.sales || 0,
+      collected: agent.collected || 0,
+      returns: agent.returns || 0,
+      storesCreated: agent.storesCreated || 0,
+    };
+  });
 
   return leaderboard;
 };

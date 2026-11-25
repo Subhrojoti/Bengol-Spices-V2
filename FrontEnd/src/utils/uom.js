@@ -15,6 +15,7 @@ export const UOM_OPTIONS = [
   { value: "gm", label: "gm" },
   { value: "ltr", label: "ltr" },
   { value: "packet", label: "Packet" },
+  { value: "chain", label: "Chain" },
 ];
 
 /**
@@ -23,8 +24,8 @@ export const UOM_OPTIONS = [
  */
 export const quantityWithUnit = (quantity, unit) => {
   if (!unit) return String(quantity);
-  if (unit === "packet") {
-    return `${quantity} ${Number(quantity) === 1 ? "packet" : "packets"}`;
+  if (unit === "packet" || unit === "chain") {
+    return `${quantity} ${unit}${Number(quantity) === 1 ? "" : "s"}`;
   }
   return `${quantity} ${unit}`;
 };

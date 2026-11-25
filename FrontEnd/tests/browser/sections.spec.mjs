@@ -57,6 +57,30 @@ test("product image validation and replacement release local previews on navigat
   expect(await page.evaluate(() => window.__urls.revoked.sort())).toEqual(await page.evaluate(() => window.__urls.created.sort()));
 });
 
+test("Admin creates a Chain variant with a chosen number of packets and packet pricing", async ({ context, page }) => {
+  const network = await installFixtures(context, { overrides: { "/products/create": success } });
+  await page.goto("/admin/products");
+  await page.getByLabel("Product Name", { exact: true }).fill("Chain Spice");
+  await page.getByLabel("Title", { exact: true }).fill("Chain Spice");
+  await page.getByPlaceholder("Spices", { exact: true }).fill("Spices");
+  await page.getByLabel("SKU", { exact: true }).fill("QA-CHAIN");
+  await page.getByRole("combobox", { name: "Unit of measure" }).selectOption("chain");
+  await page.getByLabel("Packets per chain", { exact: true }).fill("12");
+  await page.getByRole("combobox", { name: "Enter prices per" }).selectOption("packet");
+  await page.getByLabel("Price", { exact: true }).fill("4.25");
+  await page.getByLabel("Stock", { exact: true }).fill("10");
+  const png = { name: "synthetic.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") };
+  const files = page.locator('main input[type="file"]');
+  await files.nth(0).setInputFiles(png);
+  await files.nth(1).setInputFiles(png);
+  await page.getByRole("button", { name: "Create Product", exact: true }).click();
+  await expect(page.getByText("Chain Spice added to the catalog", { exact: true })).toBeVisible();
+  const sent = network.requests.find(entry => entry.path === "/products/create");
+  for (const [key, value] of Object.entries({ uom: "chain", packetsPerChain: "12", pricingUnit: "packet", price: "4.25", stock: "10" })) {
+    expect(sent.body).toContain(`name="${key}"\r\n\r\n${value}`);
+  }
+});
+
 test("product edit and delete preserve multipart fields and confirmation", async ({ context, page }) => {
   let product = { ...products[0] };
   const network = await installFixtures(context, { overrides: {

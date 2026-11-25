@@ -91,6 +91,21 @@ test("one reset/setup link can be consumed only once under concurrent submission
   }
 });
 
+test("Agent setup, reset and change refuse passwords bcrypt would truncate", async () => {
+  const user = await person({ password: await bcrypt.hash("OldPass1", 10) });
+  for (const password of ["Aa1" + "x".repeat(70), "Aa1" + "\u00e9".repeat(35)]) {
+    for (const path of ["/auth/agent/reset-password", "/agent/auth/set-password"]) {
+      const response = await call(path, null, { token: "fixture", password });
+      assert.equal(response.status, 400);
+      assert.match(response.data.message, /72 bytes/);
+    }
+    const changed = await call("/auth/change-password", sign(user, "AGENT"), { oldPassword: "OldPass1", newPassword: password, confirmPassword: password });
+    assert.equal(changed.status, 400);
+    assert.match(changed.data.message, /72 bytes/);
+  }
+  assert.equal((await Agent.findById(user._id)).password, user.password);
+});
+
 test("legacy agent sessions remain valid until password change, which revokes sessions and outstanding reset links", async () => {
   const user = await person({ password: await bcrypt.hash("OldPass1", 10), passwordResetToken: hashToken("outstanding"), passwordResetExpires: new Date(Date.now()+60000) });
   await Agent.collection.updateOne({ _id: user._id }, { $unset: { sessionVersion: "" } });
@@ -105,6 +120,26 @@ test("legacy agent sessions remain valid until password change, which revokes se
   assert.equal(login.status, 200); assert.equal((await call("/secure", login.data.token)).status, 200);
 });
 
+test("Agent sign-in keeps account status private and logout rejects only its originating token", async () => {
+  const user = await person({ agentId: "LOGOUT-AGENT", password: await bcrypt.hash("OldPass1", 10), accessStatus: "BLOCKED" });
+  const path = "/auth/agent/login";
+  const missing = await call(path, null, { agentId: "MISSING-AGENT", password: "WrongPass1" });
+  assert.equal(missing.status, 401);
+  assert.deepEqual(await call(path, null, { agentId: user.agentId, password: "WrongPass1" }), missing);
+  assert.equal((await call(path, null, { agentId: user.agentId, password: "OldPass1" })).status, 403);
+  await Agent.updateOne({ _id: user._id }, { accessStatus: "ACTIVE" });
+  const logIn = () => call(path, null, { agentId: user.agentId, password: "OldPass1" });
+  const [first, second] = await Promise.all([logIn(), logIn()]);
+  assert.equal(first.status, 200); assert.equal(second.status, 200);
+  assert.notEqual(jwt.decode(first.data.token).jti, jwt.decode(second.data.token).jti);
+  const legacy = sign(user, "AGENT");
+  for (const auth of [first.data.token, legacy]) {
+    assert.equal((await call("/auth/logout", auth, {})).status, 200);
+    assert.equal((await call("/secure", auth)).status, 401);
+  }
+  assert.equal((await call("/secure", second.data.token)).status, 200);
+});
+
 test("delivery password changes keep the new device signed in and invalidate legacy sessions and reset links", async () => {
   const row = await DeliveryPartner.collection.insertOne({ name: "Partner", phone: "9000000001", role: "DELIVERY_PARTNER", status: "ACTIVE", password: await bcrypt.hash("OldPass1", 10), passwordResetToken: hashToken("outstanding"), passwordResetExpires: new Date(Date.now()+60000) });
   const user = await DeliveryPartner.findById(row.insertedId), old = sign(user, "DELIVERY_PARTNER");
@@ -116,6 +151,77 @@ test("delivery password changes keep the new device signed in and invalidate leg
   const login = await call("/delivery-partner/login", null, { phone: user.phone, password: "NewPass1" });
   assert.equal(login.status, 200); assert.equal((await call("/secure", login.data.token)).status, 200);
   assert.equal((await DeliveryPartner.findById(user._id)).passwordResetToken, undefined);
+});
+
+test("Employee logout invalidates one session and deactivation is disclosed only after credential verification", async () => {
+  const credentials = { employeeId: "EMP-SESSION-TEST", password: "OfficeTest1!" };
+  const employee = await Employee.create({
+    ...credentials,
+    name: "Office tester",
+    email: "office-session@test.invalid",
+    password: await bcrypt.hash(credentials.password, 10),
+    status: "INACTIVE",
+  });
+  const wrong = await call("/auth/employee/login", null, { ...credentials, password: "WrongPassword1!" });
+  const missing = await call("/auth/employee/login", null, { ...credentials, employeeId: "NONEXISTENT-TEST" });
+  assert.equal(wrong.status, 401);
+  assert.deepEqual(wrong, missing);
+  assert.equal((await call("/auth/employee/login", null, credentials)).status, 403);
+
+  await Employee.updateOne({ _id: employee.id }, { status: "ACTIVE" });
+  const first = await call("/auth/employee/login", null, credentials);
+  const second = await call("/auth/employee/login", null, credentials);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.notEqual(first.data.token, second.data.token);
+  const legacy = sign(employee, "EMPLOYEE");
+  assert.equal((await call("/secure", legacy)).status, 200);
+  assert.equal((await call("/auth/employee/logout", sign(employee, "ADMIN"), {})).status, 403);
+  assert.equal((await call("/auth/employee/logout", first.data.token, {})).status, 200);
+  assert.equal((await call("/secure", first.data.token)).status, 401);
+  assert.equal((await call("/secure", second.data.token)).status, 200);
+  assert.equal((await call("/auth/employee/logout", legacy, {})).status, 200);
+  assert.equal((await call("/secure", legacy)).status, 401);
+  assert.equal((await Employee.findById(employee.id)).revokedSessions, undefined);
+});
+
+test("delivery sign-in hides approval status without valid credentials and logout revokes only one token", async () => {
+  const partner = await DeliveryPartner.create({ name: "Test partner", phone: "9000000022", status: "PENDING",
+    password: await bcrypt.hash("OldPass1", 10), address: { state: "Test", city: "Test", street: "Test", pincode: "700001" },
+    documents: { idType: "AADHAAR", idNumber: "123456789012", documentUrl: "https://example.invalid/document" },
+    bankDetails: { accountNumber: "0123456789" },
+  });
+  const path = "/delivery-partner/login";
+  const wrong = await call(path, null, { phone: partner.phone, password: "WrongPass1" });
+  const missing = await call(path, null, { phone: "9000000023", password: "WrongPass1" });
+  assert.deepEqual(wrong, missing);
+  assert.equal(wrong.status, 401);
+  assert.equal((await call(path, null, { phone: partner.phone, password: "OldPass1" })).status, 403);
+  await DeliveryPartner.updateOne({ _id: partner._id }, { status: "ACTIVE" });
+
+  const logIn = () => call(path, null, { phone: partner.phone, password: "OldPass1" });
+  const [first, second] = await Promise.all([logIn(), logIn()]);
+  assert.equal(first.status, 200); assert.equal(second.status, 200);
+  assert.notEqual(jwt.decode(first.data.token).jti, jwt.decode(second.data.token).jti);
+  assert.equal((await call("/delivery-partner/logout", first.data.token, {})).status, 200);
+  assert.equal((await call("/secure", first.data.token)).status, 401);
+  assert.equal((await call("/secure", second.data.token)).status, 200);
+
+  const legacy = sign(partner, "DELIVERY_PARTNER");
+  assert.equal((await call("/delivery-partner/logout", legacy, {})).status, 200);
+  assert.equal((await call("/secure", legacy)).status, 401);
+  const profilePath = "/delivery-partner/profile";
+  const profile = (await call(`${profilePath}?view=mobile`, second.data.token)).data.data;
+  assert.deepEqual(profile.documents, { idType: "AADHAAR", idLast4: "9012" });
+  assert.equal(profile.bankDetails, undefined);
+  assert.equal(profile.revokedSessions, undefined);
+  const legacyProfile = (await call(profilePath, second.data.token)).data.data;
+  assert.equal(legacyProfile.documents.idNumber, "123456789012");
+  assert.equal(legacyProfile.revokedSessions, undefined);
+  for (const newPassword of ["Aa1" + "x".repeat(70), "Aa1" + "\u00e9".repeat(35)]) {
+    const change = await call("/delivery-partner/change-password", second.data.token, { oldPassword: "OldPass1", newPassword });
+    assert.equal(change.status, 400); assert.match(change.data.message, /72 bytes/);
+  }
 });
 
 test("signed non-login tokens and unknown roles cannot authenticate", async () => {
@@ -210,7 +316,7 @@ test("malformed compressed JSON is refused without crashing the request parser",
   assert.equal(response.status, 400);
   assert.equal((await call("/secure")).status, 401);
   const valid = await fetch(origin + "/auth/agent/login", { method: "POST", headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" }, body: gzipSync(Buffer.from('{"agentId":"UNKNOWN","password":"guess"}')) });
-  assert.equal(valid.status, 404);
+  assert.equal(valid.status, 401);
 });
 
 test("early form refusals remove already-uploaded store/product files without leaking database errors", async () => {
@@ -244,36 +350,4 @@ test("a product photo saved successfully is retained if a subsequent stock adjus
     assert.equal((await Product.findById(product._id)).images.front.publicId, "new-front");
     assert(!removed.includes("new-front"));
   } finally { Product.updateOne = originalUpdate; cloudinary.uploader.destroy = originalDestroy; }
-});
-
-test("Employee logout invalidates one session and deactivation is disclosed only after credential verification", async () => {
-  const credentials = { employeeId: "EMP-SESSION-TEST", password: "OfficeTest1!" };
-  const employee = await Employee.create({
-    ...credentials,
-    name: "Office tester",
-    email: "office-session@test.invalid",
-    password: await bcrypt.hash(credentials.password, 10),
-    status: "INACTIVE",
-  });
-  const wrong = await call("/auth/employee/login", null, { ...credentials, password: "WrongPassword1!" });
-  const missing = await call("/auth/employee/login", null, { ...credentials, employeeId: "NONEXISTENT-TEST" });
-  assert.equal(wrong.status, 401);
-  assert.deepEqual(wrong, missing);
-  assert.equal((await call("/auth/employee/login", null, credentials)).status, 403);
-
-  await Employee.updateOne({ _id: employee.id }, { status: "ACTIVE" });
-  const first = await call("/auth/employee/login", null, credentials);
-  const second = await call("/auth/employee/login", null, credentials);
-  assert.equal(first.status, 200);
-  assert.equal(second.status, 200);
-  assert.notEqual(first.data.token, second.data.token);
-  const legacy = sign(employee, "EMPLOYEE");
-  assert.equal((await call("/secure", legacy)).status, 200);
-  assert.equal((await call("/auth/employee/logout", sign(employee, "ADMIN"), {})).status, 403);
-  assert.equal((await call("/auth/employee/logout", first.data.token, {})).status, 200);
-  assert.equal((await call("/secure", first.data.token)).status, 401);
-  assert.equal((await call("/secure", second.data.token)).status, 200);
-  assert.equal((await call("/auth/employee/logout", legacy, {})).status, 200);
-  assert.equal((await call("/secure", legacy)).status, 401);
-  assert.equal((await Employee.findById(employee.id)).revokedSessions, undefined);
 });

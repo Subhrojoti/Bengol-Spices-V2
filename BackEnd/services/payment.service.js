@@ -146,7 +146,10 @@ export const applyDuePayment = async ({
         if (previous.orderId !== orderId || (clientRequestId && previous.requestHash !== requestHash) || previous.amount !== amount || previous.method !== method) return refuse(409, "This payment request identifier was already used with different details");
         return { ok: true, order, payment: previous, replayed: true };
       }
-      if (office && await GatewayPayment.exists({ orderId, purpose: "ORDER_DUE", status: { $in: ["QR_OPEN", "PROCESSING", "FAILED", "REFUND_FAILED"] } }).session(session)) return refuse(409, "This order has an unresolved online payment or QR. Resolve it before recording another receipt.");
+      if ((office || unverified) && await GatewayPayment.exists({
+        orderId, purpose: "ORDER_DUE", status: { $in: ["QR_OPEN", "PROCESSING", "FAILED", "REFUND_FAILED"] },
+        ...(!office && { qrCodeId: { $type: "string" } }),
+      }).session(session)) return refuse(409, "This order has an unresolved online payment or QR. Resolve it before recording another receipt.");
       if (order.status === "CANCELLED") return refuse(400, "This order was cancelled");
       if (order.dueAmount <= 0) return refuse(400, "No due amount remaining");
       if (amount > order.dueAmount + 0.005) return refuse(400, "Amount exceeds due amount");

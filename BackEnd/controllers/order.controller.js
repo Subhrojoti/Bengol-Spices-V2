@@ -24,6 +24,7 @@ import Agent from "../models/Agent.js";
 import { updateTargetProgress } from "../services/target.service.js";
 import { syncAfterSale } from "../services/salesTarget.service.js";
 import { withCashVerification } from "../services/cashVerification.service.js";
+import { availableReturnItems } from "../services/returnItems.service.js";
 import { TIER_FIELDS, getLocationOverrides } from "../utils/pricing.js";
 import {
   needsVerification,
@@ -42,6 +43,7 @@ import {
 import { checkAtStore, formatDistance, readLocation } from "../utils/geo.js";
 import mongoose from "mongoose";
 import GatewayPayment from "../models/GatewayPayment.js";
+import { closeUnpaidDueQr, findUnresolvedDueQr } from "../services/dueQr.service.js";
 import { findManagedStore, historyConsumerIds, mayReadStoreHistory, managesStore } from "../services/storeAccess.service.js";
 import {
   announceCashToVerify,
@@ -105,6 +107,8 @@ const fetchVerifiedRazorpayPayment = async (paymentId, razorpayOrderId) => {
   if (
     !payment ||
     payment.order_id !== razorpayOrderId ||
+    payment.currency !== "INR" ||
+    !Number.isSafeInteger(payment.amount) || payment.amount < 100 ||
     !["captured", "authorized"].includes(payment.status)
   ) {
     return null;
@@ -122,6 +126,16 @@ const isGatewayId = (value, prefix) =>
   typeof value === "string" &&
   value.startsWith(`${prefix}_`) &&
   /^[A-Za-z0-9_]{8,60}$/.test(value);
+
+async function capturedQrPayments(qr) {
+  const { items } = await razorpayInstance.qrCode.fetchAllPayments(qr.id);
+  const captured = Array.isArray(items) ? items.filter(item => item?.status === "captured") : [];
+  if (!Number.isSafeInteger(qr.payment_amount) || qr.payment_amount < 100 ||
+    qr.payments_amount_received !== qr.payment_amount || !captured.length ||
+    captured.some(item => !isGatewayId(item.id, "pay") || item.method !== "upi" || item.currency !== "INR" || !Number.isSafeInteger(item.amount) || item.amount < 1) ||
+    captured.reduce((total, item) => total + item.amount, 0) !== qr.payment_amount) return null;
+  return captured.map(item => item.id);
+}
 
 // More than any single order here comes to; the gateway has limits of its own
 const MAX_PAYMENT_RUPEES = 10000000;
@@ -158,6 +172,10 @@ const replyToGateway = async (req, res, record) => {
   }
   return respondToClaimedGatewayPayment(res, record);
 };
+
+const settledCheckout = (paymentId) => GatewayPayment.findOne({
+  key: `payment:${paymentId}`, status: { $in: ["APPLIED", "REFUNDED", "REFUND_FAILED"] },
+}).lean();
 
 // Signature check that takes the same time whether or not it matches
 const signatureMatches = (razorpayOrderId, razorpayPaymentId, signature) => {
@@ -336,19 +354,27 @@ export const placeOrder = async (req, res) => {
       req.gatewayPaymentVerified !== true && isRequestId(req.body.requestId)
         ? req.body.requestId
         : undefined;
+    const requestHash = requestId && crypto.createHash("sha256").update(JSON.stringify({
+      consumerId, paidAmount: roundRupees(paidAmount),
+      products: products.map(item => [item?.productId, item?.name, item?.uom, Number(item?.quantity), Number(item?.unitPrice)]),
+    })).digest("hex");
+    const replyToExistingOrder = async (existing) => {
+      if (existing.consumerId !== consumerId || (existing.clientRequestHash && existing.clientRequestHash !== requestHash)) {
+        return res.status(409).json({ success: false, message: "This order request was already used for a different cart." });
+      }
+      if (!(await mayReadStoreHistory(existing.consumerId, agentId))) return res.status(404).json({ success: false, message: "Order not found" });
+      return res.status(201).json(alreadyPlacedAnswer(existing));
+    };
 
     if (requestId) {
       const already = await Order.findOne({
         agentId,
         clientRequestId: requestId,
       })
-        .select("orderId consumerId paidAmount")
+        .select("orderId consumerId paidAmount +clientRequestHash")
         .lean();
 
-      if (already) {
-        if (!(await mayReadStoreHistory(already.consumerId, agentId))) return res.status(404).json({ success: false, message: "Order not found" });
-        return res.status(201).json(alreadyPlacedAnswer(already));
-      }
+      if (already) return await replyToExistingOrder(already);
     }
 
     /* =============================
@@ -384,6 +410,10 @@ export const placeOrder = async (req, res) => {
        once the whole order has passed validation. */
     const stockLines = [];
     const minimumLines = new Map();
+    const productIds = [...new Set(products.map(item => item?.productId)
+      .filter(id => id && mongoose.isValidObjectId(id)).map(id => String(id).toLowerCase()))];
+    const catalog = productIds.length ? await Product.find({ _id: { $in: productIds } }).lean() : [];
+    const byProductId = new Map(catalog.map(product => [String(product._id), product]));
 
     for (const item of products) {
       // BASIC VALIDATION
@@ -428,10 +458,7 @@ export const placeOrder = async (req, res) => {
       let productDoc = null;
 
       if (item.productId) {
-        // A malformed id used to reach the database and answer 500
-        productDoc = mongoose.isValidObjectId(item.productId)
-          ? await Product.findById(item.productId)
-          : null;
+        productDoc = byProductId.get(String(item.productId).toLowerCase());
       } else {
         productDoc = await Product.findOne({
           name: item.name,
@@ -448,6 +475,9 @@ export const placeOrder = async (req, res) => {
           message: `${item.name} is no longer available. Please remove it from the cart.`,
         });
       }
+      if (productDoc.uom === "chain" && !Number.isSafeInteger(Number(item.quantity))) {
+        return res.status(400).json({ success: false, message: `${productDoc.name}: order a whole number of chains.` });
+      }
 
       const productKey = String(productDoc._id);
       const previousLine = minimumLines.get(productKey);
@@ -459,6 +489,8 @@ export const placeOrder = async (req, res) => {
 
       if (productDoc) {
         item.productId = productDoc._id;
+        item.sku = productDoc.sku;
+        item.packetsPerChain = productDoc.packetsPerChain;
         item.name = productDoc.name;
         /* The unit the product is sold by now, not whatever the app had
            when it last loaded the catalogue: a product the office has just
@@ -638,7 +670,7 @@ export const placeOrder = async (req, res) => {
         },
       ],
       paymentStatus: dueAmount === 0 ? "COMPLETED" : "PENDING",
-      ...(requestId && { clientRequestId: requestId }),
+      ...(requestId && { clientRequestId: requestId, clientRequestHash: requestHash }),
     };
 
     /* A number that turns out to be taken is not a reason to refuse the
@@ -687,10 +719,10 @@ export const placeOrder = async (req, res) => {
         agentId,
         clientRequestId: requestId,
       })
-        .select("orderId paidAmount")
+        .select("orderId consumerId paidAmount +clientRequestHash")
         .lean();
 
-      if (first) return res.status(201).json(alreadyPlacedAnswer(first));
+      if (first) return await replyToExistingOrder(first);
     }
 
     if (!order) {
@@ -784,6 +816,9 @@ export const placeOrder = async (req, res) => {
   }
 };
 //GET STOREWISE ORDERS
+const MOBILE_ORDER_LIST_FIELDS = "orderId consumerId status totalAmount paidAmount dueAmount dueDate createdAt invoicePolicy products.name products.image";
+const MOBILE_PAYMENT_LIST_FIELDS = MOBILE_ORDER_LIST_FIELDS + " deliveryAddress.storeName deliveryAddress.ownerName deliveryAddress.city deliveryAddress.state";
+
 export const getOrdersByStoreConsumerId = async (req, res) => {
   try {
     const { consumerId } = req.params;
@@ -802,11 +837,11 @@ export const getOrdersByStoreConsumerId = async (req, res) => {
       if (!(await mayReadStoreHistory(consumerId, user.agentId))) {
         return res.status(404).json({ success: false, message: "Store not found" });
       }
-      const orders = await Order.find({
+      const query = Order.find({
         consumerId,
-      })
-        .sort({ createdAt: -1 })
-        .lean();
+      }).sort({ createdAt: -1 });
+      if (req.query.view === "mobile") query.select(MOBILE_ORDER_LIST_FIELDS);
+      const orders = await query.lean();
 
       return res.json({
         success: true,
@@ -870,9 +905,9 @@ export const getMyOrder = async (req, res) => {
       });
     }
 
-    const order = await Order.findOne({ orderId: String(orderId), consumerId: { $in: await historyConsumerIds(agentId) } }).lean();
+    const order = await Order.findOne({ orderId: String(orderId) }).lean();
 
-    if (!order) {
+    if (!order || !(await mayReadStoreHistory(order.consumerId, agentId))) {
       return res.status(404).json({
         success: false,
         message: "Order not found",
@@ -904,7 +939,13 @@ export const getMyOrders = async (req, res) => {
       });
     }
 
-    const orders = await Order.find({ consumerId: { $in: await historyConsumerIds(agentId) } }).sort({ createdAt: -1 }).lean();
+    const completed = req.query.view === "mobile-completed";
+    const query = Order.find({
+      consumerId: { $in: await historyConsumerIds(agentId) },
+      ...(completed && { dueAmount: 0, status: { $ne: "CANCELLED" } }),
+    }).sort({ createdAt: -1 });
+    if (completed) query.select(MOBILE_PAYMENT_LIST_FIELDS);
+    const orders = await query.lean();
 
     return res.json({
       success: true,
@@ -1445,6 +1486,10 @@ export const updateDeliveryStatus = async (req, res) => {
         message: "Invalid status transition",
       });
     }
+    if (status === "DELIVERED" && order.products?.length &&
+      (await availableReturnItems(order)).every(item => item.remainingQuantity === 0)) {
+      return res.status(409).json({ success: false, message: "All items on this order were returned. The office will review the order." });
+    }
 
     /* Where the partner's phone says it is, read once as they press the
        button. It is written into the delivery trail with every step, and
@@ -1827,13 +1872,13 @@ export const getAgentDueOrders = async (req, res) => {
   try {
     const agentId = req.user.agentId;
 
-    const orders = await Order.find({
+    const query = Order.find({
       consumerId: { $in: await historyConsumerIds(agentId) },
       dueAmount: { $gt: 0 },
       status: { $ne: "CANCELLED" },
-    })
-      .sort({ dueDate: 1 })
-      .lean();
+    }).sort({ dueDate: 1 });
+    if (req.query.view === "mobile") query.select(MOBILE_PAYMENT_LIST_FIELDS);
+    const orders = await query.lean();
 
     res.json({
       success: true,
@@ -2093,6 +2138,9 @@ export const createRazorpayOrder = async (req, res) => {
     const amount = req.body.amount === undefined ? order.dueAmount : roundRupees(req.body.amount);
     if (!Number.isFinite(amount) || amount < 1 || amount > order.dueAmount + 0.005) return res.status(400).json({ success: false, message: "Enter an amount from ₹1 up to the outstanding balance" });
 
+    if (await findUnresolvedDueQr(orderId)) {
+      return res.status(409).json({ success: false, message: "Resolve the pending QR for this order before starting another payment." });
+    }
     const razorpayOrder = await razorpayInstance.orders.create({
       // Razorpay needs whole paise: 14.29 * 100 is 1428.9999…, which it refuses
       amount: Math.round(amount * 100),
@@ -2155,6 +2203,9 @@ export const verifyRazorpayPayment = async (req, res) => {
       });
     }
 
+    const settled = await settledCheckout(razorpay_payment_id);
+    if (settled) return replyToGateway(req, res, settled);
+
     /* 🔒 FIX: the amount recorded used to be the "amount" field the app sent.
        The signature only proves the payment is real, not how much it was
        for, so paying ₹1 and reporting the full due marked the order paid.
@@ -2170,6 +2221,9 @@ export const verifyRazorpayPayment = async (req, res) => {
         success: false,
         message: "Payment could not be confirmed with Razorpay",
       });
+    }
+    if (razorpayPayment.status !== "captured") {
+      return res.status(409).json({ success: false, message: "Razorpay has authorized the payment and capture is pending. Retry this payment confirmation." });
     }
 
     const amount = Number(razorpayPayment.amount) / 100; // paise → rupees
@@ -2324,6 +2378,8 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
     /* 🔒 FIX: the paid amount was the "amount" the app sent, so a ₹1 payment
        reported as the full total placed a fully-paid order. It now comes
        from Razorpay's record of the payment. */
+    const settled = await settledCheckout(razorpay_payment_id);
+    if (settled) return replyToGateway(req, res, settled);
     const razorpayPayment = await fetchVerifiedRazorpayPayment(
       razorpay_payment_id,
       razorpay_order_id,
@@ -2334,6 +2390,9 @@ export const verifyPaymentAndPlaceOrder = async (req, res) => {
         success: false,
         message: "Payment could not be confirmed with Razorpay",
       });
+    }
+    if (razorpayPayment.status !== "captured") {
+      return res.status(409).json({ success: false, message: "Razorpay has authorized the payment and capture is pending. Retry this payment confirmation." });
     }
 
     const amount = Number(razorpayPayment.amount) / 100; // paise → rupees
@@ -2502,6 +2561,40 @@ export const createInitialPaymentQr = async (req, res) => {
 
 /* STEP 1b - CREATE QR FOR COLLECTING A DUE AMOUNT */
 /* Omitted amount keeps the original full-due contract for existing clients. */
+const agentOwnsDueQr = (record, agentId) => record.collectedBy?.role === "AGENT" && record.collectedBy.id === agentId;
+const dueQrFields = (record) => ({ qrCodeId: record.qrCodeId, imageUrl: record.qrImageUrl, amount: record.amount });
+const resolvedDueQr = (record) => ["APPLIED", "REFUNDED", "RESOLVED"].includes(record?.status);
+
+export const recoverAgentDueQr = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const order = await Order.findOne({ orderId: req.params.orderId }).select("consumerId").lean();
+  if (!order || !(await managesStore(order.consumerId, req.user.agentId))) {
+    return res.status(404).json({ success: false, message: "Order not found or no longer managed by you" });
+  }
+  const pending = await findUnresolvedDueQr(req.params.orderId);
+  const owned = pending && agentOwnsDueQr(pending, req.user.agentId);
+  return res.json({ success: true, qr: owned ? dueQrFields(pending) : null, blocked: Boolean(pending && !owned) });
+};
+
+export const closeAgentDueQr = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const { orderId, qrCodeId } = req.params;
+  const record = await GatewayPayment.findOne({ orderId, qrCodeId, purpose: "ORDER_DUE", "collectedBy.role": "AGENT", "collectedBy.id": req.user.agentId }).lean();
+  if (!record) return res.status(404).json({ success: false, message: "QR code not found" });
+  if (record.status === "QR_CLOSED") return res.json({ success: true, closed: true, paid: false });
+  if (record.status !== "QR_OPEN") return res.json({ success: true, closed: false, paid: true });
+  try {
+    let qr = await razorpayInstance.qrCode.fetch(record.qrCodeId);
+    if (qr.status === "active") {
+      await razorpayInstance.qrCode.close(record.qrCodeId);
+      qr = await razorpayInstance.qrCode.fetch(record.qrCodeId);
+    }
+    return res.json({ success: true, closed: await closeUnpaidDueQr(record, qr), paid: qr.payments_amount_received > 0 });
+  } catch {
+    return res.status(503).json({ success: false, message: "Could not confirm closure. Check this QR before collecting again." });
+  }
+};
+
 export const createDuePaymentQr = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -2525,6 +2618,13 @@ export const createDuePaymentQr = async (req, res) => {
         message: "You are not allowed to collect payment for this order",
       });
     }
+    const pending = await findUnresolvedDueQr(orderId);
+    if (pending) {
+      if (!agentOwnsDueQr(pending, req.user.agentId)) {
+        return res.status(409).json({ success: false, message: "Another collector has an unresolved QR for this order. Ask the office to resolve it first." });
+      }
+      return res.json({ success: true, ...dueQrFields(pending), reused: true });
+    }
     // Refused before a QR is shown, as the online checkout already is. The
     // customer used to pay first and be refunded afterwards.
     if (order.status === "CANCELLED") {
@@ -2541,6 +2641,7 @@ export const createDuePaymentQr = async (req, res) => {
     const amount = req.body.amount === undefined ? order.dueAmount : roundRupees(req.body.amount);
     if (!Number.isFinite(amount) || amount < 1 || amount > order.dueAmount + 0.005) return res.status(400).json({ success: false, message: "Enter an amount from ₹1 up to the outstanding balance" });
 
+    const closeBy = qrExpiryTimestamp();
     const qrCode = await razorpayInstance.qrCode.create({
       type: "upi_qr",
       name: `Due Payment - ${order.orderId}`,
@@ -2548,13 +2649,24 @@ export const createDuePaymentQr = async (req, res) => {
       fixed_amount: true,
       payment_amount: Math.round(amount * 100),
       description: `Remaining balance for order ${order.orderId}`,
-      close_by: qrExpiryTimestamp(),
+      close_by: closeBy,
       notes: {
         purpose: "order_due_payment",
         orderId: order.orderId,
         agentId: req.user.agentId,
       },
     });
+    try {
+      await GatewayPayment.create({
+        key: `qr:${qrCode.id}`, purpose: "ORDER_DUE", status: "QR_OPEN",
+        agentId: req.user.agentId, orderId, amount, qrCodeId: qrCode.id,
+        qrImageUrl: qrCode.image_url, qrCloseBy: closeBy,
+        collectedBy: { role: "AGENT", id: req.user.agentId },
+      });
+    } catch (error) {
+      await razorpayInstance.qrCode.close(qrCode.id).catch(() => {});
+      throw error;
+    }
 
     return res.status(200).json({
       success: true,
@@ -2582,6 +2694,17 @@ export const checkQrPaymentStatus = async (req, res) => {
         .json({ success: false, message: "QR code not found" });
     }
 
+    const record = await GatewayPayment.findOne({ key: `qr:${qrCodeId}`, purpose: "ORDER_DUE" }).lean();
+    if (record?.collectedBy?.role && !agentOwnsDueQr(record, req.user.agentId)) {
+      return res.status(404).json({ success: false, message: "QR code not found" });
+    }
+    if (record && resolvedDueQr(record) && agentOwnsDueQr(record, req.user.agentId)) {
+      const order = await Order.findOne({ orderId: record.orderId }).select("consumerId").lean();
+      if (!order || !(await managesStore(order.consumerId, req.user.agentId))) {
+        return res.status(404).json({ success: false, message: "QR code not found" });
+      }
+      return res.json({ success: true, paid: true, status: "closed", amountReceived: record.amount });
+    }
     const qrCode = await razorpayInstance.qrCode.fetch(qrCodeId);
 
     if (qrCode.notes?.agentId !== req.user.agentId) {
@@ -2596,14 +2719,17 @@ export const checkQrPaymentStatus = async (req, res) => {
 
     const paid =
       qrCode.status === "closed" &&
-      qrCode.close_reason === "paid" &&
+      (record ? Number.isSafeInteger(qrCode.payment_amount) && qrCode.payment_amount >= 100 : qrCode.close_reason === "paid") &&
       qrCode.payments_amount_received >= qrCode.payment_amount;
 
+    const awaitingSettlement = Boolean(record && !paid && qrCode.status === "closed"
+      && !(await closeUnpaidDueQr(record, qrCode)));
     return res.status(200).json({
       success: true,
       paid,
       status: qrCode.status,
       amountReceived: qrCode.payments_amount_received / 100,
+      awaitingSettlement,
     });
   } catch (error) {
     // The gateway knows no such QR code: that is "not found", not a fault here
@@ -2674,13 +2800,9 @@ export const verifyQrAndPlaceOrder = async (req, res) => {
       });
     }
 
-    const payments = await razorpayInstance.qrCode.fetchAllPayments(qrCodeId);
-    const paymentIds = (payments.items || [])
-      .map((item) => item.id)
-      .filter(Boolean);
-
-    // 🔒 FIX: was the "amount" the app sent; now what the QR actually received
-    const amount = qrCode.payments_amount_received / 100;
+    const paymentIds = await capturedQrPayments(qrCode);
+    if (!paymentIds) return res.status(409).json({ success: false, message: "Razorpay has not confirmed this payment yet. Retry the same QR." });
+    const amount = qrCode.payment_amount / 100;
 
     /* 🔒 FIX: one paid QR could be submitted again and again, placing a new
        "paid" order each time. It is claimed before the order is placed, so
@@ -2794,10 +2916,18 @@ export const verifyDueQrPayment = async (req, res) => {
       });
     }
 
+    const saved = await GatewayPayment.findOne({ key: `qr:${qrCodeId}`, purpose: "ORDER_DUE" }).lean();
+    if (saved && (saved.orderId !== orderId || (saved.collectedBy?.role && !agentOwnsDueQr(saved, req.user.agentId)))) {
+      return res.status(404).json({ success: false, message: "QR code not found" });
+    }
+    if (resolvedDueQr(saved)) {
+      if (saved.status === "RESOLVED") return res.status(409).json({ success: false, terminal: true, message: "The office resolved this QR. Check the order balance." });
+      return replyToGateway(req, res, saved);
+    }
     const qrCode = await razorpayInstance.qrCode.fetch(qrCodeId);
     const paid =
       qrCode.status === "closed" &&
-      qrCode.close_reason === "paid" &&
+      Number.isSafeInteger(qrCode.payment_amount) && qrCode.payment_amount >= 100 &&
       qrCode.payments_amount_received >= qrCode.payment_amount;
 
     if (!paid) {
@@ -2810,7 +2940,8 @@ export const verifyDueQrPayment = async (req, res) => {
     // A QR made for one order's due cannot settle another order
     if (
       qrCode.notes?.purpose !== "order_due_payment" ||
-      qrCode.notes?.orderId !== order.orderId
+      qrCode.notes?.orderId !== order.orderId ||
+      qrCode.notes?.agentId !== req.user.agentId
     ) {
       return res.status(403).json({
         success: false,
@@ -2818,12 +2949,9 @@ export const verifyDueQrPayment = async (req, res) => {
       });
     }
 
-    const payments = await razorpayInstance.qrCode.fetchAllPayments(qrCodeId);
-    const paymentIds = (payments.items || [])
-      .map((item) => item.id)
-      .filter(Boolean);
-
-    const amount = qrCode.payments_amount_received / 100;
+    const paymentIds = await capturedQrPayments(qrCode);
+    if (!paymentIds) return res.status(409).json({ success: false, message: "Razorpay has not confirmed this payment yet. Retry the same QR." });
+    const amount = qrCode.payment_amount / 100;
 
     /* 🔒 FIX: nothing stopped the same paid QR being applied repeatedly, and
        each time the order's paid amount grew again. It is now claimed first,
@@ -2839,6 +2967,8 @@ export const verifyDueQrPayment = async (req, res) => {
 
     if (!began.ok) return replyToGateway(req, res, began.record);
     claim = began.record;
+    await markGatewayPayment(claim, { razorpayPaymentIds: paymentIds });
+    claim.razorpayPaymentIds = paymentIds;
 
     // Recorded before QR codes were claimed like this
     const alreadyUsed = await Payment.findOne({ razorpayOrderId: qrCodeId });

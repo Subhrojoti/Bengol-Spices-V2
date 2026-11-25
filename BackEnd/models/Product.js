@@ -47,6 +47,8 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    packetsPerChain: Number,
+    pricingUnit: { type: String, enum: ["chain", "packet"] },
 
     /* =============================
        PRICING

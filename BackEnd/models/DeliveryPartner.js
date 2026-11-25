@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { revokedSessionField } from "../utils/sessionRevocation.js";
 
 const deliveryPartnerSchema = new mongoose.Schema(
   {
@@ -32,6 +33,7 @@ const deliveryPartnerSchema = new mongoose.Schema(
     // Logins issued before this moment are no longer accepted
     passwordChangedAt: Date,
     sessionVersion: { type: Number, default: 0 },
+    revokedSessions: revokedSessionField,
     // Serializes new assignments against permanent test-account cleanup.
     activityVersion: { type: Number, default: 0, select: false },
 

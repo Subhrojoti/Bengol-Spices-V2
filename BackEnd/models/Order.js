@@ -38,6 +38,7 @@ const orderSchema = new mongoose.Schema(
     clientRequestId: {
       type: String,
     },
+    clientRequestHash: { type: String, select: false },
     // Explicit opt-in for new drafts; legacy issued invoices are never edited.
     invoicePolicy: { type: String, enum: ["ON_CONFIRMATION"] },
     revision: { type: Number, default: 0 },
@@ -52,6 +53,8 @@ const orderSchema = new mongoose.Schema(
           type: mongoose.Schema.Types.ObjectId,
           ref: "Product",
         },
+        sku: String,
+        packetsPerChain: Number,
         name: {
           type: String,
           required: true,

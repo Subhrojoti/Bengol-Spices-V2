@@ -23,6 +23,7 @@ import usePagination from "../../../../hooks/usePagination";
 import EditProductDetails from "./EditProductDetails";
 import { getAllProducts, deleteProduct } from "../../../../api/services";
 import usePanelBasePath from "../../../../hooks/usePanelBasePath";
+import { imageThumbnail } from "../../../../utils/image";
 
 const LOW_STOCK = 10;
 
@@ -96,7 +97,7 @@ const GridSkeleton = () => (
 const ProductCard = ({ product, onView, onEdit, onDelete }) => {
   const [broken, setBroken] = useState(false);
   const discounted =
-    product.discountPrice && n(product.discountPrice) < n(product.price);
+    product.discountPrice != null && n(product.discountPrice) < n(product.price);
 
   return (
     <Card className="group flex flex-col overflow-hidden transition hover:border-slate-300 hover:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_16px_36px_-16px_rgba(15,23,42,0.25)]">
@@ -105,9 +106,10 @@ const ProductCard = ({ product, onView, onEdit, onDelete }) => {
         className="relative block aspect-square w-full overflow-hidden border-b border-slate-100 bg-white">
         {product.images?.front?.url && !broken ? (
           <img
-            src={product.images.front.url}
+            src={imageThumbnail(product.images.front.url, 512, "limit")}
             alt={product.name}
             loading="lazy"
+            decoding="async"
             onError={() => setBroken(true)}
             className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-[1.03]"
           />

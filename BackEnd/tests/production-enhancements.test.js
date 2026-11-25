@@ -42,6 +42,7 @@ import invoiceRoutes from "../routes/invoice.routes.js";
 import agentRoutes from "../routes/agent.routes.js";
 import employeeRoutes from "../routes/employee.routes.js";
 import productRoutes from "../routes/product.routes.js";
+import notificationRoutes from "../routes/notification.routes.js";
 import { applyAgent } from "../controllers/agent.controller.js";
 import { agentLogin } from "../controllers/auth.controller.js";
 import { applyDuePayment } from "../services/payment.service.js";
@@ -51,6 +52,7 @@ import { reapplyRejectedAgent } from "../services/agentApplication.service.js";
 import cloudinary from "../config/cloudinary.js";
 import { mediaAssetOf, assetIsReferenced } from "../services/mediaCleanup.service.js";
 import { createStore } from "../controllers/store.controller.js";
+import { createProduct, updateProduct } from "../controllers/product.controller.js";
 import { getLocationOverrides } from "../utils/pricing.js";
 import { guardPartnerAssignment } from "../services/deliveryPartnerActivity.service.js";
 import { eligibilityOf } from "../services/sales.service.js";
@@ -64,8 +66,13 @@ test("orders can start with zero advance without a fake payment; retries reserve
   const order = await Order.findOne({ orderId: placed.data.orderId }).lean();
   assert.equal(order.paidAmount, 0); assert.equal(order.dueAmount, 100); assert.equal(order.paymentStatus, "PENDING");
   assert.equal(await Payment.countDocuments(), 0); assert.equal(await Invoice.countDocuments(), 0); assert.equal((await Product.findById(p._id)).stock, 90);
+  await waitForStoreRelease(s.consumerId);
   const retry = await call("/agent/orders", token(a), "POST", body);
   assert.equal(retry.data.orderId, placed.data.orderId); assert.equal(retry.data.paymentVerification, null); assert.equal(await Order.countDocuments(), 1); assert.equal((await Product.findById(p._id)).stock, 90);
+  await waitForStoreRelease(s.consumerId);
+  const changed = await call("/agent/orders", token(a), "POST", { ...body, paidAmount: 10 });
+  assert.equal(changed.status, 409); assert.match(changed.data.message, /different cart/);
+  await waitForStoreRelease(s.consumerId);
   const paid = await applyDuePayment({ orderId: order.orderId, agentId: a.agentId, amount: 30, method: "CASH", clientRequestId: id() });
   assert.equal(paid.ok, true);
   const updated = await Order.findById(order._id).lean(); assert.equal(updated.paidAmount, 30); assert.equal(updated.dueAmount, 70); assert.equal(await Payment.countDocuments(), 1);
@@ -212,22 +219,6 @@ const rawOrder = async (code, store, agent, extra = {}) => {
   await Order.collection.insertOne(result); return result;
 };
 
-test("office dues group non-cancelled orders once, include archived/clear stores on request and expose no delivery codes", async () => {
-  const a = await person("DUES-A"), s = await shop("DUES-S", a, { storeName: "Store [one]", status: "INACTIVE" }), clear = await shop("DUES-CLEAR", a);
-  await rawOrder("DUES-1", s, a, { totalAmount: 100, paidAmount: 20, dueAmount: 80 });
-  await rawOrder("DUES-2", s, a, { totalAmount: 50, paidAmount: 0, dueAmount: 50 });
-  await rawOrder("DUES-CANCEL", s, a, { status: "CANCELLED", dueAmount: 999 });
-  await rawOrder("DUES-CLEAR-O", clear, a);
-  const list = await call("/admin/store-dues", admin()); assert.equal(list.status, 200, JSON.stringify(list.data));
-  assert.equal(list.data.total, 1); assert.equal(list.data.summary.dueAmount, 130); assert.equal(list.data.summary.pendingOrders, 2);
-  assert.equal(list.data.stores[0].billAmount, 150); assert.equal(list.data.stores[0].recordedAmount, 20); assert(!JSON.stringify(list.data).includes("deliveryCode"));
-  assert.equal((await call("/admin/store-dues?balance=ALL", admin())).data.total, 2);
-  assert.equal((await call("/admin/store-dues?q=%5Bone%5D", admin())).data.total, 1);
-  assert.equal((await call("/admin/store-dues?q=%2E%2A", admin())).data.total, 0);
-  const details = await call("/admin/store-dues/stores/DUES-S/orders", admin()); assert.equal(details.data.total, 2); assert(!JSON.stringify(details.data).includes("deliveryCode"));
-  for (const query of ["?page=0", "?page[]=1", "?balance=wrong", "?q[x]=y"]) assert.equal((await call(`/admin/store-dues${query}`, admin())).status, 400);
-});
-
 test("archived stores can be restored only with an active responsible agent and keep their order history", async () => {
   const a = await person("RESTORE-A");
   const store = await shop("RESTORE-S", a, { status: "INACTIVE", archivedAt: new Date(), image: { url: "https://test.invalid/store.jpg" } });
@@ -251,6 +242,111 @@ test("archived stores can be restored only with an active responsible agent and 
   assert.equal(restored.image.url, store.image.url);
   assert.equal(await Order.countDocuments({ consumerId: store.consumerId }), 1);
   assert(await AdminAudit.exists({ action: "RESTORE_STORE", outcome: "COMPLETED", requestId: valid.requestId }));
+});
+
+test("per-packet Chain rates convert once and checkout reserves whole chains at the server price", async () => {
+  const a = await person("CHAIN-A"), s = await shop("CHAIN-S", a);
+  const request = { body: {
+    name: "Chain spice", title: "Chain", category: "Spices", sku: "CHAIN-12", uom: "chain",
+    packetsPerChain: "12", pricingUnit: "packet", price: "5.50", discountPrice: "5", retailerPrice: "4.25", stock: "15", minOrderQty: "2",
+  }, user: { role: "ADMIN" }, files: {
+    frontImage: [{ filename: "front", path: "https://test.invalid/front" }], backImage: [{ filename: "back", path: "https://test.invalid/back" }],
+  } };
+  let status, result;
+  const res = { status(code) { status = code; return this; }, json(body) { result = body; return this; } };
+  await createProduct(request, res);
+  assert.equal(status, 201, JSON.stringify(result));
+  const p = await Product.findById(result.productId).lean();
+  assert.deepEqual([p.price, p.discountPrice, p.retailerPrice, p.wholesalerPrice], [66, 60, 51, null]);
+  const edit = body => {
+    status = 200;
+    return updateProduct({ body, params: { productId: String(p._id) }, user: request.user }, res);
+  };
+  await edit({ pricingUnit: "chain" });
+  assert.equal(status, 200);
+  assert.equal((await Product.findById(p._id)).price, 66);
+  await edit({ price: "66", packetsPerChain: "24", pricingUnit: "chain" });
+  assert.equal(status, 400);
+  await edit({ pricingUnit: "packet" });
+  assert.equal(result.success, true);
+  const catalogue = await call(`/agent/store/${s.consumerId}/products`, token(a));
+  assert.equal(catalogue.data.products[0].effectivePrice, 51);
+  assert.equal(catalogue.data.products[0].pricingUnit, "packet");
+  assert.equal(catalogue.data.products[0].packetsPerChain, 12);
+  const body = { consumerId: s.consumerId, paymentMode: "CASH", paidAmount: 0, products: [{ productId: String(p._id), name: p.name, uom: "chain", quantity: 2.5, unitPrice: 51 }] };
+  assert.equal((await call("/agent/orders", token(a), "POST", body)).status, 400);
+  await waitForStoreRelease(s.consumerId);
+  body.products[0].quantity = 2;
+  const placed = await call("/agent/orders", token(a), "POST", body);
+  assert.equal(placed.status, 201, JSON.stringify(placed.data));
+  const order = await Order.findOne({ orderId: placed.data.orderId }).lean();
+  assert.equal(order.totalAmount, 102);
+  assert.equal(order.products[0].packetsPerChain, 12);
+  assert.equal(order.products[0].sku, "CHAIN-12");
+  assert.equal((await Product.findById(p._id)).stock, 13);
+});
+
+test("delivery planning includes only the partner's assigned workload and subtracts returned quantities", async () => {
+  const a = await person("LOAD-A"), b = await person("LOAD-B"), s = await shop("LOAD-S", a);
+  const owner = await partner("LOAD-P"), other = await partner("LOAD-OTHER");
+  const line = { name: "Variant", sku: "VAR-12", quantity: 4, uom: "chain", packetsPerChain: 12, unitPrice: 25 };
+  await rawOrder("LOAD-RETURN", s, a, { status: "OUT_FOR_DELIVERY", products: [line, { name: "Legacy weighed spice", quantity: 1.5, uom: "kg", unitPrice: 20 }], delivery: { partnerId: owner._id } });
+  await rawOrder("LOAD-ASSIGNED", s, b, { status: "ASSIGNED", products: [line], delivery: { partnerId: owner._id } });
+  await rawOrder("LOAD-PRIVATE", s, b, { status: "ASSIGNED", products: [line], delivery: { partnerId: other._id } });
+  const auth = partnerToken(owner);
+  const path = "/returns/delivery/LOAD-RETURN/initiate";
+  for (const quantity of [1, 3]) {
+    const items = [{ lineIndex: 0, quantity }];
+    if (quantity === 3) items.push({ lineIndex: 1, quantity: 1.5 });
+    const result = await call(path, auth, "POST", { requestId: id(), reason: "Store refused goods", items });
+    assert.equal(result.status, 201, JSON.stringify(result.data));
+    await waitForStoreRelease(s.consumerId);
+    const plan = await call("/delivery-partner/orders?view=mobile-planning", auth);
+    assert.equal(plan.status, 200);
+    assert.deepEqual(plan.data.data.map(order => order.agentName).sort(), [a.name, b.name]);
+    assert.equal(plan.data.data.find(order => order.orderId === "LOAD-RETURN").products[0].remainingDeliveryQuantity, quantity === 1 ? 3 : 0);
+    assert(!JSON.stringify(plan.data).includes("unitPrice"));
+    assert(!JSON.stringify(plan.data).includes("LOAD-PRIVATE"));
+  }
+  const refused = await call("/agent/orders/LOAD-RETURN/delivery-status", auth, "PUT", { status: "DELIVERED", deliveryCode: s.deliveryCode });
+  assert.equal(refused.status, 409);
+  assert.match(refused.data.message, /All items/);
+  const order = await Order.findOne({ orderId: "LOAD-RETURN" }).lean();
+  assert.equal(order.status, "OUT_FOR_DELIVERY");
+  assert.equal(order.paidAmount, 100);
+  assert.equal(await Return.countDocuments({ orderId: order.orderId, status: "PICKED_UP" }), 2);
+  const detail = await call("/delivery-partner/orders?view=mobile-planning&orderId=LOAD-RETURN", auth);
+  assert.deepEqual(detail.data.data.map(item => item.orderId), ["LOAD-RETURN"]);
+  assert(detail.data.data[0].products.every(item => item.remainingDeliveryQuantity === 0));
+  assert.deepEqual((await call("/delivery-partner/orders?view=mobile-planning&orderId=LOAD-PRIVATE", auth)).data.data, []);
+  const pickup = await Return.findOne({ orderId: order.orderId });
+  const pickupUrl = `/returns/delivery/assigned?returnId=${pickup.returnId}`;
+  assert.deepEqual((await call(pickupUrl, auth)).data.data.map(item => item.returnId), [pickup.returnId]);
+  assert.deepEqual((await call(pickupUrl, partnerToken(other))).data.data, []);
+  await Return.updateOne({ _id: pickup._id }, { status: "COMPLETED" });
+  const history = await call(`/delivery-partner/history?returnId=${pickup.returnId}`, auth);
+  assert.deepEqual(history.data.data.completedReturns.map(item => item.returnId), [pickup.returnId]);
+  assert.deepEqual(history.data.data.deliveredOrders, []);
+  await Order.updateOne({ orderId: "LOAD-ASSIGNED" }, { status: "DELIVERED" });
+  const delivered = await call("/delivery-partner/history?orderId=LOAD-ASSIGNED", auth);
+  assert.deepEqual(delivered.data.data.deliveredOrders.map(item => item.orderId), ["LOAD-ASSIGNED"]);
+  assert.deepEqual(delivered.data.data.completedReturns, []);
+});
+
+test("office dues group non-cancelled orders once, include archived/clear stores on request and expose no delivery codes", async () => {
+  const a = await person("DUES-A"), s = await shop("DUES-S", a, { storeName: "Store [one]", status: "INACTIVE" }), clear = await shop("DUES-CLEAR", a);
+  await rawOrder("DUES-1", s, a, { totalAmount: 100, paidAmount: 20, dueAmount: 80 });
+  await rawOrder("DUES-2", s, a, { totalAmount: 50, paidAmount: 0, dueAmount: 50 });
+  await rawOrder("DUES-CANCEL", s, a, { status: "CANCELLED", dueAmount: 999 });
+  await rawOrder("DUES-CLEAR-O", clear, a);
+  const list = await call("/admin/store-dues", admin()); assert.equal(list.status, 200, JSON.stringify(list.data));
+  assert.equal(list.data.total, 1); assert.equal(list.data.summary.dueAmount, 130); assert.equal(list.data.summary.pendingOrders, 2);
+  assert.equal(list.data.stores[0].billAmount, 150); assert.equal(list.data.stores[0].recordedAmount, 20); assert(!JSON.stringify(list.data).includes("deliveryCode"));
+  assert.equal((await call("/admin/store-dues?balance=ALL", admin())).data.total, 2);
+  assert.equal((await call("/admin/store-dues?q=%5Bone%5D", admin())).data.total, 1);
+  assert.equal((await call("/admin/store-dues?q=%2E%2A", admin())).data.total, 0);
+  const details = await call("/admin/store-dues/stores/DUES-S/orders", admin()); assert.equal(details.data.total, 2); assert(!JSON.stringify(details.data).includes("deliveryCode"));
+  for (const query of ["?page=0", "?page[]=1", "?balance=wrong", "?q[x]=y"]) assert.equal((await call(`/admin/store-dues${query}`, admin())).status, 400);
 });
 
 test("office history pages only the rows while retaining totals across every receipt", async () => {
@@ -377,9 +473,11 @@ test("delegated employees can use Admin workflows, while employee administration
   assert.equal((await call(`/admin/agents/${a.agentId}/access`, auth, "POST", { action: "BLOCK", reason: "Delegated review", requestId: id() })).status, 200);
   assert.equal((await AdminAudit.findOne({ action: "AGENT_ACCESS" }).lean()).actor.role, "EMPLOYEE");
   const saved = await call("/admin/dispatch-mappings", auth, "PUT", { agentId: a.agentId, partnerId: String(p._id), enabled: true });
+  assert.equal(saved.status, 400);
+  assert.equal(await DispatchMapping.countDocuments(), 0);
   // Blocked agents cannot be mapped; restore before the mapping operation.
   assert.equal((await call(`/admin/agents/${a.agentId}/access`, auth, "POST", { action: "REACTIVATE", reason: "Reviewed", requestId: id() })).status, 200);
-  const mapped = saved.status === 200 ? saved : await call("/admin/dispatch-mappings", auth, "PUT", { agentId: a.agentId, partnerId: String(p._id), enabled: true });
+  const mapped = await call("/admin/dispatch-mappings", auth, "PUT", { agentId: a.agentId, partnerId: String(p._id), enabled: true });
   assert.equal(mapped.status, 200);
   assert.equal((await call(`/admin/dispatch-mappings/${a.agentId}`, auth, "DELETE", { partnerId: String(p._id), updatedAt: mapped.data.mapping.updatedAt })).status, 200);
   assert.equal((await call("/admin/delivery/settings", auth, "PUT", { radiusMetres: 100, blockFarDeliveries: false })).status, 200);
@@ -716,6 +814,87 @@ test("paged workspace substantially reduces order payload versus the unchanged f
   console.log("ORDER_WORKSPACE_MEASUREMENT", JSON.stringify({ fixtureOrders: 1000, before, after, note: "Isolated fixture measurement; not production latency" }));
 });
 
+test("Agent mobile order lists lower payload without leaking other stores or changing existing history", async () => {
+  const agent = await person("MOBILE-A");
+  const outsider = await person("MOBILE-B");
+  const store = await shop("MOBILE-S", agent);
+  const privateStore = await shop("PRIVATE-S", outsider);
+  const sample = await rawOrder("MOBILE-0", store, agent, {
+    products: Array.from({ length: 4 }, (_, index) => ({
+      name: `Spice ${index + 1}`, uom: "packet", quantity: 10, unitPrice: 2.5, totalPrice: 25, image: "https://test.invalid/product.jpg",
+    })),
+    statusHistory: [{ status: "CONFIRMED", changedAt: new Date(), changedBy: { id: "staff", role: "ADMIN" } }],
+  });
+  await Order.collection.insertMany(Array.from({ length: 999 }, (_, index) => ({
+    ...sample, _id: new mongoose.Types.ObjectId(), orderId: `MOBILE-${index + 1}`,
+    ...(index % 2 === 0 && { paidAmount: 10, dueAmount: 90 }),
+    ...(index === 1 && { status: "CANCELLED" }),
+  })));
+  await rawOrder("PRIVATE-O", privateStore, outsider);
+  await Payment.create({ orderId: sample.orderId, consumerId: store.consumerId, agentId: agent.agentId, amount: 30, method: "CASH", verification: { status: "PENDING" } });
+
+  const auth = token(agent);
+  const history = await call("/agent/orders/my-orders", auth);
+  const completed = await call("/agent/orders/my-orders?view=mobile-completed", auth);
+  const due = await call("/agent/orders/due-orders?view=mobile", auth);
+  const legacyStore = await call(`/agent/orders/store/${store.consumerId}`, auth);
+  const mobileStore = await call(`/agent/orders/store/${store.consumerId}?view=mobile`, auth);
+  for (const result of [history, completed, due, legacyStore, mobileStore]) assert.equal(result.status, 200);
+  assert.equal(history.data.orders.length, 1000);
+  assert.equal(completed.data.orders.length, 499);
+  assert.equal(due.data.data.length, 500);
+  assert.equal(mobileStore.data.orders.length, 1000);
+  const listed = completed.data.orders.find(order => order.orderId === sample.orderId);
+  assert.deepEqual(listed.products[0], { name: "Spice 1", image: "https://test.invalid/product.jpg" });
+  assert.equal(listed.cashVerification.pending, 30);
+  assert.equal(listed.deliveryAddress.phone, undefined);
+  assert.equal(listed.statusHistory, undefined);
+  assert.equal((await call(`/agent/orders/mine/${sample.orderId}`, auth)).data.order.statusHistory.length, 1);
+  assert.equal((await call("/agent/orders/mine/PRIVATE-O", auth)).status, 404);
+  await Return.collection.insertMany([
+    { returnId: "EARLIER", orderId: sample.orderId, consumerId: store.consumerId, createdAt: new Date(1) },
+    { returnId: "LATEST", orderId: sample.orderId, consumerId: store.consumerId, createdAt: new Date(2) },
+    { returnId: "PRIVATE", orderId: "PRIVATE-O", consumerId: privateStore.consumerId, createdAt: new Date() },
+  ]);
+  const returnHistory = await call(`/returns/my-returns?orderId=${sample.orderId}`, auth);
+  assert.deepEqual(returnHistory.data.data.map(row => row.returnId), ["LATEST"]);
+  assert.deepEqual((await call("/returns/my-returns?orderId=PRIVATE-O", auth)).data.data, []);
+  assert.equal((await call("/returns/my-returns", auth)).data.count, 2);
+
+  const bytes = result => Buffer.byteLength(JSON.stringify(result.data));
+  const measurement = { history: [bytes(history), bytes(completed)], store: [bytes(legacyStore), bytes(mobileStore)] };
+  assert(measurement.history[1] < measurement.history[0] / 2);
+  assert(measurement.store[1] < measurement.store[0] / 2);
+  console.log("AGENT_ORDER_PAYLOAD_BYTES", JSON.stringify(measurement));
+});
+
+test("Agent compact profile and unread summary only return requested personal data", async () => {
+  const agent = await person("MOBILE-A", { bankDetails: { accountNumber: "1234" }, applicationHistory: [{ version: 1 }] });
+  const outsider = await person("MOBILE-B");
+  const auth = token(agent);
+  const legacy = await call("/agent/profile", auth);
+  const mobile = await call("/agent/profile?view=mobile", auth);
+  assert.equal(legacy.data.agent.documents.aadhaar, "a");
+  assert.equal(mobile.data.agent._id, String(agent._id));
+  assert.deepEqual(mobile.data.agent.documents, { photo: "photo" });
+  assert.equal(mobile.data.agent.bankDetails, undefined);
+  assert.equal(mobile.data.agent.applicationHistory, undefined);
+  await Notification.collection.insertMany([
+    ...Array.from({ length: 301 }, (_, index) => ({
+      recipientId: agent._id, recipientModel: "Agent", title: "Fixture", message: "Example notification",
+      isRead: index % 2 === 0 && index !== 0, createdAt: new Date(1_000 + index),
+    })),
+    { recipientId: outsider._id, recipientModel: "Agent", title: "Private", message: "Another agent", isRead: false, createdAt: new Date() },
+  ]);
+  const notifications = await call("/api/notifications", auth);
+  const unread = await call("/api/notifications?view=unread", auth);
+  assert.equal(notifications.data.length, 300);
+  assert.equal(notifications.data.filter(item => !item.isRead).length, 150);
+  assert.deepEqual(unread.data, { unreadCount: 150 });
+  console.log("AGENT_NOTIFICATION_PAYLOAD_BYTES", Buffer.byteLength(JSON.stringify(notifications.data)), Buffer.byteLength(JSON.stringify(unread.data)));
+  assert.equal((await call("/agent/dashboard?from=1900-01-01&to=2100-01-01", auth)).status, 400);
+});
+
 before(async () => {
   // No PDF upload in this suite may reach the real file service.
   cloudinary.uploader.upload_stream = (options, callback) => new Writable({ write(chunk, encoding, done) { done(); }, final(done) { callback(null, { secure_url: "https://example.invalid/synthetic-invoice.pdf" }); done(); } });
@@ -726,6 +905,7 @@ before(async () => {
   app.use("/admin", adminRoutes); app.use("/agent/orders", orderRoutes); app.use("/agent/store", storeRoutes);
   app.use("/returns", returnRoutes); app.use("/api/invoice", invoiceRoutes); app.use("/agent", agentRoutes);
   app.use("/delivery-partner", deliveryRoutes); app.use("/employee", employeeRoutes); app.use("/products", productRoutes);
+  app.use("/api/notifications", notificationRoutes);
   app.use((err, req, res, next) => res.status(err.status || 500).json({ success: false, message: err.message }));
   server = app.listen(0, "127.0.0.1"); await new Promise((resolve) => server.once("listening", resolve));
   origin = `http://127.0.0.1:${server.address().port}`;
@@ -861,13 +1041,15 @@ test("gateway replay and QR polling cannot disclose a transferred order to its f
   const payments = razorpayInstance.payments, qr = razorpayInstance.qrCode;
   const fetchPayment = payments.fetch, fetchQr = qr.fetch;
   try {
-    payments.fetch = async () => ({ order_id: "order_synthetic", status: "captured", amount: 1000 });
+    let gatewayReads = 0;
+    payments.fetch = async () => { gatewayReads++; return { order_id: "order_synthetic", status: "captured", currency: "INR", amount: 1000 }; };
     qr.fetch = async () => ({ notes: { agentId: "A", orderId: "O" }, status: "closed", close_reason: "paid", payments_count_received: 1 });
     const body = { orderId: "O", razorpay_order_id: "order_synthetic", razorpay_payment_id: "pay_synthetic", razorpay_signature: crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update("order_synthetic|pay_synthetic").digest("hex") };
     assert.equal((await call("/agent/orders/razorpay/verify", token(a), "POST", body)).status, 404);
     assert.equal((await call("/agent/orders/razorpay/verify", token(b), "POST", body)).data.alreadyProcessed, true);
     const initial = { ...body, orderPayload: { consumerId: "FAKE" } };
     assert.equal((await call("/agent/orders/razorpay/verify-initial-payment", token(a), "POST", initial)).status, 404);
+    assert.equal(gatewayReads, 0);
     assert.equal((await call("/agent/orders/razorpay/qr-status/qr_synthetic", token(a))).status, 404);
     assert.equal(await Payment.countDocuments(), 0);
   } finally {
@@ -1012,15 +1194,78 @@ const partnerToken = p => jwt.sign({ id: String(p._id), role: "DELIVERY_PARTNER"
 
 const stubDeliveryQr = t => {
   process.env.RAZORPAY_KEY_ID ||= "rzp_test_synthetic"; process.env.RAZORPAY_KEY_SECRET ||= "synthetic";
-  let qr, created = 0, items = [], refunds = 0;
+  let qr, created = 0, items = [], refunds = 0, fetched = 0;
   t.mock.method(razorpayInstance.qrCode, "create", async fields => { created++; qr = { ...fields, id: `qr_DeliveryTest${created}`, image_url: "https://example.invalid/qr.png", status: "active", payments_amount_received: 0 }; return qr; });
-  t.mock.method(razorpayInstance.qrCode, "fetch", async value => { if (value !== qr?.id) throw Object.assign(new Error("Not found"), { statusCode: 404 }); return qr; });
+  t.mock.method(razorpayInstance.qrCode, "fetch", async value => { fetched++; if (value !== qr?.id) throw Object.assign(new Error("Not found"), { statusCode: 404 }); return qr; });
   t.mock.method(razorpayInstance.qrCode, "fetchAllPayments", async () => ({ items }));
   t.mock.method(razorpayInstance.qrCode, "close", async () => { qr.status = "closed"; qr.close_reason = "on_demand"; return qr; });
   t.mock.method(razorpayInstance.payments, "refund", async () => { refunds++; return { id: "rfnd_DeliveryTest" }; });
-  return { get qr() { return qr; }, get created() { return created; }, get refunds() { return refunds; },
+  return { get qr() { return qr; }, get created() { return created; }, get refunds() { return refunds; }, get fetched() { return fetched; },
     setItems: value => { items = value; }, paid: () => { qr.status = "closed"; qr.close_reason = "paid"; qr.payments_amount_received = qr.payment_amount; items = [{ id: "pay_DeliveryTest1", status: "captured", method: "upi", currency: "INR", amount: qr.payment_amount }]; } };
 };
+
+test("Agent due QR survives a lost reply and blocks conflicting collection until captured or closed", async t => {
+  const gateway = stubDeliveryQr(t), a = await person("AGENT-QR"), other = await person("OTHER-QR"), s = await shop("AGENT-QR-S", a), p = await partner("AGENT-QR-DP");
+  await rawOrder("AGENT-QR-O", s, a, { status: "ASSIGNED", paidAmount: 0, dueAmount: 100, delivery: { partnerId: p._id } });
+  const orderId = "AGENT-QR-O", auth = token(a), api = "/agent/orders/razorpay", recovery = `/agent/orders/mine/${orderId}/payment-qr`;
+  const start = () => call(`${api}/create-due-qr`, auth, "POST", { orderId, amount: 20 });
+  const created = await start(); assert.equal(created.status, 200); const qrCodeId = created.data.qrCodeId;
+  await waitForStoreRelease(s.consumerId);
+  const recovered = await call(recovery, auth);
+  assert.equal(recovered.data.qr.qrCodeId, qrCodeId);
+  assert.equal((await call(recovery, token(other))).status, 404);
+  assert.equal((await start()).data.reused, true); assert.equal(gateway.created, 1);
+  await waitForStoreRelease(s.consumerId);
+  const rejected = await call(`/delivery-partner/orders/${orderId}/payments`, partnerToken(p), "POST", { amount: 10, method: "CASH", clientRequestId: id() });
+  assert.equal(rejected.status, 409); assert.match(rejected.data.message, /unresolved online payment/);
+  await waitForStoreRelease(s.consumerId);
+  assert.equal((await call(`${api}/create`, auth, "POST", { orderId, amount: 10 })).status, 409);
+  await waitForStoreRelease(s.consumerId);
+
+  gateway.paid(); gateway.setItems([{ id: "pay_TestPending", status: "authorized", method: "upi", currency: "INR", amount: 2000 }]);
+  const verify = () => call(`${api}/verify-due-qr`, auth, "POST", { orderId, qrCodeId });
+  assert.equal((await verify()).status, 409);
+  assert.equal(await Payment.countDocuments(), 0);
+  await waitForStoreRelease(s.consumerId);
+  gateway.paid();
+  assert.equal((await verify()).status, 200);
+  await waitForStoreRelease(s.consumerId);
+  const fetched = gateway.fetched;
+  assert.equal((await verify()).status, 200); assert.equal(gateway.fetched, fetched);
+  assert.equal(await Payment.countDocuments(), 1);
+  assert.equal((await Order.findOne({ orderId })).dueAmount, 80);
+  assert.equal((await call(recovery, auth)).data.qr, null);
+  await waitForStoreRelease(s.consumerId);
+  const second = await start(); assert.equal(second.status, 200);
+  gateway.setItems([]);
+  await waitForStoreRelease(s.consumerId);
+  const closed = await call(`${recovery}/${second.data.qrCodeId}/close`, auth, "POST", {});
+  assert.equal(closed.data.closed, true); assert.equal(closed.data.paid, false);
+});
+
+test("Agent online collection waits for INR gateway capture before recording a receipt", async t => {
+  process.env.RAZORPAY_KEY_ID ||= "rzp_test_synthetic";
+  process.env.RAZORPAY_KEY_SECRET ||= "synthetic";
+  const agent = await person("CARD-A"), store = await shop("CARD-S", agent);
+  const orderId = "CARD-O", razorpayOrderId = "order_CardFixture", paymentId = "pay_CardFixture";
+  await rawOrder(orderId, store, agent, { paidAmount: 0, dueAmount: 100 });
+  let status = "authorized", currency = "INR";
+  t.mock.method(razorpayInstance.payments, "fetch", async () => ({ order_id: razorpayOrderId, status, currency, amount: 2000 }));
+  const signature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(`${razorpayOrderId}|${paymentId}`).digest("hex");
+  const verify = () => call("/agent/orders/razorpay/verify", token(agent), "POST", {
+    orderId, razorpay_order_id: razorpayOrderId, razorpay_payment_id: paymentId, razorpay_signature: signature,
+  });
+  assert.equal((await verify()).status, 409);
+  assert.equal(await Payment.countDocuments(), 0);
+  await waitForStoreRelease(store.consumerId);
+  status = "captured"; currency = "USD";
+  assert.equal((await verify()).status, 400);
+  await waitForStoreRelease(store.consumerId);
+  currency = "INR";
+  assert.equal((await verify()).status, 200);
+  assert.equal(await Payment.countDocuments(), 1);
+  assert.equal((await Order.findOne({ orderId })).dueAmount, 80);
+});
 
 test("delivery UPI QR is scoped, durable, reused and credits its original agent exactly once", async t => {
   const gateway = stubDeliveryQr(t), a = await person("QR-A"), s = await shop("QR-S", a), p = await partner("QR-DP"), other = await partner("QR-OTHER");
@@ -1037,14 +1282,51 @@ test("delivery UPI QR is scoped, durable, reused and credits its original agent 
   assert.equal((await call(url, auth, "POST", { amount: 10 })).data.reused, true); assert.equal(gateway.created, 1);
   const endpoint = `${url}/${created.data.qrCodeId}`;
   assert.equal((await call(endpoint, partnerToken(other))).status, 404);
+  assert.equal(gateway.fetched, 0);
   assert.equal((await call(endpoint + "/verify", auth, "POST", {})).status, 400);
   gateway.paid(); gateway.setItems([{ id: "pay_FailedTest1", status: "failed", amount: 2550 }, { id: "pay_DeliveryTest1", status: "captured", method: "upi", currency: "INR", amount: 2550 }]);
   assert.equal((await call(endpoint + "/verify", auth, "POST", { amount: 100, method: "CASH" })).status, 200);
   const payment = await Payment.findOne({ orderId: "QR-O" }).lean();
   assert.equal(payment.amount, 25.5); assert.equal(payment.agentId, a.agentId); assert.equal(payment.collectedBy.id, String(p._id)); assert.equal(payment.collectedBy.role, "DELIVERY_PARTNER"); assert.equal(payment.method, "RAZORPAY"); assert.equal(payment.verification, undefined);
   assert.equal((await call(endpoint + "/verify", auth, "POST", {})).status, 200); assert.equal(await Payment.countDocuments(), 1);
+  const fetched = gateway.fetched;
+  assert.equal((await call(endpoint, auth)).data.paid, true);
+  assert.equal(gateway.fetched, fetched);
   assert.equal((await Order.findOne({ orderId: "QR-O" })).dueAmount, 74.5);
   assert.equal((await call(url, auth)).data.qr, null); assert.equal((await GatewayPayment.findOne()).status, "APPLIED");
+});
+
+test("an open delivery QR blocks new offline receipts across clients and allows replay of already-recorded receipts", async t => {
+  const gateway = stubDeliveryQr(t), a = await person("QR-A"), s = await shop("QR-S", a), p = await partner("QR-DP"), nextPartner = await partner("NEXT-DP");
+  await rawOrder("QR-O", s, a, { status: "ASSIGNED", paidAmount: 0, dueAmount: 100, delivery: { partnerId: p._id } });
+  const url = "/delivery-partner/orders/QR-O", auth = partnerToken(p);
+  const recorded = { amount: 10, method: "CASH", clientRequestId: id() };
+  assert.equal((await call(`${url}/payments`, auth, "POST", recorded)).status, 200);
+  await waitForStoreRelease(s.consumerId);
+  const created = await call(`${url}/payment-qr`, auth, "POST", { amount: 25 });
+  assert.equal(created.status, 200);
+  await waitForStoreRelease(s.consumerId);
+  const replay = await call(`${url}/payments`, auth, "POST", recorded);
+  assert.equal(replay.status, 200); assert.equal(replay.data.replayed, true);
+  await waitForStoreRelease(s.consumerId);
+  const next = { amount: 15, method: "UPI", note: "Reference", clientRequestId: id() };
+  const blocked = await call(`${url}/payments`, auth, "POST", next);
+  assert.equal(blocked.status, 409); assert.match(blocked.data.message, /unresolved online payment/);
+  assert.equal(await Payment.countDocuments(), 1); assert.equal(gateway.created, 1);
+  gateway.setItems([{ status: "authorized" }]);
+  const close = await call(`${url}/payment-qr/${created.data.qrCodeId}/close`, auth, "POST", {});
+  assert.equal(close.data.paid, false); assert.equal(close.data.closed, false);
+  await GatewayPayment.updateOne({ qrCodeId: created.data.qrCodeId }, { qrCloseBy: 1 });
+  await Order.updateOne({ orderId: "QR-O" }, { "delivery.partnerId": nextPartner._id });
+  const nextAuth = partnerToken(nextPartner);
+  assert.equal((await call(`${url}/payment-qr`, nextAuth)).data.qr, null);
+  assert.equal((await GatewayPayment.findOne()).status, "QR_OPEN");
+  gateway.setItems([{ status: "failed" }]);
+  assert.equal((await call(`${url}/payment-qr`, nextAuth)).data.qr, null);
+  assert.equal((await GatewayPayment.findOne()).status, "QR_CLOSED");
+  await waitForStoreRelease(s.consumerId);
+  assert.equal((await call(`${url}/payments`, nextAuth, "POST", next)).status, 200);
+  assert.equal(await Payment.countDocuments(), 2);
 });
 
 test("delivery QR rejects wrong gateway evidence and offline clients cannot self-verify", async t => {
@@ -1420,6 +1702,9 @@ test("category minimums inherit the current floor and prevent undersized orders 
   assert.equal(small.status, 400); assert.match(small.data.message, /minimum order is 20/);
   assert.equal((await Product.findById(p._id)).stock, 100); assert.equal(await Payment.countDocuments(), 0);
   const catalog = await call("/agent/store/S/products", token(a)); assert.equal(catalog.data.products[0].minOrderQty, 20);
+  assert.deepEqual(catalog.data.products[0].minimumOrderQuantities, { RETAILER: 10, WHOLESALER: 20, DISTRIBUTOR: 10, HORECA: 10 });
+  const otherAgent = await person("OTHER");
+  assert.equal((await call("/agent/store/S/products", token(otherAgent))).status, 404);
 });
 
 test("new mobile checkout and QR validate cart minimums/prices before gateway creation and retain amount-only clients", async () => {

@@ -15,14 +15,21 @@ export const getMyNotifications = async (req, res) => {
     /* Admin has no account record, so no id and no notifications of its
        own. Said outright rather than left to how the database happens to
        treat a search for "no id". */
-    if (!req.user._id) return res.json([]);
+    const unreadOnly = req.query.view === "unread";
+    res.setHeader("Cache-Control", "no-store");
+    if (!req.user._id) return res.json(unreadOnly ? { unreadCount: 0 } : []);
 
-    const data = await Notification.find({
+    const query = Notification.find({
       recipientId: req.user._id,
     })
       .sort({ createdAt: -1 })
       .limit(NOTIFICATION_LIMIT);
 
+    if (unreadOnly) {
+      const flags = await query.select("isRead -_id").lean();
+      return res.json({ unreadCount: flags.filter(notification => !notification.isRead).length });
+    }
+    const data = await query;
     res.json(data);
   } catch (err) {
     console.error("GET NOTIFICATIONS ERROR:", err);

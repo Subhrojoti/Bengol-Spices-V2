@@ -49,7 +49,7 @@ const returnSchema = new mongoose.Schema(
       orderLineId: String,
       productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
       name: { type: String, required: true },
-      quantity: { type: Number, required: true, min: 1 },
+      quantity: { type: Number, required: true, min: Number.MIN_VALUE },
       uom: { type: String, required: true },
       image: String,
       unitPrice: Number,

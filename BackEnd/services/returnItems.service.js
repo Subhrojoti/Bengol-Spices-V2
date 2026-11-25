@@ -10,13 +10,22 @@ export const goodsOnly = item => ({
 // warehouse receipt does not make the same goods returnable a second time.
 export const availableReturnItems = async (order, session = null) => {
   const previous = await Return.find({ orderId: order.orderId, status: { $ne: "CANCELLED" } }).session(session).lean();
+  return remainingOrderItems(order, previous);
+};
+
+export const remainingOrderItems = (order, previous) => {
   const wholeOrderReturned = previous.some(entry => !entry.items?.length);
+  const reserved = new Map();
+  for (const entry of previous) {
+    for (const line of entry.items || []) {
+      reserved.set(line.lineIndex, (reserved.get(line.lineIndex) || 0) + line.quantity);
+    }
+  }
   return order.products.map((item, lineIndex) => {
-    const reserved = previous.reduce((total, entry) => total + (entry.items || []).filter(line => line.lineIndex === lineIndex).reduce((sum, line) => sum + line.quantity, 0), 0);
     return {
       ...goodsOnly({ ...item, lineIndex, orderLineId: item._id ? String(item._id) : undefined }),
       orderedQuantity: item.quantity,
-      remainingQuantity: wholeOrderReturned ? 0 : Math.max(0, item.quantity - reserved),
+      remainingQuantity: wholeOrderReturned ? 0 : Math.max(0, item.quantity - (reserved.get(lineIndex) || 0)),
     };
   });
 };
@@ -27,9 +36,15 @@ export const selectReturnItems = (order, available, requested) => {
   const wanted = legacy ? order.products.map((item, lineIndex) => ({ lineIndex, quantity: item.quantity })) : requested;
   const seen = new Set();
   return wanted.map(line => {
-    if (!line || !Number.isInteger(line.lineIndex) || line.lineIndex < 0 || !Number.isSafeInteger(line.quantity) || line.quantity < 1 || !available[line.lineIndex] || seen.has(line.lineIndex)) refuse("Select valid order items and whole quantities; do not repeat an item");
+    if (!line || !Number.isInteger(line.lineIndex) || line.lineIndex < 0 || !available[line.lineIndex] || seen.has(line.lineIndex)) refuse("Select valid order items; do not repeat an item");
     seen.add(line.lineIndex);
     const current = available[line.lineIndex], original = order.products[line.lineIndex];
+    // A legacy order measured by weight or volume can have a fractional
+    // remainder. It can be taken back in full, with its exact saved quantity.
+    const measuredRemainder = ["kg", "gm", "ltr"].includes(original.uom) && line.quantity === current.remainingQuantity;
+    if (!Number.isFinite(line.quantity) || line.quantity <= 0 || !Number.isSafeInteger(line.quantity) && !measuredRemainder) {
+      refuse("Select whole quantities or the full remaining weight or volume");
+    }
     if (line.orderLineId !== undefined && line.orderLineId !== current.orderLineId) refuse("The order items changed. Refresh before requesting a return.");
     if (line.quantity > current.remainingQuantity) refuse(`${original.name}: only ${current.remainingQuantity} ${original.uom} remain available to return`);
     return {

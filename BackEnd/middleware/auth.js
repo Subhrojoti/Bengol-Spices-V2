@@ -65,11 +65,9 @@ export const authenticatedUser = async (token) => {
   if (decoded.role === "ADMIN") return user;
   if (typeof decoded.id !== "string" || !/^[a-f0-9]{24}$/i.test(decoded.id)) reject("Invalid token");
   const account = ACCOUNTS[decoded.role];
-  const accountQuery = decoded.role === "EMPLOYEE"
-    ? account.model.findOne({ _id: decoded.id, "revokedSessions.digest": { $ne: sessionDigest(token) } })
-    : account.model.findById(decoded.id);
-  const record = await accountQuery.select(account.fields).lean();
-  if (!record) reject("Account not found. Please log in again.");
+  const filter = { _id: decoded.id, "revokedSessions.digest": { $ne: sessionDigest(token) } };
+  const record = await account.model.findOne(filter).select(account.fields).lean();
+  if (!record) reject("Session ended or account not found. Please log in again.");
   if (record.status !== account.activeStatus) reject("Your account is no longer active.");
   if (decoded.role === "AGENT" && !agentSessionMatches(record, decoded)) {
     reject("Your access has changed. Please contact the office or sign in again.");

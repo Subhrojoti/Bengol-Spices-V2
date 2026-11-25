@@ -23,6 +23,8 @@ import {
   verifyPaymentAndPlaceOrder,
   createInitialPaymentQr,
   createDuePaymentQr,
+  recoverAgentDueQr,
+  closeAgentDueQr,
   checkQrPaymentStatus,
   verifyQrAndPlaceOrder,
   verifyDueQrPayment,
@@ -49,6 +51,8 @@ router.get("/my-orders", protect, isAgent, getMyOrders);
 // One of the agent's own orders, without downloading the whole list
 router.get("/mine/:orderId", protect, isAgent, getMyOrder);
 router.get("/mine/:orderId/payments", protect, isAgent, getMobilePaymentHistory);
+router.get("/mine/:orderId/payment-qr", protect, isAgent, recoverAgentDueQr);
+router.post("/mine/:orderId/payment-qr/:qrCodeId/close", protect, isAgent, storeOperation(closeAgentDueQr));
 router.get("/mine/:orderId/edit", protect, isAgent, getOrderEditDetails);
 router.put("/mine/:orderId/edit", protect, isAgent, storeOperation(editPlacedOrder));
 router.get("/mine/:orderId/modifications", protect, isAgent, getOrderModifications);

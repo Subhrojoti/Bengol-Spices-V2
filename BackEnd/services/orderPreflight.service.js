@@ -17,13 +17,15 @@ export const preflightInitialPayment = async ({ agentId, payload, amount }) => {
     const productId = new mongoose.Types.ObjectId(item.productId).toString();
     const previous = lines.get(productId);
     if (previous && previous.price !== Number(item.unitPrice)) refuse("The same product has different prices. Refresh the cart.");
-    lines.set(productId, { quantity: (previous?.quantity || 0) + Number(item.quantity), price: Number(item.unitPrice) });
+    lines.set(productId, { quantity: (previous?.quantity || 0) + Number(item.quantity), price: Number(item.unitPrice),
+      whole: (previous?.whole ?? true) && Number.isSafeInteger(Number(item.quantity)) });
   }
   const [products, overrides] = await Promise.all([Product.find({ _id: { $in: [...lines.keys()] }, status: "ACTIVE" }).lean(), getLocationOverrides(agentId, store.address?.state)]);
   if (products.length !== lines.size) refuse("A product is no longer available. Refresh the cart.");
   let total = 0;
   for (const product of products) {
     const line = lines.get(String(product._id)), minimum = effectiveMinimum(product, store.storeType);
+    if (product.uom === "chain" && !line.whole) refuse(`${product.name}: order a whole number of chains.`);
     if (line.quantity < minimum) refuse(`${product.name}: minimum order is ${minimum} ${product.uom} for this store category.`);
     if (!Number.isFinite(product.stock) || line.quantity > product.stock) refuse(product.stock <= 0 ? `${product.name} is out of stock. Remove it from the cart or wait for restocking.` : `Not enough stock for ${product.name}. Refresh the cart.`);
     const { price } = effectivePrice(product, store.storeType, overrides.get(String(product._id)));

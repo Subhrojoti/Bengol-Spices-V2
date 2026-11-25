@@ -30,6 +30,7 @@ import {
 } from "react-simple-wysiwyg";
 import { createProduct, getAllProducts } from "../../../../api/services";
 import { UOM_OPTIONS } from "../../../../utils/uom";
+import { chainErrors } from "../../../../utils/chainPricing";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png"];
@@ -55,6 +56,8 @@ const EMPTY = {
   category: "",
   sku: "",
   uom: "",
+  packetsPerChain: "",
+  pricingUnit: "chain",
   price: "",
   discountPrice: "",
   gstPercentage: "",
@@ -241,7 +244,7 @@ export default function ProductCreation() {
       found.minOrderQty = "Minimum order quantity must be at least 1";
     }
 
-    return { ...found, ...categoryMinimumErrors(form) };
+    return { ...found, ...categoryMinimumErrors(form), ...chainErrors(form) };
   }, [form]);
 
   const missingImages = [
@@ -297,6 +300,7 @@ export default function ProductCreation() {
     /* Optional fields are omitted rather than sent blank, so the server
        stores them as unset instead of coercing "" into a number. */
     Object.entries(form).forEach(([key, value]) => {
+      if (form.uom !== "chain" && ["packetsPerChain", "pricingUnit"].includes(key)) return;
       const text = String(value ?? "").trim();
       if (text !== "") data.append(key, text);
     });
@@ -431,6 +435,7 @@ export default function ProductCreation() {
                 error={show("uom")}
                 hint={form.uom === "packet" ? "prices are per packet" : undefined}>
                 <select
+                  aria-label="Unit of measure"
                   value={form.uom}
                   onChange={set("uom")}
                   className={inputClass(show("uom"))}>
@@ -442,6 +447,9 @@ export default function ProductCreation() {
                   ))}
                 </select>
               </Field>
+              {form.uom === "chain" && <Field label="Packets per chain" required error={show("packetsPerChain")}>
+                <input aria-label="Packets per chain" type="number" min="1" step="1" value={form.packetsPerChain} onChange={set("packetsPerChain")} className={inputClass(show("packetsPerChain"))} />
+              </Field>}
             </div>
           </Section>
 
@@ -449,6 +457,13 @@ export default function ProductCreation() {
             title="Pricing & Inventory"
             subtitle="Base price, tax and what is in stock."
             icon={<Box size={17} />}>
+            {form.uom === "chain" && <div className="mb-4 max-w-sm">
+              <Field label="Enter prices per" error={show("pricingUnit")} hint="Applies to base, discount and store-tier prices. Stock and minimum quantities are in whole chains.">
+                <select aria-label="Enter prices per" value={form.pricingUnit} onChange={set("pricingUnit")} className={inputClass(show("pricingUnit"))}>
+                  <option value="chain">Chain</option><option value="packet">Packet</option>
+                </select>
+              </Field>
+            </div>}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Price" required error={show("price")}>
                 <input aria-label="Price"
@@ -662,7 +677,7 @@ export default function ProductCreation() {
                     )}
                     {form.uom && (
                       <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[12px] font-medium text-slate-600">
-                        per {form.uom}
+                        per {form.uom === "chain" ? form.pricingUnit : form.uom}
                       </span>
                     )}
                     {form.sku && (

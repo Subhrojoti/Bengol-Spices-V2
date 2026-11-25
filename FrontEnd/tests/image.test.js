@@ -33,3 +33,9 @@ test("thumbnail sizing stays bounded and supports the legacy versionless upload 
   assert.match(imageThumbnail(source, -10), /h_48,w_48/);
   assert.match(imageThumbnail(source, 96), /h_96,w_96/);
 });
+
+test("catalogue previews bound image dimensions without cropping product packaging", () => {
+  const url = "https://res.cloudinary.com/example/image/upload/v123/product.jpg";
+  assert.match(imageThumbnail(url, 512, "limit"), /c_limit,h_512,w_512\/f_auto\/q_auto/);
+  assert.equal(imageThumbnail(url + "?signature=example", 512, "limit"), url + "?signature=example");
+});

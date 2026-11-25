@@ -37,7 +37,7 @@ export const getMySalesCoverage = async (req, res) => {
 };
 // The same fields the public catalogue exposes
 const CATALOGUE_FIELDS =
-  "name title description category uom price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage stock minOrderQty retailerMinOrderQty wholesalerMinOrderQty distributorMinOrderQty horecaMinOrderQty";
+  "name title description category uom packetsPerChain pricingUnit price discountPrice retailerPrice wholesalerPrice distributorPrice horecaPrice images gstPercentage stock minOrderQty retailerMinOrderQty wholesalerMinOrderQty distributorMinOrderQty horecaMinOrderQty";
 
 /**
  * THE CATALOGUE AS ONE STORE SEES IT (Agent, own store only)
@@ -89,6 +89,11 @@ export const getStoreCatalog = async (req, res) => {
       return {
         ...product,
         ...tierPrices,
+        // Compute from the original product floor before replacing minOrderQty
+        // with this store's minimum for compatibility with existing clients.
+        minimumOrderQuantities: Object.fromEntries(
+          STORE_TYPES.map(type => [type, effectiveMinimum(product, type)]),
+        ),
         minOrderQty: effectiveMinimum(product, store.storeType),
         effectivePrice: price,
         priceSource: source,
@@ -347,6 +352,17 @@ export const getMyStores = async (req, res) => {
         success: false,
         message: "Agent identity missing in token",
       });
+    }
+
+    if (req.query.view === "registration-check") {
+      const phone = req.query.phone;
+      if (typeof phone !== "string" || !/^\d{10}$/.test(phone)) {
+        return res.status(400).json({ success: false, message: "Enter a valid store phone number" });
+      }
+      res.setHeader("Cache-Control", "no-store");
+      const stores = await Store.find({ ...managedStoreFilter(agentId), registeredBy: agentId, phone })
+        .select("storeName phone").limit(10).lean();
+      return res.json({ success: true, count: stores.length, stores });
     }
 
     const stores = await Store.find(managedStoreFilter(agentId)).sort({
