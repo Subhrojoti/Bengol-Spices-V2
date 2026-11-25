@@ -5,13 +5,18 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Admin review (25 November 2026, release preparation):** paginated/searchable
-delivery mappings, blocked-agent mapping enforcement, bounded catalogue images,
-zero-discount display correction and Chain packet specifications. Backend
-136/136 and frontend 19/19 unit checks passed; full browser verification and
-deployment evidence will be recorded in the release note. This candidate also
-contains the pending compatible backend/Chain work described below. Mobile
-source/builds remain separate. [Review and measured performance](BackEnd/docs/ADMIN_REVIEW_2026-11-25.md).
+**Production Admin/backend release (25 November 2026):** application `8ae7193`
+pushed and deployed. Paginated/searchable delivery mappings, blocked-agent
+mapping enforcement, bounded catalogue images, zero-discount display correction
+and Chain packet specifications are live. This release also deploys the pending
+compatible backend/Chain work described below, including category-minimum API
+data and mobile session/payment safeguards. Earlier local-only descriptions
+remain historical; mobile UI source/builds are still separate and pending.
+184 browser, 136 backend and 19 frontend unit tests passed, as did lint/build
+and zero-advisory dependency audits. All deployed hashes, health/configuration
+and read-only office smoke checks passed; no business record was changed for
+verification. [Review and measurements](BackEnd/docs/ADMIN_REVIEW_2026-11-25.md).
+[Release evidence and rollback](deploy/releases/2026-11-25-admin-review.md).
 
 **Agent category comparison (25 November 2026, local):** Agent mobile product
 details now compare Retailer, Wholesaler, Distributor and HoReCa prices and
