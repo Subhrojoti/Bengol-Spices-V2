@@ -5,7 +5,8 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Leaderboard correction (25 November 2026, local only):** Agent mobile now
+**Leaderboard correction (25 November 2026):** `d0996d2` pushed; backend deployed
+and verified on the VPS. Agent mobile source now
 switches between incentive earned and product sales over the existing rolling
 30-day period. Earned amounts come from completed `EARNING` ledger entries
 (including monthly incentives), at credit time; payouts and pending earnings
@@ -20,13 +21,20 @@ share one 30-second period snapshot across both metrics; personalized results
 are assembled per authenticated request and use `Cache-Control: no-store`.
 Date-only API filters use Indian calendar boundaries; timestamps stay exact.
 See `BackEnd/tests/leaderboard.test.js` and
-`agent-app/tests/leaderboard.test.cjs`. Backend deployment and an Agent mobile
-release are required; no production data or incentive-earning rules changed.
+`agent-app/tests/leaderboard.test.cjs`. A new Agent mobile release is still
+required for the selector; no incentive-earning rules changed.
 Validation: 140 backend tests, 58 Agent tests, Agent TypeScript check and Android
 production bundle export passed. Component tests exercise both ranking modes,
-personal ranks below tenth place and loading/error states. No real-device or
-live-database verification was performed for this change. One existing product
+personal ranks below tenth place and loading/error states. The exact selectively
+staged Agent source also passed TypeScript and its three leaderboard tests;
+the exact backend passed all seven focused database tests. Read-only live-data
+checks matched both rankings to independent totals for 12 eligible agents.
+All 197 deployed backend files matched; API/database health, unauthorized
+request rejection and Admin availability passed. Settings and the unrelated HR
+process were unchanged. No real-device check was performed. One existing product
 preview test mock was updated for its already-added pricing/quantity helpers.
+That unrelated mobile test adjustment remains local alongside the other pending
+mobile work. [Deployment and rollback](deploy/releases/2026-11-25-leaderboard.md).
 
 **Production Admin/backend release (25 November 2026):** application `8ae7193`
 pushed and deployed. Paginated/searchable delivery mappings, blocked-agent
