@@ -5,7 +5,7 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
-**Editable chain size (26 November 2026, local):** All Products > Edit >
+**Editable chain size (deployed 26 November 2026, commit 8017a34):** All Products > Edit >
 Classification now provides a numeric Packets per chain field for existing
 Chain products. Product updates accept a changed positive integer size with
 `previousPacketsPerChain` as a stale-form check. Changes are transactional and
@@ -17,8 +17,9 @@ are not rewritten. Stock and minimums remain counts of chains; Admin must check
 physical packing. Per-chain input prices stay unchanged unless edited; per-packet
 input prices are submitted against the new size and converted once by the server.
 Unit conversion to/from Chain still requires a separate SKU. Existing clients'
-request formats remain supported. Requires an Admin/backend release, not an app
-rebuild. Not deployed. Regression coverage: backend chain-size/checkout tests and
+request formats remain supported. Released to the Admin website and backend. The isolated release passed
+142 backend tests and three browser checks. Live verification matched all 197 API
+files and 222 website files and confirmed database and portal availability. Regression coverage: backend chain-size/checkout tests and
 `FrontEnd/tests/browser/chain-size.spec.mjs`. Validation: all 145 backend tests,
 9 targeted Admin browser tests, Admin lint and SPA build passed. Browser checks
 also exposed and fixed narrow-screen edit-footer overflow; desktop layout stays
