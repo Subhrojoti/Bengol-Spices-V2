@@ -15,7 +15,8 @@ export function readChainProduct(body, product) {
   }
   const packetsPerChain = numberOf(body.packetsPerChain ?? product?.packetsPerChain);
   if (!Number.isSafeInteger(packetsPerChain) || packetsPerChain < 1) throw new Error("Enter a whole number of packets per chain.");
-  if (product && packetsPerChain !== product.packetsPerChain) throw new Error("Create a separate SKU to change the number of packets per chain.");
+  // Pack-size edits are checked against unfinished orders transactionally by
+  // updateProduct. Existing order lines retain their own pack-size snapshot.
 
   const pricingUnit = body.pricingUnit ?? product?.pricingUnit ?? "chain";
   if (pricingUnit !== "chain" && pricingUnit !== "packet") throw new Error("Choose a price per chain or per packet.");

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import cloudinary from "../config/cloudinary.js";
 import { UNITS, isKnownUnit, normalizeUnit } from "../utils/uom.js";
@@ -249,110 +250,132 @@ export const updateProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findById(productId);
-    if (!product) {
-      throw new Error("Product not found");
-    }
-
-    const chainFields = readChainProduct(req.body, product);
-
-    // FRONT IMAGE UPDATE
-    if (req.files?.frontImage) {
-      newFrontId = req.files.frontImage[0].filename;
-      oldFrontId = product.images.front.publicId;
-      product.images.front = {
-        url: req.files.frontImage[0].path,
-        publicId: newFrontId,
-      };
-    }
-
-    // BACK IMAGE UPDATE
-    if (req.files?.backImage) {
-      newBackId = req.files.backImage[0].filename;
-      oldBackId = product.images.back.publicId;
-      product.images.back = {
-        url: req.files.backImage[0].path,
-        publicId: newBackId,
-      };
-    }
-
-    // Update all scalar fields dynamically
-    // ✅ Tiered pricing fields (retailerPrice, wholesalerPrice, distributorPrice)
-    //    are handled naturally here since they're in req.body
-    //    We just make sure to parse them as Numbers since multipart sends strings
-    const numericFields = [
-      "price",
-      "discountPrice",
-      "retailerPrice",
-      "wholesalerPrice",
-      "distributorPrice",
-      "horecaPrice",
-      "gstPercentage",
-      "stock",
-      "minOrderQty",
-    ];
-
-    /* 🔥 FIX: stock sent with an edit was written as an absolute number. The
-       edit form sends the stock it showed when it was opened, so saving any
-       change (a new description, a price) put back units that orders had
-       taken in the meantime, and those units were sold twice. When the form
-       also sends previousStock, the difference is applied to the current
-       stock instead, and an unchanged stock is left alone. */
-    let stockAdjustment = null;
-
-    if (req.body.stock !== undefined && req.body.previousStock !== undefined) {
-      const next = Number(req.body.stock);
-      const previous = Number(req.body.previousStock);
-
-      if (!Number.isFinite(next) || !Number.isFinite(previous) || next < 0) {
-        throw new Error("Stock must be a number of 0 or more");
+    const persist = async (session = null) => {
+      const product = await Product.findById(productId).session(session);
+      if (!product) {
+        throw new Error("Product not found");
       }
 
-      stockAdjustment = next - previous;
-    }
-
-    EDITABLE_FIELDS.forEach((key) => {
-      if (req.body[key] === undefined) return;
-      if (key === "stock" && stockAdjustment !== null) return; // applied below
-
-      if (numericFields.includes(key)) {
-        // ✅ Safely parse numeric fields — avoids string storage from multipart
-        product[key] = req.body[key] !== "" ? Number(req.body[key]) : null;
-      } else if (key === "description") {
-        product.description = sanitizeDescription(req.body.description);
-      } else if (key === "uom") {
-        /* A product saved long ago with some other unit can still be edited
-           without touching it; only a change has to be a known unit. */
-        const unit = normalizeUnit(req.body.uom);
-        if (unit !== normalizeUnit(product.uom)) product.uom = readUnit(unit);
-      } else {
-        product[key] = req.body[key];
+      const chainFields = readChainProduct(req.body, product);
+      if (req.body.previousPacketsPerChain !== undefined && Number(req.body.previousPacketsPerChain) !== product.packetsPerChain) {
+        throw new Error("The chain size changed. Refresh the product and try again.");
       }
-    });
+      if (product.uom === "chain" && chainFields.packetsPerChain !== product.packetsPerChain) {
+        if (req.body.previousPacketsPerChain === undefined || Number(req.body.previousPacketsPerChain) !== product.packetsPerChain) {
+          throw new Error("The chain size changed or needs confirmation. Refresh the product and try again.");
+        }
+        const unfinished = await Order.exists({
+          status: { $nin: ["DELIVERED", "CANCELLED"] },
+          "products.productId": product._id,
+        }).session(session);
+        if (unfinished) throw new Error("Finish or cancel all unfinished orders containing this product before changing packets per chain. You can create a separate SKU for a different pack size needed now.");
+      }
 
-    if (req.body.certificates) {
-      product.certificates = req.body.certificates.split(",");
+      // FRONT IMAGE UPDATE
+      if (req.files?.frontImage) {
+        newFrontId = req.files.frontImage[0].filename;
+        oldFrontId = product.images.front.publicId;
+        product.images.front = {
+          url: req.files.frontImage[0].path,
+          publicId: newFrontId,
+        };
+      }
+
+      // BACK IMAGE UPDATE
+      if (req.files?.backImage) {
+        newBackId = req.files.backImage[0].filename;
+        oldBackId = product.images.back.publicId;
+        product.images.back = {
+          url: req.files.backImage[0].path,
+          publicId: newBackId,
+        };
+      }
+
+      // Update all scalar fields dynamically
+      // ✅ Tiered pricing fields (retailerPrice, wholesalerPrice, distributorPrice)
+      //    are handled naturally here since they're in req.body
+      //    We just make sure to parse them as Numbers since multipart sends strings
+      const numericFields = [
+        "price",
+        "discountPrice",
+        "retailerPrice",
+        "wholesalerPrice",
+        "distributorPrice",
+        "horecaPrice",
+        "gstPercentage",
+        "stock",
+        "minOrderQty",
+      ];
+
+      /* 🔥 FIX: stock sent with an edit was written as an absolute number. The
+         edit form sends the stock it showed when it was opened, so saving any
+         change (a new description, a price) put back units that orders had
+         taken in the meantime, and those units were sold twice. When the form
+         also sends previousStock, the difference is applied to the current
+         stock instead, and an unchanged stock is left alone. */
+      let stockAdjustment = null;
+
+      if (req.body.stock !== undefined && req.body.previousStock !== undefined) {
+        const next = Number(req.body.stock);
+        const previous = Number(req.body.previousStock);
+
+        if (!Number.isFinite(next) || !Number.isFinite(previous) || next < 0) {
+          throw new Error("Stock must be a number of 0 or more");
+        }
+
+        stockAdjustment = next - previous;
+      }
+
+      EDITABLE_FIELDS.forEach((key) => {
+        if (req.body[key] === undefined) return;
+        if (key === "stock" && stockAdjustment !== null) return; // applied below
+
+        if (numericFields.includes(key)) {
+          // ✅ Safely parse numeric fields — avoids string storage from multipart
+          product[key] = req.body[key] !== "" ? Number(req.body[key]) : null;
+        } else if (key === "description") {
+          product.description = sanitizeDescription(req.body.description);
+        } else if (key === "uom") {
+          /* A product saved long ago with some other unit can still be edited
+             without touching it; only a change has to be a known unit. */
+          const unit = normalizeUnit(req.body.uom);
+          if (unit !== normalizeUnit(product.uom)) product.uom = readUnit(unit);
+        } else {
+          product[key] = req.body[key];
+        }
+      });
+
+      if (req.body.certificates) {
+        product.certificates = req.body.certificates.split(",");
+      }
+
+      Object.assign(product, chainFields, categoryMinimums(req, product));
+      await product.save({ session });
+      if (!session) imagesCommitted = true;
+
+      if (stockAdjustment) {
+        await Product.updateOne(
+          { _id: product._id },
+          { $inc: { stock: stockAdjustment } },
+          { session },
+        );
+        // Orders may have taken more than the reduction left; never below zero
+        await Product.updateOne(
+          { _id: product._id, stock: { $lt: 0 } },
+          { $set: { stock: 0 } },
+          { session },
+        );
+      }
+
+    };
+    if (req.body.packetsPerChain !== undefined) {
+      await mongoose.connection.transaction(persist);
+    } else {
+      await persist();
     }
-
-    Object.assign(product, chainFields, categoryMinimums(req, product));
-    await product.save();
     imagesCommitted = true;
 
-    if (stockAdjustment) {
-      await Product.updateOne(
-        { _id: product._id },
-        { $inc: { stock: stockAdjustment } },
-      );
-      // Orders may have taken more than the reduction left; never below zero
-      await Product.updateOne(
-        { _id: product._id, stock: { $lt: 0 } },
-        { $set: { stock: 0 } },
-      );
-    }
-
-    // 🔥 FIX: only clean up the OLD images now that the new state is
-    // safely persisted — this is the earliest point it's actually safe
-    // to delete them.
+    // Only clean up old images after the database work commits.
     await destroyImage(oldFrontId);
     await destroyImage(oldBackId);
 

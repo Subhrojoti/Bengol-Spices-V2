@@ -313,6 +313,9 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
       }
     });
     if (form.uom === "chain") data.set("pricingUnit", form.pricingUnit);
+    if (String(form.packetsPerChain) !== String(initial.packetsPerChain)) {
+      data.set("previousPacketsPerChain", String(initial.packetsPerChain));
+    }
 
     data.append("certificates", certificates.join(","));
 
@@ -501,7 +504,12 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
                   )}
                 </select>
               </Field>
-              {form.uom === "chain" && <p className="self-center text-sm text-slate-500">{form.packetsPerChain} packets per chain. Create a new SKU to change the pack size.</p>}
+              {form.uom === "chain" && <Field label="Packets per chain" required error={show("packetsPerChain")}>
+                <input aria-label="Packets per chain" type="number" min="1" step="1"
+                  value={form.packetsPerChain} onChange={set("packetsPerChain")}
+                  className={inputClass(show("packetsPerChain"))} />
+                <p className="mt-2 text-xs text-slate-500">Size changes require all orders containing this product to be delivered or cancelled. Stock and minimums remain in chains; check that your stock matches the new packing.</p>
+              </Field>}
             </div>
           </Section>
 
@@ -515,6 +523,9 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
                   <option value="chain">Chain</option><option value="packet">Packet</option>
                 </select>
               </Field>
+              {String(form.packetsPerChain) !== String(initial.packetsPerChain) && <p className="mt-2 text-xs text-slate-500">
+                {form.pricingUnit === "packet" ? "The entered packet prices will apply to the new number of packets in each chain. Review prices before saving." : "Prices remain per chain unless you change them. Review prices before saving."}
+              </p>}
             </div>}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Price" required error={show("price")}>
@@ -673,12 +684,12 @@ const EditProductDetails = ({ product, onClose, onSuccess }) => {
         </div>
 
         {/* FOOTER */}
-        <footer className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-5 py-4">
-          <p className="text-[12.5px] text-slate-400">
+        <footer className="flex shrink-0 flex-wrap items-center gap-3 border-t border-slate-200 bg-white px-5 py-4">
+          <p className="w-full text-[12.5px] text-slate-400 sm:w-auto">
             {dirty ? "Unsaved changes" : "No changes yet"}
           </p>
 
-          <div className="ml-auto flex gap-2.5">
+          <div className="ml-auto flex max-w-full flex-wrap justify-end gap-2.5">
             <button
               type="button"
               onClick={reset}

@@ -207,6 +207,15 @@ Router: [deliveryPartner.routes.js](../routes/deliveryPartner.routes.js).
 
 ## /products
 
+Chain-size editing (local): `PUT /products/update/:productId` accepts a positive
+integer `packetsPerChain` and the original `previousPacketsPerChain`. Changes
+require no unfinished orders referencing that product; a stale size or open
+order returns 400 with an explanation. The guard and product save share a
+transaction. Stock/minimums remain in chains and historical order/invoice
+snapshots are preserved. Omitted price fields retain canonical per-chain prices;
+explicit prices with `pricingUnit: "packet"` use the new packet count. Conversion
+between Chain and other units remains unsupported for existing SKUs.
+
 Router: [product.routes.js](../routes/product.routes.js).
 
 | Method | Full path | Pipeline and handler | Router line |

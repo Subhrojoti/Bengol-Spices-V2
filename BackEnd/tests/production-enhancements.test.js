@@ -286,6 +286,74 @@ test("per-packet Chain rates convert once and checkout reserves whole chains at 
   assert.equal((await Product.findById(p._id)).stock, 13);
 });
 
+test("chain size edits preserve historical orders and block unfinished orders and stale checkout", async () => {
+  const a = await person("SIZE-A"), s = await shop("SIZE-S", a);
+  const p = await Product.create({ name: "Chain spice", title: "Chain", category: "Spices", sku: "SIZE-12", uom: "chain",
+    packetsPerChain: 12, pricingUnit: "chain", price: 60, retailerPrice: 48, stock: 15, minOrderQty: 2,
+    images: { front: { url: "f", publicId: "f" }, back: { url: "b", publicId: "b" } } });
+  const edit = body => call(`/products/update/${p._id}`, admin(), "PUT", body);
+  for (const packetsPerChain of [0, -1, 1.5, "invalid"]) {
+    assert.equal((await edit({ packetsPerChain, previousPacketsPerChain: 12 })).status, 400);
+  }
+  assert.equal((await edit({ packetsPerChain: 24 })).status, 400);
+  const line = { productId: p._id, sku: p.sku, name: p.name, quantity: 2, unitPrice: 48, totalPrice: 96, uom: "chain", packetsPerChain: 12 };
+  await rawOrder("SIZE-ORDER", s, a, { products: [line], status: "PLACED" });
+  for (const status of ["PLACED", "CONFIRMED", "ASSIGNED", "SHIPPED", "OUT_FOR_DELIVERY"]) {
+    await Order.updateOne({ orderId: "SIZE-ORDER" }, { $set: { status } });
+    const denied = await edit({ packetsPerChain: 24, previousPacketsPerChain: 12, price: 120 });
+    assert.equal(denied.status, 400);
+    assert.match(denied.data.message, /unfinished orders/);
+    const unchanged = await Product.findById(p._id).lean();
+    assert.deepEqual([unchanged.packetsPerChain, unchanged.price, unchanged.stock], [12, 60, 15]);
+  }
+  await Order.updateOne({ orderId: "SIZE-ORDER" }, { $set: { status: "DELIVERED" } });
+  await Invoice.create({ orderId: "SIZE-ORDER", invoiceNumber: "SIZE-INV", pdfUrl: "https://test.invalid/old.pdf" });
+  const invoiceBefore = await Invoice.findOne({ orderId: "SIZE-ORDER" }).lean();
+  const changed = await edit({ packetsPerChain: 24, previousPacketsPerChain: 12 });
+  assert.equal(changed.status, 200, JSON.stringify(changed.data));
+  let current = await Product.findById(p._id).lean();
+  assert.deepEqual([current.packetsPerChain, current.price, current.retailerPrice, current.stock, current.minOrderQty], [24, 60, 48, 15, 2]);
+  assert.equal((await Order.findOne({ orderId: "SIZE-ORDER" })).products[0].packetsPerChain, 12);
+  assert.deepEqual(await Invoice.findOne({ orderId: "SIZE-ORDER" }).lean(), invoiceBefore);
+  assert.equal((await edit({ packetsPerChain: 24, previousPacketsPerChain: 12 })).status, 400);
+  await assert.rejects(createInitialOrderRecords({ fields: { products: [line] }, stockLines: [{ productId: p._id, quantity: 2 }], storeType: "RETAILER", paymentMethod: "CASH" }), /chain size changed/);
+  assert.equal((await Product.findById(p._id)).stock, 15);
+  assert.equal((await edit({ packetsPerChain: 10, previousPacketsPerChain: 24, pricingUnit: "packet", price: 5, retailerPrice: 4 })).status, 200);
+  current = await Product.findById(p._id).lean();
+  assert.deepEqual([current.packetsPerChain, current.price, current.retailerPrice], [10, 50, 40]);
+  const body = { consumerId: s.consumerId, paymentMode: "CASH", paidAmount: 0, products: [{ productId: String(p._id), name: p.name, uom: "chain", quantity: 2, unitPrice: 40 }] };
+  const placed = await call("/agent/orders", token(a), "POST", body);
+  assert.equal(placed.status, 201, JSON.stringify(placed.data));
+  assert.equal((await Order.findOne({ orderId: placed.data.orderId })).products[0].packetsPerChain, 10);
+  await waitForStoreRelease(s.consumerId);
+});
+
+test("checkout winning a concurrent chain-size edit leaves the reserved pack definition unchanged", async () => {
+  const a = await person("SIZE-RACE-A"), s = await shop("SIZE-RACE-S", a);
+  const p = await Product.create({ name: "Race chain", title: "Chain", category: "Spices", sku: "SIZE-RACE", uom: "chain",
+    packetsPerChain: 12, pricingUnit: "chain", price: 60, stock: 15, minOrderQty: 1,
+    images: { front: { url: "f", publicId: "f" }, back: { url: "b", publicId: "b" } } });
+  const originalSave = Product.prototype.save;
+  let placed;
+  Product.prototype.save = async function (...args) {
+    if (String(this._id) === String(p._id) && this.packetsPerChain === 24 && !placed) {
+      placed = await call("/agent/orders", token(a), "POST", { consumerId: s.consumerId, paymentMode: "CASH", paidAmount: 0,
+        products: [{ productId: String(p._id), name: p.name, uom: "chain", quantity: 2, unitPrice: 60 }] });
+      assert.equal(placed.status, 201, JSON.stringify(placed.data));
+    }
+    return originalSave.apply(this, args);
+  };
+  try {
+    const changed = await call(`/products/update/${p._id}`, admin(), "PUT", { packetsPerChain: 24, previousPacketsPerChain: 12 });
+    assert.equal(changed.status, 400, JSON.stringify(changed.data));
+    assert.match(changed.data.message, /unfinished orders/);
+    const current = await Product.findById(p._id).lean();
+    assert.deepEqual([current.packetsPerChain, current.stock], [12, 13]);
+    assert.equal((await Order.findOne({ orderId: placed.data.orderId })).products[0].packetsPerChain, 12);
+    await waitForStoreRelease(s.consumerId);
+  } finally { Product.prototype.save = originalSave; }
+});
+
 test("delivery planning includes only the partner's assigned workload and subtracts returned quantities", async () => {
   const a = await person("LOAD-A"), b = await person("LOAD-B"), s = await shop("LOAD-S", a);
   const owner = await partner("LOAD-P"), other = await partner("LOAD-OTHER");

@@ -13,6 +13,9 @@ export const createInitialOrderRecords = ({ fields, stockLines, storeType, payme
     const product = await Product.findById(productId).session(session);
     const minimum = product ? effectiveMinimum(product, storeType) : 1;
     if (!product || product.status !== "ACTIVE") throw Object.assign(new Error("A product is no longer available. Refresh the catalogue."), { status: 400, expose: true });
+    if (product.uom === "chain" && fields.products.some(line => String(line.productId) === productId && line.packetsPerChain !== product.packetsPerChain)) {
+      throw Object.assign(new Error(`${product.name}: the chain size changed. Refresh the catalogue and review your order.`), { status: 409, expose: true });
+    }
     if (quantity < minimum) throw Object.assign(new Error(`${product.name}: minimum order is ${minimum} ${product.uom} for this store category.`), { status: 400, expose: true });
     const taken = await Product.findOneAndUpdate({ _id: productId, status: "ACTIVE", stock: { $gte: quantity } }, { $inc: { stock: -quantity } }, { new: true, session });
     if (!taken) throw Object.assign(new Error(`Not enough stock for ${product.name}. Refresh the catalogue and retry.`), { status: 400, expose: true });

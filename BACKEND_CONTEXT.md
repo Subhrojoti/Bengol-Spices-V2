@@ -5,6 +5,25 @@ Reviewed: **25 October 2026 (Asia/Calcutta)**. Repository HEAD at review:
 
 ## Purpose and scope
 
+**Editable chain size (26 November 2026, local):** All Products > Edit >
+Classification now provides a numeric Packets per chain field for existing
+Chain products. Product updates accept a changed positive integer size with
+`previousPacketsPerChain` as a stale-form check. Changes are transactional and
+refused while any non-delivered/non-cancelled order references the product.
+Ordinary product edits keep their existing path. Checkout rechecks the saved
+chain-size snapshot inside stock reservation, preventing a concurrent size edit
+from committing an order with the old packing. Closed order/invoice snapshots
+are not rewritten. Stock and minimums remain counts of chains; Admin must check
+physical packing. Per-chain input prices stay unchanged unless edited; per-packet
+input prices are submitted against the new size and converted once by the server.
+Unit conversion to/from Chain still requires a separate SKU. Existing clients'
+request formats remain supported. Requires an Admin/backend release, not an app
+rebuild. Not deployed. Regression coverage: backend chain-size/checkout tests and
+`FrontEnd/tests/browser/chain-size.spec.mjs`. Validation: all 145 backend tests,
+9 targeted Admin browser tests, Admin lint and SPA build passed. Browser checks
+also exposed and fixed narrow-screen edit-footer overflow; desktop layout stays
+the same. No production data was changed.
+
 **Leaderboard correction (25 November 2026):** `d0996d2` pushed; backend deployed
 and verified on the VPS. Agent mobile source now
 switches between incentive earned and product sales over the existing rolling
